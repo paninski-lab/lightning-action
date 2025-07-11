@@ -32,7 +32,8 @@ dependencies = [
     "numpy (>=2.0.0)",
     "tensorboard",
     "torch",
-    "typeguard",
+    "typeguard (<3.0.0)",
+    "pandas",
     "pyyaml",
 ]
 
