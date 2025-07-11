@@ -1,0 +1,88 @@
+[build-system]
+requires = ["poetry-core>=2.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[project]
+name = "lightning-action"
+version = "0.1.0"
+description = "Action segmentation framework built with PyTorch Lightning"
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Matt Whiteway" },
+]
+
+keywords = ["machine learning", "deep learning", "action segmentation", "computer vision"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Image Processing",
+]
+
+dependencies = [
+    "jaxtyping",
+    "lightning",
+    "numpy (>=2.0.0)",
+    "tensorboard",
+    "torch",
+    "typeguard",
+    "pyyaml",
+]
+
+[project.urls]
+repository = "https://github.com/paninski-lab/lightning-action"
+documentation = "https://github.com/paninski-lab/lightning-action"
+
+# project.dependencies are used for metadata when building the project, tool.poetry.dependencies is only used to enrich
+# project.dependencies for locking
+[tool.poetry.dependencies]
+python = ">=3.10,<3.13"
+
+[tool.poetry.scripts]
+lightning-action = "lightning_action.cli.main:main"
+
+[project.optional-dependencies]
+dev = [
+    "flake8-pyproject",
+    "isort",
+    "pytest",
+    "pytest-html",
+    "requests",
+    "sphinx",
+    "sphinx_rtd_theme",
+    "sphinx-rtd-dark-mode",
+    "sphinx-automodapi",
+    "sphinx-copybutton",
+]
+
+[tool.isort]
+line_length = 99
+profile = "black"
+src_paths = ["lightning_action", "tests"]
+
+[tool.flake8]
+max-line-length = 99
+extend-ignore = ["E203", "W503", "F722"]
+exclude = [
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    ".venv",
+    "venv",
+    "docs/",
+    "scripts/",
+    "examples/",
+]
+
+[tool.pytest.ini_options]
+testpaths = "tests"
+generate_report_on_test = "True"
+markers = ["multigpu"]
