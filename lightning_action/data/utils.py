@@ -10,7 +10,6 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import torch
 from jaxtyping import Float, Int
 from typeguard import typechecked
 
@@ -134,7 +133,7 @@ def load_marker_csv(file_path: str | Path) -> tuple[
     Returns:
         tuple containing:
         - x_coords: x coordinates for each marker and frame
-        - y_coords: y coordinates for each marker and frame  
+        - y_coords: y coordinates for each marker and frame
         - likelihoods: confidence scores for each marker and frame
         - marker_names: list of marker names
         
@@ -183,7 +182,7 @@ def load_marker_csv(file_path: str | Path) -> tuple[
         raise ValueError(f'Error loading marker CSV file {file_path}: {e}')
 
 
-@typechecked  
+@typechecked
 def load_feature_csv(file_path: str | Path) -> tuple[
     Float[np.ndarray, 'n_frames n_features'],
     list[str],
@@ -253,7 +252,6 @@ def load_label_csv(file_path: str | Path) -> tuple[
         
     except Exception as e:
         raise ValueError(f'Error loading label CSV file {file_path}: {e}')
-
 
 
 @typechecked

@@ -1,0 +1,5 @@
+[flake8]
+max-line-length = 99
+# F722: typing issues
+# W293: blank line contains whitespace (claude does this)
+extend-ignore = F722,W293

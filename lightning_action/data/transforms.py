@@ -64,7 +64,7 @@ class Compose:
 
     @typechecked
     def __call__(
-        self, 
+        self,
         data: Float[np.ndarray, 'time features'],
     ) -> Float[np.ndarray, 'time features']:
         """Apply all transforms sequentially.
@@ -103,7 +103,7 @@ class MotionEnergy(Transform):
 
     @typechecked
     def __call__(
-        self, 
+        self,
         data: Float[np.ndarray, 'time features'],
     ) -> Float[np.ndarray, 'time features']:
         """Compute motion energy from input data.
@@ -150,7 +150,7 @@ class ZScore(Transform):
 
     @typechecked
     def __call__(
-        self, 
+        self,
         data: Float[np.ndarray, 'time features'],
     ) -> Float[np.ndarray, 'time features']:
         """Apply z-score normalization to input data.
