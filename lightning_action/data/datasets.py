@@ -7,7 +7,6 @@ of behavioral data including markers and labels.
 
 import logging
 from collections import OrderedDict
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -106,7 +105,7 @@ class FeatureDataset(Dataset):
                 self.sequences.append(sequence)
                 self.sequence_info.append({
                     'dataset_id': dataset_id,
-                    'dataset_idx': dataset_idx, 
+                    'dataset_idx': dataset_idx,
                     'sequence_idx': seq_idx
                 })
 
@@ -241,8 +240,8 @@ class FeatureDataset(Dataset):
         return labels.astype(np.int32)
 
     def _create_dataset_sequences(
-        self, 
-        dataset_data: OrderedDict, 
+        self,
+        dataset_data: OrderedDict,
         dataset_id: str
     ) -> list[dict[str, np.ndarray]]:
         """Create sequences from dataset data.
@@ -290,7 +289,11 @@ class FeatureDataset(Dataset):
         """Return total number of sequences across all datasets."""
         return len(self.sequences)
 
-    def __getitem__(self, idx: int, as_numpy: bool = False) -> dict[str, torch.Tensor | np.ndarray]:
+    def __getitem__(
+        self,
+        idx: int,
+        as_numpy: bool = False,
+    ) -> dict[str, torch.Tensor | np.ndarray]:
         """Get a single sequence by index.
         
         Args:

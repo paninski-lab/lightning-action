@@ -2,7 +2,7 @@
 
 from .datamodule import DataModule
 from .datasets import FeatureDataset
-from .transforms import Transform, Compose, MotionEnergy, ZScore
+from .transforms import Compose, MotionEnergy, Transform, ZScore
 from .utils import (
     compute_sequence_pad,
     compute_sequences,
@@ -17,7 +17,7 @@ __all__ = [
     'FeatureDataset',
     'Transform',
     'Compose',
-    'MotionEnergy', 
+    'MotionEnergy',
     'ZScore',
     'compute_sequences',
     'compute_sequence_pad',

@@ -1,0 +1,56 @@
+# Example configuration for action segmentation training
+# This config demonstrates the structure and parameters for training
+# a basic segmentation model with the lightning-action framework
+
+# Data configuration
+data:
+  # Dataset configuration
+  data_path: /Path/to/dataset
+  
+  # Sequence parameters
+  sequence_length: 500
+  
+  # DataLoader parameters
+  batch_size: 32
+  num_workers: 4
+  train_probability: 0.8
+  val_probability: 0.2
+  pin_memory: true
+  persistent_workers: true
+  device: 'cpu'
+
+  # Reproducibility for data splits
+  seed: 42
+
+# Model configuration
+model:
+
+  # Backbone architecture [temporalmlp | lstm | gru | dtcn]
+  backbone: temporalmlp
+  
+  # Backbone parameters (placeholder MLP)
+  num_hid_units: 256
+  num_layers: 2
+  
+  # Reproducibility for model initialization
+  seed: 42
+
+# Optimizer configuration
+optimizer:
+  type: 'Adam'  # 'Adam' or 'AdamW'
+  lr: 1e-3
+  wd: 1e-4  # weight decay
+  
+  # Learning rate scheduler (optional)
+  scheduler: 'cosine'  # 'step', 'cosine', or null
+  # For step scheduler:
+  step_size: 30
+  gamma: 0.1
+  # For cosine scheduler:
+  T_max: 100
+
+# Training configuration
+training:
+  max_epochs: 100
+  log_every_n_steps: 10
+  check_val_every_n_epoch: 1

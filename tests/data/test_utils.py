@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from lightning_action.data import (  # load_marker_csv,; load_feature_csv,; load_label_csv,
+from lightning_action.data import (
     compute_sequence_pad,
     compute_sequences,
     split_sizes_from_probabilities,
@@ -39,7 +39,7 @@ class TestComputeSequencePad:
         assert result == 5
 
     def test_tcn(self):
-        """Test padding calculation for tcn model.""" 
+        """Test padding calculation for tcn model."""
         result = compute_sequence_pad('tcn', n_layers=3, n_lags=2)
         expected = (2 ** 3) * 2  # 16
         assert result == expected

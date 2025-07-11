@@ -3,13 +3,11 @@
 import tempfile
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
 import pytest
 import torch
 from torch.utils.data import DataLoader
 
-from lightning_action.data.datamodule import DataModule
+from lightning_action.data import DataModule
 
 
 class TestDataModule:

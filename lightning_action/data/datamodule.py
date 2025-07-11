@@ -8,6 +8,7 @@ import logging
 from typing import Any
 
 import lightning as pl
+import numpy as np
 from torch.utils.data import DataLoader, random_split
 from typeguard import typechecked
 
@@ -38,6 +39,7 @@ class DataModule(pl.LightningDataModule):
         pin_memory: bool = True,
         persistent_workers: bool = True,
         device: str = 'cpu',
+        seed: int = 42,
     ):
         """Initialize DataModule.
         
@@ -45,7 +47,7 @@ class DataModule(pl.LightningDataModule):
             data_config: configuration dictionary with keys:
                 - 'ids': list of dataset identifiers
                 - 'signals': list of signal lists for each dataset
-                - 'transforms': list of transform lists for each dataset  
+                - 'transforms': list of transform lists for each dataset
                 - 'paths': list of file path lists for each dataset
             sequence_length: length of each sequence
             sequence_pad: additional padding for sequences
@@ -56,6 +58,7 @@ class DataModule(pl.LightningDataModule):
             pin_memory: whether to use pinned memory for faster GPU transfer
             persistent_workers: whether to keep workers alive between epochs
             device: device for tensor placement ('cpu' or 'cuda')
+            seed: random seed for weight initialization
             
         Raises:
             ValueError: if data_config is missing required keys
@@ -78,6 +81,7 @@ class DataModule(pl.LightningDataModule):
         self.pin_memory = pin_memory
         self.persistent_workers = persistent_workers
         self.device = device
+        self.seed = seed
 
         # create full dataset
         logger.info('Creating FeatureDataset')
@@ -121,7 +125,7 @@ class DataModule(pl.LightningDataModule):
             )
             
             logger.info(f'Splitting dataset: {train_size} train, {val_size} val sequences')
-            
+            np.random.seed(self.seed)
             self.dataset_train, self.dataset_val = random_split(
                 self.dataset,
                 [train_size, val_size],

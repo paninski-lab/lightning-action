@@ -70,7 +70,7 @@ src_paths = ["lightning_action", "tests"]
 
 [tool.flake8]
 max-line-length = 99
-extend-ignore = ["E203", "W503", "F722"]
+extend-ignore = ["E203", "W503", "F722", "W293"]
 exclude = [
     ".git",
     "__pycache__",

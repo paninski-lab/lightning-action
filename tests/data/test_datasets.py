@@ -4,11 +4,10 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import pytest
 import torch
 
-from lightning_action.data.datasets import FeatureDataset
+from lightning_action.data import FeatureDataset
 
 
 class TestFeatureDataset:
@@ -25,8 +24,11 @@ class TestFeatureDataset:
                 paths=[[None]]
             )
 
-        # mismatched signal/transform/path lengths should raise error  
-        with pytest.raises(ValueError, match='signals, transforms, and paths must have same length'):
+        # mismatched signal/transform/path lengths should raise error
+        with pytest.raises(
+            ValueError,
+            match='signals, transforms, and paths must have same length'
+        ):
             FeatureDataset(
                 ids=['dataset1'],
                 signals=[['markers', 'labels']],

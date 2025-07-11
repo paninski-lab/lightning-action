@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from lightning_action.data.transforms import Transform, Compose, MotionEnergy, ZScore
+from lightning_action.data import Compose, MotionEnergy, Transform, ZScore
 
 
 class MockTransform(Transform):
