@@ -306,7 +306,7 @@ class Segmenter(BaseModel):
                 input_size=self.input_size,
                 num_hid_units=self.model_config['num_hid_units'],
                 num_layers=self.model_config['num_layers'],
-                n_lags=self.model_config.get('n_lags', 1),
+                num_lags=self.model_config.get('num_lags', 1),
                 activation=self.model_config.get('activation', 'lrelu'),
                 dropout_rate=self.model_config.get('dropout_rate', 0.0),
                 seed=self.model_config.get('seed', 42),
@@ -320,6 +320,17 @@ class Segmenter(BaseModel):
                 rnn_type=self.model_config.get('rnn_type', 'lstm'),
                 bidirectional=self.model_config.get('bidirectional', False),
                 dropout_rate=self.model_config.get('dropout_rate', 0.0),
+                seed=self.model_config.get('seed', 42),
+            )
+        elif backbone_type.lower() in ['dtcn', 'dilatedtcn']:
+            from lightning_action.models.backbones import DilatedTCN
+            return DilatedTCN(
+                input_size=self.input_size,
+                num_hid_units=self.model_config['num_hid_units'],
+                num_layers=self.model_config['num_layers'],
+                num_lags=self.model_config.get('num_lags', 1),
+                activation=self.model_config.get('activation', 'relu'),
+                dropout_rate=self.model_config.get('dropout_rate', 0.2),
                 seed=self.model_config.get('seed', 42),
             )
         else:

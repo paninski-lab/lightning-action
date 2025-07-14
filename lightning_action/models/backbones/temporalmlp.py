@@ -4,8 +4,6 @@ This module implements the TemporalMLP architecture adapted from daart,
 which uses 1D convolution for temporal context followed by dense layers.
 """
 
-import logging
-
 import torch
 import torch.nn as nn
 from jaxtyping import Float
@@ -33,7 +31,7 @@ class TemporalMLP(nn.Module):
         input_size: int,
         num_hid_units: int,
         num_layers: int,
-        n_lags: int = 5,
+        num_lags: int = 5,
         activation: str = 'lrelu',
         dropout_rate: float = 0.0,
         seed: int = 42,
@@ -44,7 +42,7 @@ class TemporalMLP(nn.Module):
             input_size: number of input features per timestep
             num_hid_units: number of hidden units in dense layers
             num_layers: number of hidden dense layers
-            n_lags: number of temporal lags for 1D conv window (creates 2*n_lags + 1 kernel)
+            num_lags: number of temporal lags for 1D conv window (creates 2*n_lags + 1 kernel)
             activation: activation function ('relu', 'lrelu', 'sigmoid', 'tanh', 'linear')
             dropout_rate: dropout probability (0.0 = no dropout)
             seed: random seed for weight initialization
@@ -54,7 +52,7 @@ class TemporalMLP(nn.Module):
         self.input_size = input_size
         self.num_hid_units = num_hid_units
         self.num_layers = num_layers
-        self.n_lags = n_lags
+        self.num_lags = num_lags
         self.activation = activation
         self.dropout_rate = dropout_rate
 
@@ -68,12 +66,12 @@ class TemporalMLP(nn.Module):
     def _build_model(self):
         """Build the TemporalMLP model layers."""
         # initial 1D convolution layer for temporal context
-        conv_kernel_size = 2 * self.n_lags + 1
+        conv_kernel_size = 2 * self.num_lags + 1
         conv_layer = nn.Conv1d(
             in_channels=self.input_size,
             out_channels=self.num_hid_units,
             kernel_size=conv_kernel_size,
-            padding=self.n_lags,  # maintains sequence length
+            padding=self.num_lags,  # maintains sequence length
         )
         self.layers.append(conv_layer)
         
@@ -159,7 +157,7 @@ class TemporalMLP(nn.Module):
             f'  input_size={self.input_size}, '
             f'  num_hid_units={self.num_hid_units}, '
             f'  num_layers={self.num_layers}, '
-            f'  n_lags={self.n_lags}, '
+            f'  num_lags={self.num_lags}, '
             f'  activation={self.activation}, '
             f'  dropout_rate={self.dropout_rate}, '
             ')'

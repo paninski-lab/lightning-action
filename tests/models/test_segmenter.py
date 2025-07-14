@@ -78,6 +78,28 @@ class TestSegmenter:
                         'wd': 1e-3,
                     }
                 }
+            },
+            {
+                'backbone_type': 'dilatedtcn',
+                'config': {
+                    'model': {
+                        'input_size': 6,
+                        'output_size': 4,
+                        'sequence_length': 100,
+                        'backbone': 'dilatedtcn',
+                        'num_hid_units': 32,
+                        'num_layers': 3,
+                        'n_lags': 2,
+                        'activation': 'relu',
+                        'dropout_rate': 0.2,
+                        'seed': 42,
+                    },
+                    'optimizer': {
+                        'type': 'Adam',
+                        'lr': 1e-3,
+                        'wd': 1e-4,
+                    }
+                }
             }
         ]
 
