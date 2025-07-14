@@ -107,7 +107,7 @@ class DataModule(pl.LightningDataModule):
         Args:
             stage: training stage ('fit', 'validate', 'test', or None)
         """
-        if stage == 'test':
+        if stage in ['test', 'predict']:
             # no test data support as requested
             return
         
@@ -155,6 +155,19 @@ class DataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
             persistent_workers=self.persistent_workers,
+        )
+
+    def predict_dataloader(self) -> DataLoader:
+        """Create validation DataLoader.
+
+        Returns:
+            DataLoader for prediction
+        """
+        return DataLoader(
+            self.dataset,
+            batch_size=1,
+            shuffle=False,
+            num_workers=self.num_workers,
         )
 
     def get_feature_names(self) -> list[str]:

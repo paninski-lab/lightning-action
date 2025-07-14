@@ -234,7 +234,7 @@ class FeatureDataset(Dataset):
         if not self.label_names:
             self.label_names = class_names
         
-        return labels.astype(np.int32)
+        return labels.astype(np.float32)
 
     def _create_dataset_sequences(
         self,

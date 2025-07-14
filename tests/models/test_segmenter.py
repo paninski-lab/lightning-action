@@ -106,10 +106,11 @@ class TestSegmenter:
     @pytest.fixture
     def sample_batch(self):
         """Fixture providing sample batch data."""
-        batch_size, sequence_length, features = 2, 100, 6
+        # these values match those in backbone_configs fixture
+        batch_size, sequence_length, features, output_size = 2, 100, 6, 4
         return {
             'markers': torch.randn(batch_size, sequence_length, features),
-            'labels': torch.randint(0, 4, (batch_size, sequence_length)),
+            'labels': torch.randint(0, 4, (batch_size, sequence_length, output_size)).double(),
             'dataset_id': ['test_dataset'] * batch_size,
             'batch_idx': torch.arange(batch_size),
         }

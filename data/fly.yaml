@@ -7,7 +7,7 @@ data:
   # Dataset configuration
   data_path: lightning-action/data
 
-  input_dir: 'markers'
+  input_dir: markers
 
   # Specify subset of ids in data_path for model training; null will default to all
   expt_ids:

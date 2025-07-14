@@ -127,9 +127,9 @@ def train(
 
     # update training steps information for schedulers
     num_epochs = training_config.get('num_epochs', 100)
-    train_batch_size = training_config.get('train_batch_size', 32)
+    batch_size = training_config.get('batch_size', 32)
 
-    steps_per_epoch = int(np.ceil(len(datamodule.train_dataset) / train_batch_size))
+    steps_per_epoch = int(np.ceil(len(datamodule.dataset_train) / batch_size))
     total_steps = steps_per_epoch * num_epochs
 
     # update model config with step information
@@ -342,11 +342,13 @@ def build_data_config_from_path(
         expt_paths = []
 
         for signal_type in signal_types:
+
             signal_dir = data_path / signal_type
             signal_file = signal_dir / f"{expt_id}.csv"
             if not signal_file.exists():
                 raise FileNotFoundError(f"Signal file not found: {signal_file}")
-            
+            expt_paths.append(signal_file)
+
             expt_signals.append(signal_type)
             
             # set up transforms: Z-score for markers/features, None for labels
@@ -393,18 +395,18 @@ def compute_class_weights(datamodule: DataModule, ignore_class: int = 0) -> list
     logger.info("Computing class weights from training data...")
     
     # ensure datamodule is set up
-    if not hasattr(datamodule, 'train_dataset') or datamodule.train_dataset is None:
+    if not hasattr(datamodule, 'dataset_train') or datamodule.dataset_train is None:
         datamodule.setup('fit')
     
     # count examples per class in training set
-    train_dataset = datamodule.train_dataset
+    dataset_train = datamodule.dataset_train
     
     # get all labels from training dataset
     all_labels = []
     num_classes = None
     
-    for i in range(len(train_dataset)):
-        batch = train_dataset[i]
+    for i in range(len(dataset_train)):
+        batch = dataset_train[i]
         if 'labels' in batch:
             labels = batch['labels']
             if isinstance(labels, torch.Tensor):
@@ -420,8 +422,8 @@ def compute_class_weights(datamodule: DataModule, ignore_class: int = 0) -> list
     if not all_labels:
         logger.warning("No labels found in training dataset, using uniform weights")
         # try to get num_classes from dataset
-        if hasattr(train_dataset, 'label_names'):
-            num_classes = len(train_dataset.label_names)
+        if hasattr(dataset_train, 'label_names'):
+            num_classes = len(dataset_train.label_names)
         else:
             num_classes = 4  # default fallback
         return [1.0] * num_classes

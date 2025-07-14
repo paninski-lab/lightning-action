@@ -299,7 +299,7 @@ class TestComputeClassWeights:
         # Total counts: class 0: 4, class 1: 5, class 2: 5, class 3: 4
         
         mock_dataset.__getitem__.side_effect = [batch1, batch2, batch3]
-        datamodule.train_dataset = mock_dataset
+        datamodule.dataset_train = mock_dataset
         
         return datamodule
 
@@ -339,7 +339,7 @@ class TestComputeClassWeights:
         batch = {'features': torch.randn(2, 10)}
         mock_dataset.__getitem__.return_value = batch
         
-        datamodule.train_dataset = mock_dataset
+        datamodule.dataset_train = mock_dataset
         
         weights = compute_class_weights(datamodule)
         
@@ -483,8 +483,8 @@ class TestTrain:
         }
         
         mock_datamodule = MagicMock()
-        mock_datamodule.train_dataset = MagicMock()
-        mock_datamodule.train_dataset.__len__.return_value = 100
+        mock_datamodule.dataset_train = MagicMock()
+        mock_datamodule.dataset_train.__len__.return_value = 100
         mock_datamodule_class.return_value = mock_datamodule
         
         mock_trainer = MagicMock()
@@ -528,7 +528,7 @@ class TestTrain:
         mock_dataset = MagicMock()
         mock_dataset.__len__.return_value = 10
         mock_dataset.__getitem__.return_value = {'labels': torch.tensor([[0, 1, 1]])}
-        mock_datamodule.train_dataset = mock_dataset
+        mock_datamodule.dataset_train = mock_dataset
         mock_datamodule_class.return_value = mock_datamodule
         
         with patch('lightning_action.train.pl.Trainer') as mock_trainer_class:
@@ -567,8 +567,8 @@ class TestTrain:
         }
         
         mock_datamodule = MagicMock()
-        mock_datamodule.train_dataset = MagicMock()
-        mock_datamodule.train_dataset.__len__.return_value = 100
+        mock_datamodule.dataset_train = MagicMock()
+        mock_datamodule.dataset_train.__len__.return_value = 100
         mock_datamodule_class.return_value = mock_datamodule
         
         with patch('lightning_action.train.torch.cuda.is_available', return_value=True):
@@ -608,8 +608,8 @@ class TestTrain:
         }
         
         mock_datamodule = MagicMock()
-        mock_datamodule.train_dataset = MagicMock()
-        mock_datamodule.train_dataset.__len__.return_value = 100
+        mock_datamodule.dataset_train = MagicMock()
+        mock_datamodule.dataset_train.__len__.return_value = 100
         mock_datamodule_class.return_value = mock_datamodule
         
         with patch('lightning_action.train.pl.Trainer') as mock_trainer_class:
