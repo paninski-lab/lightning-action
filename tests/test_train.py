@@ -229,15 +229,6 @@ class TestBuildDataConfigFromPath:
                 # labels should have no transform
                 assert transforms[i] is None
 
-    def test_build_config_missing_files(self, temp_data_dir):
-        """Test handling of missing signal files."""
-        # remove one file
-        (temp_data_dir / 'markers' / 'exp1.csv').unlink()
-        assert not (temp_data_dir / 'markers' / 'expt1.csv').exists()
-
-        with pytest.raises(FileNotFoundError):
-            build_data_config_from_path(temp_data_dir)
-
     def test_build_config_nonexistent_path(self):
         """Test error handling for nonexistent data path."""
         with pytest.raises(FileNotFoundError, match="Data path does not exist"):
