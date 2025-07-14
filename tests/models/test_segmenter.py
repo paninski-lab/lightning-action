@@ -20,7 +20,7 @@ class TestSegmenter:
                         'input_size': 6,
                         'output_size': 4,
                         'sequence_length': 100,
-                        'backbone_type': 'temporalmlp',
+                        'backbone': 'temporalmlp',
                         'num_hid_units': 32,
                         'num_layers': 2,
                         'n_lags': 3,
@@ -32,6 +32,50 @@ class TestSegmenter:
                         'type': 'Adam',
                         'lr': 1e-3,
                         'wd': 1e-4,
+                    }
+                }
+            },
+            {
+                'backbone_type': 'rnn',
+                'config': {
+                    'model': {
+                        'input_size': 6,
+                        'output_size': 4,
+                        'sequence_length': 100,
+                        'backbone': 'rnn',
+                        'num_hid_units': 32,
+                        'num_layers': 1,
+                        'rnn_type': 'lstm',
+                        'bidirectional': False,
+                        'dropout_rate': 0.1,
+                        'seed': 42,
+                    },
+                    'optimizer': {
+                        'type': 'Adam',
+                        'lr': 1e-3,
+                        'wd': 1e-4,
+                    }
+                }
+            },
+            {
+                'backbone_type': 'rnn',
+                'config': {
+                    'model': {
+                        'input_size': 6,
+                        'output_size': 4,
+                        'sequence_length': 150,
+                        'backbone': 'rnn',
+                        'num_hid_units': 48,
+                        'num_layers': 2,
+                        'rnn_type': 'gru',
+                        'bidirectional': True,
+                        'dropout_rate': 0.2,
+                        'seed': 123,
+                    },
+                    'optimizer': {
+                        'type': 'AdamW',
+                        'lr': 2e-3,
+                        'wd': 1e-3,
                     }
                 }
             }
@@ -353,3 +397,22 @@ class TestSegmenter:
             # just check that they have the right shape and are finite
             assert torch.isfinite(outputs1['logits']).all()
             assert torch.isfinite(outputs2['logits']).all()
+
+    def test_unsupported_backbone_type(self):
+        """Test that unsupported backbone type raises error."""
+        config = {
+            'model': {
+                'input_size': 6,
+                'output_size': 4,
+                'backbone': 'unsupported_backbone',
+                'num_hid_units': 32,
+                'num_layers': 2,
+            },
+            'optimizer': {
+                'type': 'Adam',
+                'lr': 1e-3,
+            }
+        }
+        
+        with pytest.raises(ValueError, match='Unsupported backbone type'):
+            Segmenter(config)

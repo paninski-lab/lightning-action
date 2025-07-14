@@ -11,8 +11,6 @@ import torch.nn as nn
 from jaxtyping import Float
 from typeguard import typechecked
 
-logger = logging.getLogger(__name__)
-
 
 class TemporalMLP(nn.Module):
     """Temporal Multi-Layer Perceptron for sequence encoding.
@@ -38,6 +36,7 @@ class TemporalMLP(nn.Module):
         n_lags: int = 5,
         activation: str = 'lrelu',
         dropout_rate: float = 0.0,
+        seed: int = 42,
     ):
         """Initialize TemporalMLP backbone.
         
@@ -48,6 +47,7 @@ class TemporalMLP(nn.Module):
             n_lags: number of temporal lags for 1D conv window (creates 2*n_lags + 1 kernel)
             activation: activation function ('relu', 'lrelu', 'sigmoid', 'tanh', 'linear')
             dropout_rate: dropout probability (0.0 = no dropout)
+            seed: random seed for weight initialization
         """
         super().__init__()
         
@@ -57,13 +57,16 @@ class TemporalMLP(nn.Module):
         self.n_lags = n_lags
         self.activation = activation
         self.dropout_rate = dropout_rate
-        
-        # build encoder layers
-        self.layers = nn.ModuleList()
-        self._build_encoder()
 
-    def _build_encoder(self):
-        """Build the encoder layers."""
+        # set random seed
+        torch.manual_seed(seed)
+
+        # build model
+        self.layers = nn.ModuleList()
+        self._build_model()
+
+    def _build_model(self):
+        """Build the TemporalMLP model layers."""
         # initial 1D convolution layer for temporal context
         conv_kernel_size = 2 * self.n_lags + 1
         conv_layer = nn.Conv1d(
@@ -148,14 +151,6 @@ class TemporalMLP(nn.Module):
                 output = layer(output)
         
         return output
-
-    def get_output_size(self) -> int:
-        """Get the output feature size of the backbone.
-        
-        Returns:
-            number of output features per timestep
-        """
-        return self.num_hid_units
 
     def __repr__(self) -> str:
         """Return string representation of the model."""

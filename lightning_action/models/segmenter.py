@@ -295,26 +295,35 @@ class Segmenter(BaseModel):
         
         Returns:
             backbone network module
-            
-        Note:
-            This is a placeholder implementation. In the future, this will
-            create backbone networks from the backbones/ directory based on
-            the model configuration.
         """
-        # placeholder: simple MLP backbone
-        hidden_size = self.model_config['num_hid_units']
-        num_layers = self.model_config['num_layers']
+        backbone_type = self.model_config.get('backbone', 'temporalmlp')
+
+        logger.info(f'Contructing Segmenter model with {backbone_type} backbone')
         
-        layers = []
-        input_size = self.input_size
-        
-        for i in range(num_layers):
-            layers.append(nn.Linear(input_size, hidden_size))
-            layers.append(nn.ReLU())
-            layers.append(nn.Dropout(0.1))
-            input_size = hidden_size
-        
-        return nn.Sequential(*layers)
+        if backbone_type.lower() == 'temporalmlp':
+            from lightning_action.models.backbones import TemporalMLP
+            return TemporalMLP(
+                input_size=self.input_size,
+                num_hid_units=self.model_config['num_hid_units'],
+                num_layers=self.model_config['num_layers'],
+                n_lags=self.model_config.get('n_lags', 1),
+                activation=self.model_config.get('activation', 'lrelu'),
+                dropout_rate=self.model_config.get('dropout_rate', 0.0),
+                seed=self.model_config.get('seed', 42),
+            )
+        elif backbone_type.lower() == 'rnn':
+            from lightning_action.models.backbones import RNN
+            return RNN(
+                input_size=self.input_size,
+                num_hid_units=self.model_config['num_hid_units'],
+                num_layers=self.model_config['num_layers'],
+                rnn_type=self.model_config.get('rnn_type', 'lstm'),
+                bidirectional=self.model_config.get('bidirectional', False),
+                dropout_rate=self.model_config.get('dropout_rate', 0.0),
+                seed=self.model_config.get('seed', 42),
+            )
+        else:
+            raise ValueError(f'Unsupported backbone type: {backbone_type}')
 
     def _get_backbone_output_size(self) -> int:
         """Get the output size of the backbone network.
@@ -322,7 +331,7 @@ class Segmenter(BaseModel):
         Returns:
             output feature size of the backbone
         """
-        # for the placeholder MLP backbone
+        # both TemporalMLP and RNN output num_hid_units features
         return self.model_config['num_hid_units']
 
     def _initialize_weights(self):
