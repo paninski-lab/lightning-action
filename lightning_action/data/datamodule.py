@@ -38,7 +38,6 @@ class DataModule(pl.LightningDataModule):
         val_probability: float | None = None,
         pin_memory: bool = True,
         persistent_workers: bool = True,
-        device: str = 'cpu',
         seed: int = 42,
     ):
         """Initialize DataModule.
@@ -57,7 +56,6 @@ class DataModule(pl.LightningDataModule):
             val_probability: fraction of data used for validation (defaults to 1-train_probability)
             pin_memory: whether to use pinned memory for faster GPU transfer
             persistent_workers: whether to keep workers alive between epochs
-            device: device for tensor placement ('cpu' or 'cuda')
             seed: random seed for weight initialization
             
         Raises:
@@ -80,7 +78,6 @@ class DataModule(pl.LightningDataModule):
         self.val_probability = val_probability
         self.pin_memory = pin_memory
         self.persistent_workers = persistent_workers
-        self.device = device
         self.seed = seed
 
         # create full dataset
@@ -92,7 +89,6 @@ class DataModule(pl.LightningDataModule):
             paths=self.data_config['paths'],
             sequence_length=self.sequence_length,
             sequence_pad=self.sequence_pad,
-            device=self.device,
         )
 
         logger.info(f'Created dataset with {len(self.dataset)} sequences')

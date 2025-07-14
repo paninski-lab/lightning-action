@@ -147,6 +147,8 @@ class ZScore(Transform):
             eps: small epsilon value to avoid division by zero
         """
         self.eps = eps
+        self.mean = None
+        self.std = None
 
     @typechecked
     def __call__(
@@ -167,7 +169,9 @@ class ZScore(Transform):
         # compute mean and std across time dimension
         mean = np.mean(result, axis=0)
         std = np.std(result, axis=0)
-        
+        self.mean = mean
+        self.std = std
+
         # subtract mean
         result -= mean
         

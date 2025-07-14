@@ -37,7 +37,6 @@ class FeatureDataset(Dataset):
         paths: list[list[str | None]],
         sequence_length: int = 500,
         sequence_pad: int = 0,
-        device: str = 'cpu',
     ):
         """Initialize FeatureDataset.
         
@@ -48,7 +47,6 @@ class FeatureDataset(Dataset):
             paths: list of file path lists (one per signal per dataset)
             sequence_length: length of each sequence
             sequence_pad: additional padding for sequences
-            device: 'cpu' or 'cuda' for tensor placement
             
         Raises:
             ValueError: if input parameters are inconsistent
@@ -59,7 +57,6 @@ class FeatureDataset(Dataset):
         self.paths = paths
         self.sequence_length = sequence_length
         self.sequence_pad = sequence_pad
-        self.device = device
         
         # validate input consistency
         self._validate_inputs()
@@ -313,8 +310,6 @@ class FeatureDataset(Dataset):
             for signal, data in sequence.items():
                 if isinstance(data, np.ndarray):
                     tensor = torch.from_numpy(data)
-                    if self.device == 'cuda':
-                        tensor = tensor.cuda()
                     sequence[signal] = tensor
         
         return sequence
