@@ -5,7 +5,7 @@
 # Data configuration
 data:
   # Dataset configuration
-  data_path: /Path/to/dataset
+  data_path: /path/to/dataset
   
   # Sequence parameters
   sequence_length: 500
@@ -15,8 +15,6 @@ data:
   num_workers: 4
   train_probability: 0.8
   val_probability: 0.2
-  pin_memory: true
-  persistent_workers: true
   device: 'cpu'
 
   # Reproducibility for data splits
@@ -28,9 +26,10 @@ model:
   # Backbone architecture [temporalmlp | lstm | gru | dtcn]
   backbone: temporalmlp
   
-  # Backbone parameters (placeholder MLP)
+  # Backbone parameters
   num_hid_units: 256
   num_layers: 2
+  num_lags: 2
   
   # Reproducibility for model initialization
   seed: 42
@@ -43,9 +42,11 @@ optimizer:
   
   # Learning rate scheduler (optional)
   scheduler: 'cosine'  # 'step', 'cosine', or null
+
   # For step scheduler:
   step_size: 30
   gamma: 0.1
+
   # For cosine scheduler:
   T_max: 100
 

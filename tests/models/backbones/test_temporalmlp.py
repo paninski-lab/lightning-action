@@ -15,13 +15,13 @@ class TestTemporalMLP:
             input_size=6,
             num_hid_units=32,
             num_layers=2,
-            n_lags=3,
+            num_lags=3,
         )
         
         assert model.input_size == 6
         assert model.num_hid_units == 32
         assert model.num_layers == 2
-        assert model.n_lags == 3
+        assert model.num_lags == 3
         assert model.activation == 'lrelu'  # default
         assert model.dropout_rate == 0.0  # default
 
@@ -33,7 +33,7 @@ class TestTemporalMLP:
             input_size=features,
             num_hid_units=32,
             num_layers=2,
-            n_lags=5,
+            num_lags=5,
         )
         
         # create input tensor
@@ -75,39 +75,59 @@ class TestTemporalMLP:
                 activation='invalid_activation',
             )
 
+    def test_layer_count(self):
+        """Test that correct number of layers are created."""
+        n_hid_layers = 3
+        model = TemporalMLP(
+            input_size=4,
+            num_hid_units=16,
+            num_layers=n_hid_layers,
+            dropout_rate=0.1,
+        )
+
+        # count different layer types
+        conv_layers = sum(1 for layer in model.layers if isinstance(layer, torch.nn.Conv1d))
+        linear_layers = sum(1 for layer in model.layers if isinstance(layer, torch.nn.Linear))
+        dropout_layers = sum(1 for layer in model.layers if isinstance(layer, torch.nn.Dropout))
+
+        assert conv_layers == 1  # one conv layer
+        assert linear_layers == n_hid_layers  # n_hid_layers linear layers
+        # dropout after conv + between hidden layers (but not after final)
+        assert dropout_layers == n_hid_layers
+
     def test_zero_hidden_layers(self):
         """Test model with zero hidden layers (only conv layer)."""
         model = TemporalMLP(
             input_size=6,
             num_hid_units=32,
             num_layers=0,
-            n_lags=2,
+            num_lags=2,
         )
-        
+
         x = torch.randn(2, 50, 6)
         output = model(x)
-        
+
         # should still work, only conv layer + activation
         assert output.shape == (2, 50, 32)
 
-    def test_different_n_lags(self):
+    def test_different_num_lags(self):
         """Test different temporal window sizes."""
-        input_size, n_hid_units = 4, 16
+        input_size, num_hid_units = 4, 16
         sequence_length = 100
         
-        for n_lags in [1, 3, 5, 10]:
+        for num_lags in [1, 3, 5, 10]:
             model = TemporalMLP(
                 input_size=input_size,
-                num_hid_units=n_hid_units,
+                num_hid_units=num_hid_units,
                 num_layers=1,
-                n_lags=n_lags,
+                num_lags=num_lags,
             )
             
             x = torch.randn(1, sequence_length, input_size)
             output = model(x)
             
-            # sequence length should be preserved regardless of n_lags
-            assert output.shape == (1, sequence_length, n_hid_units)
+            # sequence length should be preserved regardless of num_lags
+            assert output.shape == (1, sequence_length, num_hid_units)
 
     def test_dropout_behavior(self):
         """Test dropout functionality."""
@@ -200,7 +220,7 @@ class TestTemporalMLP:
             input_size=4,
             num_hid_units=16,
             num_layers=1,
-            n_lags=3,
+            num_lags=3,
         )
         
         batch_size, features = 2, 4
@@ -212,23 +232,13 @@ class TestTemporalMLP:
             expected_shape = (batch_size, seq_len, 16)
             assert output.shape == expected_shape
 
-    def test_get_output_size(self):
-        """Test get_output_size method."""
-        model = TemporalMLP(
-            input_size=6,
-            num_hid_units=64,
-            num_layers=2,
-        )
-        
-        assert model.get_output_size() == 64
-
     def test_repr(self):
         """Test string representation."""
         model = TemporalMLP(
             input_size=6,
             num_hid_units=32,
             num_layers=2,
-            n_lags=5,
+            num_lags=5,
             activation='relu',
             dropout_rate=0.1,
         )
@@ -240,26 +250,6 @@ class TestTemporalMLP:
         assert 'input_size=6' in repr_str
         assert 'num_hid_units=32' in repr_str
         assert 'num_layers=2' in repr_str
-        assert 'n_lags=5' in repr_str
+        assert 'num_lags=5' in repr_str
         assert 'activation=relu' in repr_str
         assert 'dropout_rate=0.1' in repr_str
-
-    def test_layer_count(self):
-        """Test that correct number of layers are created."""
-        n_hid_layers = 3
-        model = TemporalMLP(
-            input_size=4,
-            num_hid_units=16,
-            num_layers=n_hid_layers,
-            dropout_rate=0.1,
-        )
-        
-        # count different layer types
-        conv_layers = sum(1 for layer in model.layers if isinstance(layer, torch.nn.Conv1d))
-        linear_layers = sum(1 for layer in model.layers if isinstance(layer, torch.nn.Linear))
-        dropout_layers = sum(1 for layer in model.layers if isinstance(layer, torch.nn.Dropout))
-        
-        assert conv_layers == 1  # one conv layer
-        assert linear_layers == n_hid_layers  # n_hid_layers linear layers
-        # dropout after conv + between hidden layers (but not after final)
-        assert dropout_layers == n_hid_layers
