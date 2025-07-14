@@ -106,7 +106,7 @@ class BaseModel(pl.LightningModule):
         
         # flatten for loss computation
         logits_flat = logits.view(-1, self.output_size)
-        targets_flat = targets.view(-1)
+        targets_flat = targets.view(-1, self.output_size)
         
         # compute cross entropy loss
         loss = F.cross_entropy(logits_flat, targets_flat)
@@ -156,7 +156,11 @@ class BaseModel(pl.LightningModule):
         loss, metrics = self.compute_loss(outputs, targets, stage='train')
         
         # log metrics
-        self.log_dict(metrics, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log_dict(
+            metrics,
+            on_step=True, on_epoch=True, prog_bar=True, sync_dist=True,
+            batch_size=x.shape[0],
+        )
         
         return loss
 
@@ -177,12 +181,16 @@ class BaseModel(pl.LightningModule):
         
         # forward pass
         outputs = self.forward(x)
-        
+
         # compute loss and metrics
         loss, metrics = self.compute_loss(outputs, targets, stage='val')
         
         # log metrics
-        self.log_dict(metrics, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log_dict(
+            metrics,
+            on_step=False, on_epoch=True, prog_bar=True, sync_dist=True,
+            batch_size=x.shape[0],
+        )
 
         return None
 
@@ -230,14 +238,14 @@ class BaseModel(pl.LightningModule):
         if optimizer_type.lower() == 'adam':
             optimizer = torch.optim.Adam(
                 self.parameters(),
-                lr=lr,
-                weight_decay=weight_decay,
+                lr=float(lr),
+                weight_decay=float(weight_decay),
             )
         elif optimizer_type.lower() == 'adamw':
             optimizer = torch.optim.AdamW(
                 self.parameters(),
-                lr=lr,
-                weight_decay=weight_decay,
+                lr=float(lr),
+                weight_decay=float(weight_decay),
             )
         else:
             raise ValueError(f'Unsupported optimizer type: {optimizer_type}')

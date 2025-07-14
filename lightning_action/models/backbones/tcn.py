@@ -178,7 +178,7 @@ class DilationBlock(nn.Module):
         # build model
 
         # first convolution
-        self.conv0 = nn.utils.weight_norm(nn.Conv1d(
+        self.conv0 = nn.utils.parametrizations.weight_norm(nn.Conv1d(
             in_channels=input_size,
             out_channels=int_size,
             stride=stride,
@@ -188,7 +188,7 @@ class DilationBlock(nn.Module):
         ))
 
         # second convolution
-        self.conv1 = nn.utils.weight_norm(nn.Conv1d(
+        self.conv1 = nn.utils.parametrizations.weight_norm(nn.Conv1d(
             in_channels=int_size,
             out_channels=output_size,
             stride=stride,
@@ -201,8 +201,8 @@ class DilationBlock(nn.Module):
         self.activation = self._get_activation_func(activation)
         self.final_activation = self._get_activation_func(self.final_activation_str)
 
-        # dropout (using Dropout2d for feature-wise dropout)
-        self.dropout = nn.Dropout2d(dropout)
+        # dropout
+        self.dropout = nn.Dropout1d(dropout)
 
         # build main block
         self.block = nn.Sequential()

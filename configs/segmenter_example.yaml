@@ -6,22 +6,24 @@
 data:
   # Dataset configuration
   data_path: /path/to/dataset
-  
-  # Sequence parameters
-  sequence_length: 500
-  
-  # DataLoader parameters
-  batch_size: 32
-  num_workers: 4
-  train_probability: 0.8
-  val_probability: 0.2
-  device: 'cpu'
+
+  input_dir: 'markers'
+
+  # Specify subset of ids in data_path for model training; null will default to all
+  expt_ids: null
 
   # Reproducibility for data splits
   seed: 42
 
+  # Set to -100 if every single frame is scored; see docs for more info
+  ignore_class: 0
+  weight_classes: true
+
 # Model configuration
 model:
+
+  input_size: 10
+  output_size: 4
 
   # Backbone architecture [temporalmlp | lstm | gru | dtcn]
   backbone: temporalmlp
@@ -52,6 +54,17 @@ optimizer:
 
 # Training configuration
 training:
-  max_epochs: 100
+
+  device: 'cpu'
+
+  # Training parameters
+  num_epochs: 100
   log_every_n_steps: 10
   check_val_every_n_epoch: 1
+
+  # DataLoader parameters
+  sequence_length: 500
+  batch_size: 32
+  num_workers: 4
+  train_probability: 0.9
+  val_probability: 0.1

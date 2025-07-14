@@ -30,6 +30,7 @@ dependencies = [
     "jaxtyping",
     "lightning",
     "numpy (>=2.0.0)",
+    "scikit-learn",
     "tensorboard",
     "torch",
     "typeguard (<3.0.0)",

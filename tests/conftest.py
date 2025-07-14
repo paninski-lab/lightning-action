@@ -5,6 +5,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from lightning_action.api.model import Model
+
+ROOT = Path(__file__).parent.parent
+
 
 @pytest.fixture
 def create_test_marker_csv():
@@ -68,3 +72,13 @@ def create_test_label_csv():
         return class_names
 
     return _create_test_label_csv
+
+
+@pytest.fixture
+def data_dir() -> Path:
+    return ROOT.joinpath('data')
+
+
+@pytest.fixture
+def config_path() -> Path:
+    return ROOT.joinpath('data', 'fly.yaml')
