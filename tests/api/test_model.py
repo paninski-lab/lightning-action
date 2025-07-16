@@ -335,3 +335,26 @@ class TestModelIntegration:
 
                 # should have reasonable number of time steps
                 assert predictions.shape[0] > 10
+
+    def test_model_velocity_transform(self, data_dir, fast_config):
+        """Test training model on CPU with real data."""
+        # update data path to be absolute
+        fast_config['data']['data_path'] = str(data_dir)
+        fast_config['data']['transforms'] = ['VelocityConcat', 'ZScore']
+
+        model = Model.from_config(fast_config)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / 'test_run'
+
+            # train model
+            model.train(output_dir=output_dir)
+
+            # check that model was trained
+            assert model.model is not None
+            assert model.model_dir == output_dir
+
+            # check that files were created
+            assert output_dir.exists()
+            assert (output_dir / 'config.yaml').exists()
+            assert (output_dir / 'final_model.ckpt').exists()

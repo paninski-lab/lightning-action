@@ -20,7 +20,7 @@ class TestFeatureDataset:
             FeatureDataset(
                 ids=['dataset1'],
                 signals=[['markers'], ['labels']],  # different length
-                transforms=[[None]],
+                transforms=[[None], [None]],
                 paths=[[None]]
             )
 
@@ -120,6 +120,7 @@ class TestFeatureDataset:
 
     def test_multiple_datasets(self, create_test_marker_csv):
         """Test with multiple datasets."""
+        from lightning_action.data.transforms import ZScore, MotionEnergy
         with tempfile.TemporaryDirectory() as tmpdir:
             # create test files for two datasets
             marker_file1 = Path(tmpdir) / 'markers1.csv'
@@ -132,11 +133,11 @@ class TestFeatureDataset:
             dataset = FeatureDataset(
                 ids=['dataset1', 'dataset2'],
                 signals=[['markers'], ['markers']],
-                transforms=[[None], [None]],
+                transforms=[[None], [[ZScore(), MotionEnergy()]]],
                 paths=[[str(marker_file1)], [str(marker_file2)]],
                 sequence_length=10
             )
-            
+
             # check that sequences from both datasets are included
             dataset_ids = [dataset.get_sequence_info(i)['dataset_id'] for i in range(len(dataset))]
             assert 'dataset1' in dataset_ids

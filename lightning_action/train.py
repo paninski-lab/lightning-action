@@ -19,6 +19,7 @@ from typeguard import typechecked
 
 from lightning_action.data import DataModule
 from lightning_action.data.transforms import ZScore
+from lightning_action.data import transforms as transform_module
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +82,7 @@ def train(
             data_path=data_config['data_path'],
             expt_ids=data_config.get('expt_ids'),
             signal_types=[data_config.get('input_dir', 'markers'), 'labels'],
+            transforms=data_config.get('transforms', None),  # for input stream only
         )
         
         # use the full config for DataModule
@@ -262,6 +264,7 @@ def build_data_config_from_path(
     data_path: str | Path,
     expt_ids: list[str] | None = None,
     signal_types: list[str] | None = None,
+    transforms: list[str] | None = None,
 ) -> dict[str, Any]:
     """Build DataModule configuration from data directory path.
     
@@ -270,7 +273,7 @@ def build_data_config_from_path(
       (e.g., 'markers', 'labels', 'features_0')
     - Each signal directory contains CSV files named after experiment IDs
     - Default signal types are ['markers', 'labels']
-    - Applies Z-score normalization to markers/features, no transform to labels
+    - Applies configurable transforms to input signals, defaults to Z-score for markers/features
     
     Expected structure:
     data_path/
@@ -288,6 +291,7 @@ def build_data_config_from_path(
         data_path: path to data directory containing signal type subdirectories
         expt_ids: list of experiment IDs to include (None for all)
         signal_types: list of signal types to load (None for auto-detect)
+        transforms: list of transform class names to apply (None for default ZScore)
         
     Returns:
         DataModule configuration dictionary
@@ -313,6 +317,22 @@ def build_data_config_from_path(
     if not signal_types:
         raise ValueError(f"No signal directories found in {data_path}")
     
+    # set up default transforms if not specified
+    if transforms is None:
+        transforms = ['ZScore']
+        logger.info(f"Using default transforms: {transforms}")
+    else:
+        logger.info(f"Using specified transforms: {transforms}")
+    
+    # create transform instances from class names
+    def create_transform_instance(transform_name: str):
+        """Create transform instance from class name."""
+        if hasattr(transform_module, transform_name):
+            transform_class = getattr(transform_module, transform_name)
+            return transform_class()
+        else:
+            raise ValueError(f"Unknown transform class: {transform_name}")
+    
     # discover experiment IDs if not specified
     if expt_ids is None:
         # find experiment IDs by looking at CSV files in the first signal directory
@@ -330,10 +350,10 @@ def build_data_config_from_path(
         raise ValueError(f"No experiment CSV files found in {data_path}")
     
     # build configuration for each experiment
-    ids = []
-    signals = []
-    transforms = []
-    paths = []
+    ids_all = []
+    signals_all = []
+    transforms_all = []
+    paths_all = []
     
     for expt_id in expt_ids:
         # build paths for each signal type for this experiment
@@ -351,30 +371,33 @@ def build_data_config_from_path(
 
             expt_signals.append(signal_type)
             
-            # set up transforms: Z-score for markers/features, None for labels
+            # set up transforms: configurable transforms for markers/features, None for labels
             if signal_type.startswith(('markers', 'features')):
-                expt_transforms.append(ZScore())
+                signal_transforms = []
+                for transform in transforms:
+                    signal_transforms.append(create_transform_instance(transform))
+                expt_transforms.append(signal_transforms)
             else:
                 expt_transforms.append(None)
 
         # add experiment
-        ids.append(expt_id)
-        signals.append(expt_signals)
-        transforms.append(expt_transforms)
-        paths.append(expt_paths)
+        ids_all.append(expt_id)
+        signals_all.append(expt_signals)
+        transforms_all.append(expt_transforms)
+        paths_all.append(expt_paths)
     
-    if not ids:
+    if not ids_all:
         raise ValueError(f"No valid experiments found in {data_path}")
     
     logger.info(
-        f"Built data config for {len(ids)} experiments with {len(signal_types)} signal types"
+        f"Built data config for {len(ids_all)} experiments with {len(signal_types)} signal types"
     )
     
     return {
-        'ids': ids,
-        'signals': signals,
-        'transforms': transforms,
-        'paths': paths,
+        'ids': ids_all,
+        'signals': signals_all,
+        'transforms': transforms_all,
+        'paths': paths_all,
     }
 
 

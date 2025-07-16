@@ -9,6 +9,7 @@ This directory contains YAML configuration files for training and evaluating act
 - `data.sequence_length`: Length of input sequences
 - `data.batch_size`: Training batch size
 - `data.train_probability`: Fraction of data for training
+- `data.transforms`: List of transforms for input data (optional, default is ZScore) 
 
 ### Model Configuration
 - `model.backbone`: Backbone architecture
@@ -33,20 +34,11 @@ This directory contains YAML configuration files for training and evaluating act
 Load and use configs in training scripts:
 
 ```python
-import lightning as pl
-import yaml
-from lightning_action.models import Segmenter
-from lightning_action.data import DataModule
+from lightning_action.api import Model
 
-# Load config
-with open('configs/segmenter_example.yaml', 'r') as f:
-    config = yaml.safe_load(f)
+# Load model from config
+model = Model.from_config('configs/segmenter_example.yaml')
 
-# Create model and data module
-model = Segmenter(config)
-datamodule = DataModule(**config['data'])
-
-# Train with Lightning
-trainer = pl.Trainer(**config['training'])
-trainer.fit(model, datamodule)
+# Train model
+model.train(output_dir='/path/to/output')
 ```

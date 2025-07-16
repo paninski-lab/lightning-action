@@ -7,7 +7,10 @@ data:
   # Dataset configuration
   data_path: /path/to/dataset
 
-  input_dir: markers
+  input_dir: features
+  transforms:
+    - VelocityConcat
+    - ZScore
 
   # Specify subset of ids in data_path for model training; null will default to all
   expt_ids: null
@@ -16,22 +19,22 @@ data:
   seed: 42
 
   # Set to -100 if every single frame is scored; see docs for more info
-  ignore_class: 0
+  ignore_class: -100
   weight_classes: true
 
 # Model configuration
 model:
 
-  input_size: 10
+  input_size: 3
   output_size: 4
 
   # Backbone architecture [temporalmlp | lstm | gru | dtcn]
-  backbone: temporalmlp
+  backbone: dtcn
   
   # Backbone parameters
-  num_hid_units: 256
+  num_hid_units: 32
   num_layers: 2
-  num_lags: 2
+  num_lags: 4
   
   # Reproducibility for model initialization
   seed: 42
@@ -39,11 +42,11 @@ model:
 # Optimizer configuration
 optimizer:
   type: Adam  # Adam or AdamW
-  lr: 1e-3
-  wd: 1e-4  # weight decay
+  lr: 1e-4
+  wd: 0  # weight decay
   
   # Learning rate scheduler (optional)
-  scheduler: cosine  # 'step', 'cosine', or null
+  scheduler: null  # 'step', 'cosine', or null
 
   # For step scheduler:
   step_size: 30
@@ -58,13 +61,13 @@ training:
   device: cpu
 
   # Training parameters
-  num_epochs: 100
+  num_epochs: 200
   log_every_n_steps: 10
   check_val_every_n_epoch: 1
 
   # DataLoader parameters
-  sequence_length: 500
-  batch_size: 32
+  sequence_length: 1000
+  batch_size: 8
   num_workers: 4
-  train_probability: 0.9
-  val_probability: 0.1
+  train_probability: 0.95
+  val_probability: 0.05
