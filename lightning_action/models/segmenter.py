@@ -103,7 +103,7 @@ class BaseModel(pl.LightningModule):
             tuple of (loss tensor, metrics dictionary)
         """
         logits = outputs['logits']
-        
+
         # flatten for loss computation
         logits_flat = logits.view(-1, self.output_size)
         targets_flat = targets.view(-1, self.output_size)
@@ -158,10 +158,10 @@ class BaseModel(pl.LightningModule):
         # log metrics
         self.log_dict(
             metrics,
-            on_step=True, on_epoch=True, prog_bar=True, sync_dist=True,
+            on_step=False, on_epoch=True, prog_bar=True, sync_dist=True,
             batch_size=x.shape[0],
         )
-        
+
         return loss
 
     def validation_step(
@@ -375,16 +375,16 @@ class Segmenter(BaseModel):
             dictionary with 'logits' and 'probabilities'
         """
         batch_size, sequence_length, features = x.shape
-        
+
         # pass through backbone
         backbone_features = self.backbone(x)
-        
+
         # classify each time step
         logits = self.classifier(backbone_features)
-        
+
         # compute probabilities
         probabilities = F.softmax(logits, dim=-1)
-        
+
         return {
             'logits': logits,
             'probabilities': probabilities,

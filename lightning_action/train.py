@@ -182,8 +182,6 @@ def train(
     trainer_config = {
         'max_epochs': num_epochs,
         'min_epochs': training_config.get('min_epochs', 1),
-        'check_val_every_n_epoch': training_config.get('check_val_every_n_epoch', 1),
-        'log_every_n_steps': training_config.get('log_every_n_steps', 10),
         'callbacks': callbacks,
         'logger': tb_logger,
         'default_root_dir': output_dir,
