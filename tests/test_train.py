@@ -212,23 +212,6 @@ class TestBuildDataConfigFromPath:
         signal_types = set(config['signals'][0])
         assert signal_types == {'markers', 'labels'}
 
-    def test_build_config_transforms(self, temp_data_dir):
-        """Test that transforms are set correctly."""
-        config = build_data_config_from_path(temp_data_dir)
-        
-        # check transforms for first experiment
-        transforms = config['transforms'][0]
-        signals = config['signals'][0]
-        
-        for i, signal_type in enumerate(signals):
-            if signal_type.startswith(('markers', 'features')):
-                # should have ZScore transform
-                assert transforms[i] is not None
-                assert hasattr(transforms[i], 'mean')  # ZScore has mean attribute
-            else:
-                # labels should have no transform
-                assert transforms[i] is None
-
     def test_build_config_nonexistent_path(self):
         """Test error handling for nonexistent data path."""
         with pytest.raises(FileNotFoundError, match="Data path does not exist"):
@@ -254,6 +237,75 @@ class TestBuildDataConfigFromPath:
             
             with pytest.raises(ValueError, match="No signal directories found"):
                 build_data_config_from_path(data_path)
+
+    def test_build_config_default_transforms(self, temp_data_dir):
+        """Test that default transforms are applied when none specified."""
+        config = build_data_config_from_path(temp_data_dir, expt_ids=['exp1'])
+        
+        # check transforms for first experiment
+        transforms = config['transforms'][0]
+        signals = config['signals'][0]
+        
+        for i, signal_type in enumerate(signals):
+            if signal_type.startswith(('markers', 'features')):
+                # should have ZScore transform
+                assert transforms[i] is not None
+                assert len(transforms[i]) == 1
+                assert transforms[i][0].__class__.__name__ == 'ZScore'
+            else:
+                # labels should have no transform
+                assert transforms[i] is None
+
+    def test_build_config_custom_transforms_single(self, temp_data_dir):
+        """Test building config with single custom transform."""
+        config = build_data_config_from_path(
+            temp_data_dir,
+            signal_types=['markers', 'labels'],
+            transforms=['MotionEnergy']
+        )
+        
+        # check transforms for first experiment
+        transforms = config['transforms'][0]
+        signals = config['signals'][0]
+        
+        for i, signal_type in enumerate(signals):
+            if signal_type.startswith(('markers', 'features')):
+                # should have MotionEnergy transform
+                assert transforms[i] is not None
+                assert len(transforms[i]) == 1
+                assert transforms[i][0].__class__.__name__ == 'MotionEnergy'
+            else:
+                # labels should have no transform
+                assert transforms[i] is None
+
+    def test_build_config_custom_transforms_multiple(self, temp_data_dir):
+        """Test building config with multiple custom transforms."""
+        config = build_data_config_from_path(
+            temp_data_dir,
+            signal_types=['markers', 'labels'],
+            transforms=['ZScore', 'MotionEnergy']
+        )
+        
+        # check transforms for first experiment
+        transforms = config['transforms'][0]
+        signals = config['signals'][0]
+        print(transforms)
+        # markers should get ZScore (first transform)
+        markers_idx = signals.index('markers')
+        assert transforms[markers_idx][0].__class__.__name__ == 'ZScore'
+        assert transforms[markers_idx][1].__class__.__name__ == 'MotionEnergy'
+        
+        # labels should have no transform
+        labels_idx = signals.index('labels')
+        assert transforms[labels_idx] is None
+
+    def test_build_config_invalid_transform(self, temp_data_dir):
+        """Test error handling for invalid transform class name."""
+        with pytest.raises(ValueError, match="Unknown transform class: InvalidTransform"):
+            build_data_config_from_path(
+                temp_data_dir,
+                transforms=['InvalidTransform']
+            )
 
 
 class TestComputeClassWeights:

@@ -148,7 +148,8 @@ class FeatureDataset(Dataset):
             # apply transforms
             if signal_transform is not None:
                 logger.debug(f'Applying transform to {signal}')
-                data_curr = signal_transform(data_curr)
+                for transform in signal_transform:
+                    data_curr = transform(data_curr)
             
             # store data and track length
             data[signal] = data_curr
