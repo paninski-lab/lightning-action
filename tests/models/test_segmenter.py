@@ -445,9 +445,6 @@ class TestSegmenter:
         config = backbone_configs[0]['config']
         model = Segmenter(config)
         
-        batch_size, sequence_length = 2, 10
-        num_classes = config['model']['output_size']
-        
         # create sample predictions and targets
         predictions = torch.tensor([
             [0, 1, 2, 3, 0, 1, 2, 3, 0, 1],  # batch 1
@@ -474,9 +471,6 @@ class TestSegmenter:
         config = backbone_configs[0]['config']
         model = Segmenter(config)
         
-        batch_size, sequence_length = 2, 12
-        num_classes = config['model']['output_size']
-        
         # create sample predictions and targets with known F1 characteristics
         predictions = torch.tensor([
             [0, 0, 1, 1, 2, 2, 3, 3, 0, 1, 2, 3],  # batch 1
@@ -501,8 +495,6 @@ class TestSegmenter:
         # set ignore_index in data config
         config['data'] = {'ignore_index': 0}
         model = Segmenter(config)
-        
-        batch_size, sequence_length = 2, 8
         
         # create predictions and targets where class 0 should be ignored
         predictions = torch.tensor([
@@ -533,8 +525,6 @@ class TestSegmenter:
         config['data'] = {'ignore_index': 0}
         model = Segmenter(config)
         
-        batch_size, sequence_length = 2, 8
-        
         # create predictions and targets where class 0 should be ignored
         predictions = torch.tensor([
             [0, 1, 2, 3, 0, 1, 2, 3],  # batch 1
@@ -549,6 +539,6 @@ class TestSegmenter:
         # compute F1 score
         f1 = model.train_f1(predictions, targets)
         
-        # F1 should be between 0 and 1, should be high since most non-ignored predictions are correct
+        # F1 should be in [0, 1], should be high since most non-ignored predictions are correct
         assert 0.0 <= f1 <= 1.0
         assert f1 > 0.8  # should be quite high given the mostly correct predictions
