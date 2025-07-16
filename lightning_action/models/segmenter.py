@@ -365,8 +365,8 @@ class Segmenter(BaseModel):
                 num_hid_units=self.model_config['num_hid_units'],
                 num_layers=self.model_config['num_layers'],
                 num_lags=self.model_config.get('num_lags', 1),
-                activation=self.model_config.get('activation', 'relu'),
-                dropout_rate=self.model_config.get('dropout_rate', 0.2),
+                activation=self.model_config.get('activation', 'lrelu'),
+                dropout_rate=self.model_config.get('dropout_rate', 0.1),
                 seed=self.model_config.get('seed', 42),
             )
         else:

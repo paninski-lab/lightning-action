@@ -93,19 +93,19 @@ def compute_sequence_pad(model_type: str, **model_params: Any) -> int:
     model_type = model_type.lower()
     
     if model_type == 'temporal-mlp':
-        return model_params['n_lags']
+        return model_params['num_lags']
     
     elif model_type == 'tcn':
-        n_layers = model_params['n_layers']
-        n_lags = model_params['n_lags']
+        n_layers = model_params['num_layers']
+        n_lags = model_params['num_lags']
         return (2 ** n_layers) * n_lags
-    
+
     elif model_type == 'dtcn':
         # dilated TCN with more complex calculation
         # dilattion of each dilation block is 2 ** layer_num
         # 2 conv layers per dilation block
         return sum(
-            [2 * (2 ** n) * model_params['n_lags'] for n in range(model_params['n_hid_layers'])]
+            [2 * (2 ** n) * model_params['num_lags'] for n in range(model_params['num_layers'])]
         )
     
     elif model_type in ['lstm', 'gru']:

@@ -15,7 +15,7 @@ import torch
 import yaml
 from typeguard import typechecked
 
-from lightning_action.data import DataModule
+from lightning_action.data import DataModule, compute_sequence_pad
 from lightning_action.models.segmenter import Segmenter
 from lightning_action.train import train
 
@@ -140,6 +140,11 @@ class Model:
         if config['data'].get('transforms'):
             if 'VelocityConcat' in config['data']['transforms']:
                 config['model']['input_size'] *= 2
+
+        # compute sequence pad
+        config['model']['sequence_pad'] = compute_sequence_pad(
+            config['model']['backbone'], **config['model'],
+        )
 
         model = Segmenter(config)
 
