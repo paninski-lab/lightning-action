@@ -62,12 +62,20 @@ class BaseModel(pl.LightningModule):
         num_classes = self.output_size
 
         # training metrics
-        self.train_accuracy = Accuracy(task='multiclass', num_classes=num_classes)
-        self.train_f1 = F1Score(task='multiclass', num_classes=num_classes, average='macro')
+        self.train_accuracy = Accuracy(
+            task='multiclass', num_classes=num_classes, ignore_index=self.ignore_index,
+        )
+        self.train_f1 = F1Score(
+            task='multiclass', num_classes=num_classes, ignore_index=self.ignore_index,
+        )
 
         # validation metrics
-        self.val_accuracy = Accuracy(task='multiclass', num_classes=num_classes)
-        self.val_f1 = F1Score(task='multiclass', num_classes=num_classes, average='macro')
+        self.val_accuracy = Accuracy(
+            task='multiclass', num_classes=num_classes, ignore_index=self.ignore_index,
+        )
+        self.val_f1 = F1Score(
+            task='multiclass', num_classes=num_classes, ignore_index=self.ignore_index,
+        )
 
     @abstractmethod
     def _build_model(self):
@@ -117,34 +125,35 @@ class BaseModel(pl.LightningModule):
             torch.argmax(targets_flat, axis=-1),
             ignore_index=self.ignore_index,
         )
-        
+
         # compute metrics
         with torch.no_grad():
             probabilities = outputs['probabilities']
             probs_flat = probabilities.view(-1, self.output_size)
 
-            pred_classes = torch.argmax(probs_flat, axis=-1)
-            targ_classes = torch.argmax(targets_flat, axis=-1)
+            pred_classes = torch.argmax(probs_flat.clone(), axis=-1)
+            targ_classes = torch.argmax(targets_flat.clone(), axis=-1)
 
-            pred_classes_ = pred_classes[targ_classes != self.ignore_index]
-            targ_classes_ = targ_classes[targ_classes != self.ignore_index]
+            if stage == 'train':
+                accuracy = self.train_accuracy(pred_classes, targ_classes)
+                f1 = self.train_f1(pred_classes, targ_classes)
+            else:  # val or test
+                accuracy = self.val_accuracy(pred_classes, targ_classes)
+                f1 = self.val_f1(pred_classes, targ_classes)
 
-            if pred_classes_.shape[0] == 0:
-                accuracy = torch.tensor([float('nan')])
-                f1 = torch.tensor([float('nan')])
-            else:
-                if stage == 'train':
-                    accuracy = self.train_accuracy(pred_classes_, targ_classes_)
-                    f1 = self.train_f1(pred_classes_, targ_classes_)
-                else:  # val or test
-                    accuracy = self.val_accuracy(pred_classes_, targ_classes_)
-                    f1 = self.val_f1(pred_classes_, targ_classes_)
-
-        metrics = {
-            f'{stage}_loss': loss.item(),
-            f'{stage}_accuracy': accuracy.item(),
-            f'{stage}_f1': f1.item(),
-        }
+        # handle NaN losses (e.g., from batches with no ground truth labels)
+        loss_value = loss.item()
+        accuracy_value = accuracy.item()
+        f1_value = f1.item()
+        
+        # filter out NaN values to avoid contaminating epoch-level logging
+        metrics = {}
+        if not torch.isnan(loss):
+            metrics[f'{stage}_loss'] = loss_value
+        if not torch.isnan(accuracy):
+            metrics[f'{stage}_accuracy'] = accuracy_value
+        if not torch.isnan(f1):
+            metrics[f'{stage}_f1'] = f1_value
         
         return loss, metrics
 
@@ -172,12 +181,13 @@ class BaseModel(pl.LightningModule):
         # compute loss and metrics
         loss, metrics = self.compute_loss(outputs, targets, stage='train')
         
-        # log metrics
-        self.log_dict(
-            metrics,
-            on_step=False, on_epoch=True, prog_bar=True, sync_dist=True,
-            batch_size=x.shape[0],
-        )
+        # log metrics (only if we have valid metrics to log)
+        if metrics:  # will be empty if all metrics were NaN
+            self.log_dict(
+                metrics,
+                on_step=False, on_epoch=True, prog_bar=True, sync_dist=True,
+                batch_size=x.shape[0],
+            )
 
         return loss
 
@@ -202,12 +212,13 @@ class BaseModel(pl.LightningModule):
         # compute loss and metrics
         loss, metrics = self.compute_loss(outputs, targets, stage='val')
         
-        # log metrics
-        self.log_dict(
-            metrics,
-            on_step=False, on_epoch=True, prog_bar=True, sync_dist=True,
-            batch_size=x.shape[0],
-        )
+        # log metrics (only if we have valid metrics to log)
+        if metrics:  # will be empty if all metrics were NaN
+            self.log_dict(
+                metrics,
+                on_step=False, on_epoch=True, prog_bar=True, sync_dist=True,
+                batch_size=x.shape[0],
+            )
 
         return None
 
