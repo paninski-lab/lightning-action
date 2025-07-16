@@ -157,7 +157,7 @@ class Model:
             self.model = train(self.config, self.model, output_dir=self.model_dir)
     
     def predict(
-        self, 
+        self,
         data_path: str | Path,
         input_dir: str,
         output_dir: str | Path,

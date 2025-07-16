@@ -18,7 +18,6 @@ from lightning.pytorch.utilities import rank_zero_only
 from typeguard import typechecked
 
 from lightning_action.data import DataModule
-from lightning_action.data.transforms import ZScore
 from lightning_action.data import transforms as transform_module
 
 logger = logging.getLogger(__name__)

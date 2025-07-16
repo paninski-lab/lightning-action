@@ -87,9 +87,10 @@ def handle(args):
     if not args.output:
         now = datetime.datetime.now()
         args.output = Path('runs') / now.strftime('%Y-%m-%d') / now.strftime('%H-%M-%S')
+        args.output.mkdir()
 
     # Set up logging to the model directory
-    model_log_handler = _setup_model_logging(args.output)
+    _setup_model_logging(args.output)
 
     # Apply command line overrides
     config = apply_overrides(config, args)

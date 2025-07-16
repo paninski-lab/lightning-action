@@ -145,7 +145,7 @@ class FeatureDataset(Dataset):
             else:
                 try:
                     data_curr = self._load_features(signal_path)
-                except Exception as e:
+                except Exception:
                     raise ValueError(f'Unknown signal type: {signal}')
 
             # apply transforms

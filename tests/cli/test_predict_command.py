@@ -1,12 +1,11 @@
 """Tests for CLI predict command."""
 
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lightning_action.cli.commands.predict import handle, register_parser
+from lightning_action.cli.commands.predict import handle
 
 
 class TestHandle:

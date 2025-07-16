@@ -306,7 +306,7 @@ class TestComputeClassWeights:
             [[0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 1, 0]]   # sequence 2
         ])}  # counts: class 0: 1, class 1: 3, class 2: 2, class 3: 0
         
-        # batch2: 3 timepoints 
+        # batch2: 3 timepoints
         batch2 = {'labels': torch.tensor([
             [[1, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0]],  # sequence 1
             [[0, 0, 1, 0], [0, 0, 1, 0], [0, 0, 0, 1]]   # sequence 2
@@ -495,12 +495,19 @@ class TestTrain:
     @patch('lightning_action.train.DataModule')
     @patch('lightning_action.train.pl.Trainer')
     @patch('lightning_action.train.build_data_config_from_path')
-    def test_train_basic_flow(self, mock_build_config, mock_trainer_class, mock_datamodule_class, 
-                             basic_config, mock_model, temp_output_dir):
+    def test_train_basic_flow(
+        self,
+        mock_build_config,
+        mock_trainer_class,
+        mock_datamodule_class,
+        basic_config,
+        mock_model,
+        temp_output_dir,
+    ):
         """Test basic training flow."""
         # setup mocks
         mock_build_config.return_value = {
-            'ids': ['exp1'], 'signals': [['markers', 'labels']], 
+            'ids': ['exp1'], 'signals': [['markers', 'labels']],
             'transforms': [None, None], 'paths': [['path1', 'path2']]
         }
         
@@ -534,15 +541,21 @@ class TestTrain:
 
     @patch('lightning_action.train.DataModule')
     @patch('lightning_action.train.build_data_config_from_path')
-    def test_train_with_class_weights(self, mock_build_config, mock_datamodule_class,
-                                     basic_config, mock_model, temp_output_dir):
+    def test_train_with_class_weights(
+        self,
+        mock_build_config,
+        mock_datamodule_class,
+        basic_config,
+        mock_model,
+        temp_output_dir
+    ):
         """Test training with class weight computation."""
         # enable class weighting
         basic_config['data']['weight_classes'] = True
         
         # setup mocks
         mock_build_config.return_value = {
-            'ids': ['exp1'], 'signals': [['markers', 'labels']], 
+            'ids': ['exp1'], 'signals': [['markers', 'labels']],
             'transforms': [None, None], 'paths': [['path1', 'path2']]
         }
         
@@ -576,15 +589,21 @@ class TestTrain:
 
     @patch('lightning_action.train.DataModule')
     @patch('lightning_action.train.build_data_config_from_path')
-    def test_train_gpu_config(self, mock_build_config, mock_datamodule_class,
-                             basic_config, mock_model, temp_output_dir):
+    def test_train_gpu_config(
+        self,
+        mock_build_config,
+        mock_datamodule_class,
+        basic_config,
+        mock_model,
+        temp_output_dir,
+    ):
         """Test training with GPU configuration."""
         # set GPU device
         basic_config['training']['device'] = 'gpu'
         
         # setup mocks
         mock_build_config.return_value = {
-            'ids': ['exp1'], 'signals': [['markers', 'labels']], 
+            'ids': ['exp1'], 'signals': [['markers', 'labels']],
             'transforms': [None, None], 'paths': [['path1', 'path2']]
         }
         

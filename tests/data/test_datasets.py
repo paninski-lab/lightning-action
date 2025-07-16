@@ -120,7 +120,7 @@ class TestFeatureDataset:
 
     def test_multiple_datasets(self, create_test_marker_csv):
         """Test with multiple datasets."""
-        from lightning_action.data.transforms import ZScore, MotionEnergy
+        from lightning_action.data.transforms import MotionEnergy, ZScore
         with tempfile.TemporaryDirectory() as tmpdir:
             # create test files for two datasets
             marker_file1 = Path(tmpdir) / 'markers1.csv'

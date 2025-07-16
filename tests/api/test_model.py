@@ -1,12 +1,12 @@
 """Integration tests for the Model API using real data."""
 
 import tempfile
-import yaml
 from pathlib import Path
 
+import numpy as np
 import pytest
 import torch
-import numpy as np
+import yaml
 
 from lightning_action.api.model import Model
 
