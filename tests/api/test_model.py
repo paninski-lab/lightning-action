@@ -62,6 +62,8 @@ class TestModelIntegration:
             model = Model.from_config(temp_config_path)
             
             assert model.model is not None
+            assert 'sequence_pad' in model.config['model']  # this gets added before model creation
+            del model.config['model']['sequence_pad']
             assert model.config == fast_config
             assert model.model_dir is None
         finally:
@@ -358,3 +360,168 @@ class TestModelIntegration:
             assert output_dir.exists()
             assert (output_dir / 'config.yaml').exists()
             assert (output_dir / 'final_model.ckpt').exists()
+
+
+class TestModelSequencePadding:
+    """Test sequence padding computation in Model.from_config."""
+    
+    def test_sequence_pad_temporal_mlp(self):
+        """Test sequence padding computation for TemporalMLP backbone."""
+        config = {
+            'data': {
+                'data_path': '/tmp/test',
+                'input_dir': 'markers',
+            },
+            'model': {
+                'input_size': 10,
+                'output_size': 4,
+                'backbone': 'temporalmlp',
+                'num_hid_units': 32,
+                'num_layers': 2,
+                'num_lags': 3,
+            },
+            'optimizer': {
+                'type': 'Adam',
+                'lr': 1e-3,
+            },
+            'training': {
+                'num_epochs': 1,
+                'batch_size': 4,
+            }
+        }
+        
+        model = Model.from_config(config)
+        
+        # For temporal-mlp, sequence_pad should equal num_lags
+        assert model.config['model']['sequence_pad'] == 3
+        
+    def test_sequence_pad_dilated_tcn(self):
+        """Test sequence padding computation for DilatedTCN backbone."""
+        config = {
+            'data': {
+                'data_path': '/tmp/test',
+                'input_dir': 'markers',
+            },
+            'model': {
+                'input_size': 10,
+                'output_size': 4,
+                'backbone': 'dtcn',
+                'num_hid_units': 32,
+                'num_layers': 3,
+                'num_lags': 2,
+            },
+            'optimizer': {
+                'type': 'Adam',
+                'lr': 1e-3,
+            },
+            'training': {
+                'num_epochs': 1,
+                'batch_size': 4,
+            }
+        }
+        
+        model = Model.from_config(config)
+        
+        # For DTCN, sequence_pad is sum of 2 * (2 ** n) * num_lags for n in range(num_layers)
+        # layers: 0, 1, 2
+        # dilations: 2**0=1, 2**1=2, 2**2=4
+        # pad per layer: 2*1*2=4, 2*2*2=8, 2*4*2=16
+        # total: 4 + 8 + 16 = 28
+        expected_pad = 2 * (2 ** 0) * 2 + 2 * (2 ** 1) * 2 + 2 * (2 ** 2) * 2
+        assert model.config['model']['sequence_pad'] == expected_pad
+        
+    def test_sequence_pad_lstm(self):
+        """Test sequence padding computation for LSTM backbone."""
+        config = {
+            'data': {
+                'data_path': '/tmp/test',
+                'input_dir': 'markers',
+            },
+            'model': {
+                'input_size': 10,
+                'output_size': 4,
+                'backbone': 'rnn',
+                'rnn_type': 'lstm',
+                'num_hid_units': 32,
+                'num_layers': 2,
+                'bidirectional': False,
+            },
+            'optimizer': {
+                'type': 'Adam',
+                'lr': 1e-3,
+            },
+            'training': {
+                'num_epochs': 1,
+                'batch_size': 4,
+            }
+        }
+        
+        model = Model.from_config(config)
+        
+        # For LSTM/GRU, sequence_pad should be fixed at 4
+        assert model.config['model']['sequence_pad'] == 4
+        
+    def test_sequence_pad_gru(self):
+        """Test sequence padding computation for GRU backbone."""
+        config = {
+            'data': {
+                'data_path': '/tmp/test',
+                'input_dir': 'markers',
+            },
+            'model': {
+                'input_size': 10,
+                'output_size': 4,
+                'backbone': 'rnn',
+                'rnn_type': 'gru',
+                'num_hid_units': 32,
+                'num_layers': 2,
+                'bidirectional': True,
+            },
+            'optimizer': {
+                'type': 'Adam',
+                'lr': 1e-3,
+            },
+            'training': {
+                'num_epochs': 1,
+                'batch_size': 4,
+            }
+        }
+        
+        model = Model.from_config(config)
+        
+        # For LSTM/GRU, sequence_pad should be fixed at 4
+        assert model.config['model']['sequence_pad'] == 4
+        
+    def test_sequence_pad_different_parameters(self):
+        """Test sequence padding with different parameter combinations."""
+        base_config = {
+            'data': {
+                'data_path': '/tmp/test',
+                'input_dir': 'markers',
+            },
+            'model': {
+                'input_size': 10,
+                'output_size': 4,
+                'backbone': 'temporalmlp',
+                'num_hid_units': 32,
+                'num_layers': 2,
+            },
+            'optimizer': {
+                'type': 'Adam',
+                'lr': 1e-3,
+            },
+            'training': {
+                'num_epochs': 1,
+                'batch_size': 4,
+            }
+        }
+        
+        # Test different num_lags values
+        for num_lags in [1, 2, 5, 10]:
+            config = base_config.copy()
+            config['model']['num_lags'] = num_lags
+            
+            model = Model.from_config(config)
+            
+            # sequence_pad should equal num_lags for temporal-mlp
+            assert model.config['model']['sequence_pad'] == num_lags

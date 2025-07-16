@@ -45,10 +45,10 @@ def compute_sequences(
 
     if sequence_length <= 0:
         raise ValueError(f'sequence_length must be positive, got {sequence_length}')
-    
+
     if sequence_pad < 0:
         raise ValueError(f'sequence_pad must be non-negative, got {sequence_pad}')
-    
+
     if len(data.shape) == 2:
         batch_dims = (sequence_length + 2 * sequence_pad, data.shape[1])
     else:
@@ -69,7 +69,7 @@ def compute_sequences(
                 batched_data[b] = data[idx_beg - sequence_pad:idx_end + sequence_pad]
         else:
             batched_data[b] = data[idx_beg:idx_end]
-    
+
     return batched_data
 
 
@@ -92,7 +92,7 @@ def compute_sequence_pad(model_type: str, **model_params: Any) -> int:
     """
     model_type = model_type.lower()
     
-    if model_type == 'temporal-mlp':
+    if model_type in ['temporal-mlp', 'temporalmlp']:
         return model_params['num_lags']
     
     elif model_type == 'tcn':
@@ -108,7 +108,7 @@ def compute_sequence_pad(model_type: str, **model_params: Any) -> int:
             [2 * (2 ** n) * model_params['num_lags'] for n in range(model_params['num_layers'])]
         )
     
-    elif model_type in ['lstm', 'gru']:
+    elif model_type in ['lstm', 'gru', 'rnn']:
         # fixed warmup period for recurrent models
         return 4
     
