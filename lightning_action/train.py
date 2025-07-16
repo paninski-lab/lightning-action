@@ -111,7 +111,7 @@ def train(
         logger.info("Computing class weights...")
         class_weights = compute_class_weights(
             datamodule,
-            ignore_class=data_config.get('ignore_class', 0)
+            ignore_index=data_config.get('ignore_index', -100),
         )
 
         # update model configuration with class weights
@@ -399,7 +399,7 @@ def build_data_config_from_path(
 
 
 @typechecked
-def compute_class_weights(datamodule: DataModule, ignore_class: int = 0) -> list[float]:
+def compute_class_weights(datamodule: DataModule, ignore_index: int = -100) -> list[float]:
     """Compute class weights for imbalanced dataset.
     
     Computes weights inversely proportional to class frequency, with the most
@@ -407,7 +407,7 @@ def compute_class_weights(datamodule: DataModule, ignore_class: int = 0) -> list
     
     Args:
         datamodule: Lightning DataModule with class counting capability
-        ignore_class: class index to ignore (typically background class)
+        ignore_index: class index to ignore (typically background class)
         
     Returns:
         list of class weights
@@ -466,8 +466,8 @@ def compute_class_weights(datamodule: DataModule, ignore_class: int = 0) -> list
             totals[int(cls)] = count
     
     # ignore background class if specified
-    if 0 <= ignore_class < len(totals):
-        totals[ignore_class] = 0
+    if 0 <= ignore_index < len(totals):
+        totals[ignore_index] = 0
     
     # compute class weights: most frequent class gets weight 1.0,
     # others get weights inversely proportional to frequency

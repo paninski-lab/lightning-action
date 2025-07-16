@@ -43,11 +43,14 @@ class BaseModel(pl.LightningModule):
         self.input_size = self.model_config['input_size']
         self.output_size = self.model_config['output_size']
         self.sequence_length = self.model_config.get('sequence_length', 500)
-        
+
+        # ignore index
+        self.ignore_index = config.get('data', {}).get('ignore_index', -100)
+
         # set random seed for reproducibility
         if 'seed' in self.model_config:
             pl.seed_everything(self.model_config['seed'])
-        
+
         # initialize metrics
         self._setup_metrics()
         
@@ -57,11 +60,11 @@ class BaseModel(pl.LightningModule):
     def _setup_metrics(self):
         """Set up torchmetrics for evaluation."""
         num_classes = self.output_size
-        
+
         # training metrics
         self.train_accuracy = Accuracy(task='multiclass', num_classes=num_classes)
         self.train_f1 = F1Score(task='multiclass', num_classes=num_classes, average='macro')
-        
+
         # validation metrics
         self.val_accuracy = Accuracy(task='multiclass', num_classes=num_classes)
         self.val_f1 = F1Score(task='multiclass', num_classes=num_classes, average='macro')
@@ -109,20 +112,34 @@ class BaseModel(pl.LightningModule):
         targets_flat = targets.view(-1, self.output_size)
         
         # compute cross entropy loss
-        loss = F.cross_entropy(logits_flat, targets_flat)
+        loss = F.cross_entropy(
+            logits_flat,
+            torch.argmax(targets_flat, axis=-1),
+            ignore_index=self.ignore_index,
+        )
         
         # compute metrics
         with torch.no_grad():
             probabilities = outputs['probabilities']
             probs_flat = probabilities.view(-1, self.output_size)
-            
-            if stage == 'train':
-                accuracy = self.train_accuracy(probs_flat, targets_flat)
-                f1 = self.train_f1(probs_flat, targets_flat)
-            else:  # val or test
-                accuracy = self.val_accuracy(probs_flat, targets_flat)
-                f1 = self.val_f1(probs_flat, targets_flat)
-        
+
+            pred_classes = torch.argmax(probs_flat, axis=-1)
+            targ_classes = torch.argmax(targets_flat, axis=-1)
+
+            pred_classes_ = pred_classes[targ_classes != self.ignore_index]
+            targ_classes_ = targ_classes[targ_classes != self.ignore_index]
+
+            if pred_classes_.shape[0] == 0:
+                accuracy = torch.tensor([float('nan')])
+                f1 = torch.tensor([float('nan')])
+            else:
+                if stage == 'train':
+                    accuracy = self.train_accuracy(pred_classes_, targ_classes_)
+                    f1 = self.train_f1(pred_classes_, targ_classes_)
+                else:  # val or test
+                    accuracy = self.val_accuracy(pred_classes_, targ_classes_)
+                    f1 = self.val_f1(pred_classes_, targ_classes_)
+
         metrics = {
             f'{stage}_loss': loss.item(),
             f'{stage}_accuracy': accuracy.item(),

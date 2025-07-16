@@ -16,7 +16,7 @@ data:
   seed: 42
 
   # Set to -100 if every single frame is scored; see docs for more info
-  ignore_class: 0
+  ignore_index: 0
   weight_classes: true
 
 # Model configuration

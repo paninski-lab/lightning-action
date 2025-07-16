@@ -327,7 +327,7 @@ class TestComputeClassWeights:
 
     def test_compute_class_weights_basic(self, mock_datamodule):
         """Test basic class weight computation."""
-        weights = compute_class_weights(mock_datamodule, ignore_class=-100)
+        weights = compute_class_weights(mock_datamodule, ignore_index=-100)
         print(weights)
         # expected counts: class 0: 4, class 1: 5, class 2: 5, class 3: 4
         # max count is 5, so weights should be: [5/4, 5/5, 5/5, 5/4] = [1.25, 1.0, 1.0, 1.25]
@@ -337,9 +337,9 @@ class TestComputeClassWeights:
         for i, expected in enumerate(expected_weights):
             assert abs(weights[i] - expected) < 1e-6
 
-    def test_compute_class_weights_ignore_class(self, mock_datamodule):
+    def test_compute_class_weights_ignore_index(self, mock_datamodule):
         """Test class weight computation with ignored class."""
-        weights = compute_class_weights(mock_datamodule, ignore_class=0)
+        weights = compute_class_weights(mock_datamodule, ignore_index=0)
         
         # class 0 should be ignored (weight 0)
         # expected counts: class 1: 5, class 2: 5, class 3: 4
