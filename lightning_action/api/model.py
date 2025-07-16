@@ -136,6 +136,11 @@ class Model:
         else:
             config = config_path
 
+        # update config options if necessary
+        if config['data'].get('transforms'):
+            if 'VelocityConcat' in config['data']['transforms']:
+                config['model']['input_size'] *= 2
+
         model = Segmenter(config)
 
         return cls(model, config, model_dir=None)

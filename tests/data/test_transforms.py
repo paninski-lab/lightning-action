@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from lightning_action.data import Compose, MotionEnergy, Transform, ZScore
+from lightning_action.data import Compose, MotionEnergy, Transform, VelocityConcat, ZScore
 
 
 class MockTransform(Transform):
@@ -264,6 +264,111 @@ class TestZScore:
         assert repr(transform_custom) == 'ZScore(eps=1e-05)'
 
 
+class TestVelocityConcat:
+    """Test the VelocityConcat class."""
+    
+    def test_basic_velocity_concat(self):
+        """Test basic velocity computation and concatenation."""
+        # create data with known velocity patterns
+        data = np.array([
+            [1.0, 2.0],
+            [3.0, 4.0],
+            [6.0, 5.0],
+        ], dtype=np.float32)
+        
+        transform = VelocityConcat()
+        result = transform(data)
+        
+        # check output shape - should be (3, 4) with velocity concatenated
+        assert result.shape == (3, 4)
+        
+        # check original data is preserved in first half
+        np.testing.assert_array_equal(result[:, :2], data)
+        
+        # check velocity calculations
+        # first row velocity should be zero (padded)
+        np.testing.assert_array_equal(result[0, 2:], [0.0, 0.0])
+        
+        # second row velocity should be diff between row 1 and 0
+        np.testing.assert_array_equal(result[1, 2:], [2.0, 2.0])
+        
+        # third row velocity should be diff between row 2 and 1
+        np.testing.assert_array_equal(result[2, 2:], [3.0, 1.0])
+    
+    def test_single_timepoint(self):
+        """Test velocity concat with single time point."""
+        data = np.array([[1.0, 2.0]], dtype=np.float32)
+        
+        transform = VelocityConcat()
+        result = transform(data)
+        
+        # check output shape - should be (1, 4)
+        assert result.shape == (1, 4)
+        
+        # check original data is preserved
+        np.testing.assert_array_equal(result[:, :2], data)
+        
+        # check velocity is zero
+        np.testing.assert_array_equal(result[:, 2:], [[0.0, 0.0]])
+    
+    def test_two_timepoints(self):
+        """Test velocity concat with two time points."""
+        data = np.array([
+            [1.0, 5.0],
+            [4.0, 2.0],
+        ], dtype=np.float32)
+        
+        transform = VelocityConcat()
+        result = transform(data)
+        
+        # check output shape
+        assert result.shape == (2, 4)
+        
+        # check original data preserved
+        np.testing.assert_array_equal(result[:, :2], data)
+        
+        # check velocity calculations
+        # first row velocity should be zero
+        np.testing.assert_array_equal(result[0, 2:], [0.0, 0.0])
+        
+        # second row velocity should be diff
+        np.testing.assert_array_equal(result[1, 2:], [3.0, -3.0])
+    
+    def test_empty_data(self):
+        """Test velocity concat with empty data."""
+        data = np.array([], dtype=np.float32).reshape(0, 2)
+        
+        transform = VelocityConcat()
+        result = transform(data)
+        
+        # check output shape - should be (0, 4)
+        assert result.shape == (0, 4)
+    
+    def test_negative_values(self):
+        """Test velocity concat with negative values."""
+        data = np.array([
+            [-1.0, 2.0],
+            [3.0, -4.0],
+            [0.0, 1.0],
+        ], dtype=np.float32)
+        
+        transform = VelocityConcat()
+        result = transform(data)
+        
+        # check original data preserved
+        np.testing.assert_array_equal(result[:, :2], data)
+        
+        # check velocity calculations
+        np.testing.assert_array_equal(result[0, 2:], [0.0, 0.0])  # first row zero
+        np.testing.assert_array_equal(result[1, 2:], [4.0, -6.0])  # 3-(-1), -4-2
+        np.testing.assert_array_equal(result[2, 2:], [-3.0, 5.0])  # 0-3, 1-(-4)
+    
+    def test_repr(self):
+        """Test string representation."""
+        transform = VelocityConcat()
+        assert repr(transform) == 'VelocityConcat()'
+
+
 class TestTransformIntegration:
     """Test transform integration and edge cases."""
     
@@ -321,3 +426,29 @@ class TestTransformIntegration:
         
         # check that it doesn't crash and produces reasonable output
         assert np.isfinite(result).all()
+    
+    def test_velocity_concat_integration(self):
+        """Test VelocityConcat with other transforms."""
+        data = np.array([
+            [1.0, 2.0],
+            [3.0, 4.0],
+            [5.0, 6.0],
+        ], dtype=np.float32)
+        
+        # test composition with velocity concat
+        transform = Compose([
+            VelocityConcat(),
+            ZScore(),
+        ])
+        
+        result = transform(data)
+        
+        # check shape - should be (3, 4) after velocity concat, preserved after zscore
+        assert result.shape == (3, 4)
+        
+        # check that result is finite
+        assert np.isfinite(result).all()
+        
+        # check that original data structure is preserved (first half should be normalized original)
+        # and velocity structure is preserved (second half should be normalized velocity)
+        assert result.shape[1] == 4  # doubled from original 2 features

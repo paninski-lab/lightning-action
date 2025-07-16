@@ -184,3 +184,48 @@ class ZScore(Transform):
     def __repr__(self) -> str:
         """Return string representation of transform."""
         return f'ZScore(eps={self.eps})'
+
+
+class VelocityConcat(Transform):
+    """Compute velocity and concatenate with original signal.
+    
+    Computes the velocity (first derivative) of the signal along the time dimension
+    using np.diff, pads the first timepoint with zeros, and concatenates the
+    velocity to the original signal along the feature dimension.
+    """
+
+    def __init__(self):
+        """Initialize VelocityConcat transform."""
+        pass
+
+    @typechecked
+    def __call__(
+        self,
+        data: Float[np.ndarray, 'time features'],
+    ) -> Float[np.ndarray, 'time features_times_two']:
+        """Compute velocity and concatenate with original signal.
+        
+        Args:
+            data: input data array with shape (time, features)
+            
+        Returns:
+            concatenated array with shape (time, features*2) where the first
+            'features' columns are the original signal and the second 'features'
+            columns are the velocity
+        """
+        if data.shape[0] < 2:
+            # if less than 2 time points, velocity is zero
+            velocity = np.zeros_like(data)
+        else:
+            # compute velocity using diff along time dimension
+            # pad first timepoint so velocity is zero for first row
+            velocity = np.diff(data, axis=0, prepend=data[None, 0])
+        
+        # concatenate original signal with velocity along feature dimension
+        result = np.concatenate([data, velocity], axis=1)
+        
+        return result
+
+    def __repr__(self) -> str:
+        """Return string representation of transform."""
+        return 'VelocityConcat()'
