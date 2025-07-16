@@ -143,8 +143,11 @@ class FeatureDataset(Dataset):
             elif signal == 'labels':
                 data_curr = self._load_labels(signal_path)
             else:
-                raise ValueError(f'Unknown signal type: {signal}')
-            
+                try:
+                    data_curr = self._load_features(signal_path)
+                except Exception as e:
+                    raise ValueError(f'Unknown signal type: {signal}')
+
             # apply transforms
             if signal_transform is not None:
                 logger.debug(f'Applying transform to {signal}')
@@ -260,7 +263,14 @@ class FeatureDataset(Dataset):
         for signal, data in dataset_data.items():
             # create sequences for this signal
             seq_data = compute_sequences(data, self.sequence_length, self.sequence_pad)
-            signal_sequences[signal] = seq_data
+
+            # standardize input name
+            if signal == 'labels':
+                signal_ = signal
+            else:
+                signal_ = 'input'
+
+            signal_sequences[signal_] = seq_data
             
             # track number of sequences (should be same for all signals)
             if n_sequences is None:

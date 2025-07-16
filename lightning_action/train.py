@@ -364,15 +364,15 @@ def build_data_config_from_path(
         for signal_type in signal_types:
 
             signal_dir = data_path / signal_type
-            signal_file = signal_dir / f"{expt_id}.csv"
+            signal_file = next(signal_dir.glob(f"{expt_id}*.csv"))
             if not signal_file.exists():
                 raise FileNotFoundError(f"Signal file not found: {signal_file}")
             expt_paths.append(signal_file)
 
             expt_signals.append(signal_type)
-            
+
             # set up transforms: configurable transforms for markers/features, None for labels
-            if signal_type.startswith(('markers', 'features')):
+            if not signal_type.startswith('labels'):
                 signal_transforms = []
                 for transform in transforms:
                     signal_transforms.append(create_transform_instance(transform))

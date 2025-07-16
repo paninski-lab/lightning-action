@@ -146,7 +146,7 @@ class BaseModel(pl.LightningModule):
             loss tensor
         """
         # get inputs and targets
-        x = batch['markers']  # or 'features' depending on signal type
+        x = batch['input']
         targets = batch['labels']
         
         # forward pass
@@ -176,7 +176,7 @@ class BaseModel(pl.LightningModule):
             batch_idx: batch index
         """
         # get inputs and targets
-        x = batch['markers']  # or 'features' depending on signal type
+        x = batch['input']
         targets = batch['labels']
         
         # forward pass
@@ -209,7 +209,7 @@ class BaseModel(pl.LightningModule):
             dictionary with predictions
         """
         # get inputs
-        x = batch['markers']  # or 'features' depending on signal type
+        x = batch['input']
         
         # forward pass
         outputs = self.forward(x)

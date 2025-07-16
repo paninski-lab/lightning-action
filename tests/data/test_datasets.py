@@ -61,8 +61,8 @@ class TestFeatureDataset:
             
             # check sequence
             sequence = dataset[0]
-            assert 'markers' in sequence
-            assert sequence['markers'].shape[1] == 4  # 2 markers * 2 coords
+            assert 'input' in sequence
+            assert sequence['input'].shape[1] == 4  # 2 markers * 2 coords
 
     def test_markers_and_labels_dataset(self, create_test_marker_csv, create_test_label_csv):
         """Test dataset with both markers and labels."""
@@ -92,9 +92,9 @@ class TestFeatureDataset:
             
             # check sequence
             sequence = dataset[0]
-            assert 'markers' in sequence
+            assert 'input' in sequence
             assert 'labels' in sequence
-            assert sequence['markers'].shape[1] == 6
+            assert sequence['input'].shape[1] == 6
             assert sequence['labels'].shape[1] == 5
 
     def test_feature_input_type(self, create_test_feature_csv):
@@ -162,11 +162,11 @@ class TestFeatureDataset:
             
             # check tensor output (default)
             sequence_tensor = dataset[0]
-            assert isinstance(sequence_tensor['markers'], torch.Tensor)
+            assert isinstance(sequence_tensor['input'], torch.Tensor)
             
             # check numpy output
             sequence_numpy = dataset.__getitem__(idx=0, as_numpy=True)
-            assert isinstance(sequence_numpy['markers'], np.ndarray)
+            assert isinstance(sequence_numpy['input'], np.ndarray)
 
     def test_sequence_metadata(self, create_test_marker_csv):
         """Test sequence metadata functionality."""

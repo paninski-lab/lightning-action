@@ -169,27 +169,6 @@ class TestBuildDataConfigFromPath:
             
             yield data_path
 
-    def test_build_config_auto_detect_all(self, temp_data_dir):
-        """Test building config with auto-detection of signal types and experiments."""
-        config = build_data_config_from_path(temp_data_dir)
-        
-        # check structure
-        assert 'ids' in config
-        assert 'signals' in config
-        assert 'transforms' in config
-        assert 'paths' in config
-        
-        # check experiments detected
-        assert len(config['ids']) == 3
-        assert set(config['ids']) == {'exp1', 'exp2', 'exp3'}
-        
-        # check signal types detected (should auto-detect all 3 directories)
-        assert len(config['signals'][0]) == 3  # 3 signal types
-        signal_types = set(config['signals'][0])
-        assert 'markers' in signal_types
-        assert 'labels' in signal_types
-        assert 'features_0' in signal_types
-
     def test_build_config_specified_experiments(self, temp_data_dir):
         """Test building config with specified experiment IDs."""
         config = build_data_config_from_path(

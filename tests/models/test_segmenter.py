@@ -109,7 +109,7 @@ class TestSegmenter:
         # these values match those in backbone_configs fixture
         batch_size, sequence_length, features, output_size = 2, 100, 6, 4
         return {
-            'markers': torch.randn(batch_size, sequence_length, features),
+            'input': torch.randn(batch_size, sequence_length, features),
             'labels': torch.randint(0, 4, (batch_size, sequence_length, output_size)).double(),
             'dataset_id': ['test_dataset'] * batch_size,
             'batch_idx': torch.arange(batch_size),
@@ -144,7 +144,7 @@ class TestSegmenter:
             config = backbone_config['config']
             model = Segmenter(config)
             
-            x = sample_batch['markers']
+            x = sample_batch['input']
             batch_size, sequence_length, features = x.shape
             
             # forward pass
@@ -182,7 +182,7 @@ class TestSegmenter:
             config = backbone_config['config']
             model = Segmenter(config)
             
-            x = sample_batch['markers']
+            x = sample_batch['input']
             targets = sample_batch['labels']
             
             # forward pass
@@ -248,7 +248,7 @@ class TestSegmenter:
             assert 'probabilities' in predictions
             assert 'predictions' in predictions
             
-            x = sample_batch['markers']
+            x = sample_batch['input']
             batch_size, sequence_length = x.shape[:2]
             output_size = config['model']['output_size']
             
@@ -329,7 +329,7 @@ class TestSegmenter:
             config = backbone_config['config']
             model = Segmenter(config)
             
-            x = sample_batch['markers']
+            x = sample_batch['input']
             targets = sample_batch['labels']
             
             # forward pass
@@ -386,7 +386,7 @@ class TestSegmenter:
             config = backbone_config['config']
             model = Segmenter(config)
             
-            x = sample_batch['markers']
+            x = sample_batch['input']
             
             # test in eval mode
             model.eval()
@@ -408,7 +408,7 @@ class TestSegmenter:
                 config['model']['dropout_rate'] = 0.5
             
             model = Segmenter(config)
-            x = sample_batch['markers']
+            x = sample_batch['input']
             
             # test in train mode
             model.train()

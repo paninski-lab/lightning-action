@@ -90,9 +90,9 @@ class TestDataModule:
             
             # check that we can iterate through batches
             batch = next(iter(train_loader))
-            assert 'markers' in batch
-            assert batch['markers'].shape[0] <= 2  # batch size
-            assert isinstance(batch['markers'], torch.Tensor)
+            assert 'input' in batch
+            assert batch['input'].shape[0] <= 2  # batch size
+            assert isinstance(batch['input'], torch.Tensor)
 
     def test_val_dataloader(self, create_test_feature_csv):
         """Test validation dataloader creation and properties."""
@@ -128,9 +128,9 @@ class TestDataModule:
             
             # check that we can iterate through batches
             batch = next(iter(val_loader))
-            assert 'features' in batch
-            assert batch['features'].shape[0] <= 3  # batch size
-            assert isinstance(batch['features'], torch.Tensor)
+            assert 'input' in batch
+            assert batch['input'].shape[0] <= 3  # batch size
+            assert isinstance(batch['input'], torch.Tensor)
 
     def test_multiple_datasets(self, create_test_marker_csv):
         """Test DataModule with multiple datasets."""
