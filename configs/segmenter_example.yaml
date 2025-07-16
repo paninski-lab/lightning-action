@@ -7,7 +7,7 @@ data:
   # Dataset configuration
   data_path: /path/to/dataset
 
-  input_dir: 'markers'
+  input_dir: markers
 
   # Specify subset of ids in data_path for model training; null will default to all
   expt_ids: null
@@ -38,12 +38,12 @@ model:
 
 # Optimizer configuration
 optimizer:
-  type: 'Adam'  # 'Adam' or 'AdamW'
+  type: Adam  # Adam or AdamW
   lr: 1e-3
   wd: 1e-4  # weight decay
   
   # Learning rate scheduler (optional)
-  scheduler: 'cosine'  # 'step', 'cosine', or null
+  scheduler: cosine  # 'step', 'cosine', or null
 
   # For step scheduler:
   step_size: 30
@@ -55,7 +55,7 @@ optimizer:
 # Training configuration
 training:
 
-  device: 'cpu'
+  device: cpu
 
   # Training parameters
   num_epochs: 100

@@ -7,7 +7,10 @@ data:
   # Dataset configuration
   data_path: /path/to/dataset
 
-  input_dir: 'features'
+  input_dir: features
+  transforms:
+    - VelocityConcat
+    - ZScore
 
   # Specify subset of ids in data_path for model training; null will default to all
   expt_ids: null
@@ -38,7 +41,7 @@ model:
 
 # Optimizer configuration
 optimizer:
-  type: 'Adam'  # 'Adam' or 'AdamW'
+  type: Adam  # Adam or AdamW
   lr: 1e-4
   wd: 0  # weight decay
   
@@ -55,7 +58,7 @@ optimizer:
 # Training configuration
 training:
 
-  device: 'cpu'
+  device: cpu
 
   # Training parameters
   num_epochs: 200
