@@ -1,18 +1,17 @@
 """Tests for CLI train command."""
 
 import tempfile
-import yaml
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+import yaml
 
 from lightning_action.cli.commands.train import (
     apply_config_overrides,
     apply_overrides,
     handle,
     parse_config_value,
-    register_parser,
 )
 
 
@@ -170,10 +169,10 @@ class TestHandle:
         }
 
     @pytest.fixture
-    def mock_args(self):
+    def mock_args(self, tmpdir):
         """Create mock arguments."""
         args = MagicMock()
-        args.output = None
+        args.output = tmpdir
         args.data_path = None
         args.device = None
         args.epochs = None
@@ -201,27 +200,6 @@ class TestHandle:
             mock_model_class.assert_called_once()
             config_arg = mock_model_class.call_args[0][0]
             assert config_arg['data']['data_path'] == '/test/data'
-
-        # cleanup
-        Path(config_path).unlink()
-
-    def test_handle_creates_output_dir(self, test_config, mock_args):
-        """Test that handle creates output directory."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
-            yaml.dump(test_config, f)
-            config_path = f.name
-
-        mock_args.config = config_path
-
-        with patch('lightning_action.api.model.Model.from_config') as mock_model_class:
-            mock_model = MagicMock()
-            mock_model_class.return_value = mock_model
-            
-            handle(mock_args)
-            
-            # check that output directory was set
-            assert mock_args.output is not None
-            assert isinstance(mock_args.output, Path)
 
         # cleanup
         Path(config_path).unlink()

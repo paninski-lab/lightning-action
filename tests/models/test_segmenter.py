@@ -109,7 +109,7 @@ class TestSegmenter:
         # these values match those in backbone_configs fixture
         batch_size, sequence_length, features, output_size = 2, 100, 6, 4
         return {
-            'markers': torch.randn(batch_size, sequence_length, features),
+            'input': torch.randn(batch_size, sequence_length, features),
             'labels': torch.randint(0, 4, (batch_size, sequence_length, output_size)).double(),
             'dataset_id': ['test_dataset'] * batch_size,
             'batch_idx': torch.arange(batch_size),
@@ -144,7 +144,7 @@ class TestSegmenter:
             config = backbone_config['config']
             model = Segmenter(config)
             
-            x = sample_batch['markers']
+            x = sample_batch['input']
             batch_size, sequence_length, features = x.shape
             
             # forward pass
@@ -182,7 +182,7 @@ class TestSegmenter:
             config = backbone_config['config']
             model = Segmenter(config)
             
-            x = sample_batch['markers']
+            x = sample_batch['input']
             targets = sample_batch['labels']
             
             # forward pass
@@ -248,7 +248,7 @@ class TestSegmenter:
             assert 'probabilities' in predictions
             assert 'predictions' in predictions
             
-            x = sample_batch['markers']
+            x = sample_batch['input']
             batch_size, sequence_length = x.shape[:2]
             output_size = config['model']['output_size']
             
@@ -329,7 +329,7 @@ class TestSegmenter:
             config = backbone_config['config']
             model = Segmenter(config)
             
-            x = sample_batch['markers']
+            x = sample_batch['input']
             targets = sample_batch['labels']
             
             # forward pass
@@ -386,7 +386,7 @@ class TestSegmenter:
             config = backbone_config['config']
             model = Segmenter(config)
             
-            x = sample_batch['markers']
+            x = sample_batch['input']
             
             # test in eval mode
             model.eval()
@@ -408,7 +408,7 @@ class TestSegmenter:
                 config['model']['dropout_rate'] = 0.5
             
             model = Segmenter(config)
-            x = sample_batch['markers']
+            x = sample_batch['input']
             
             # test in train mode
             model.train()
@@ -439,3 +439,106 @@ class TestSegmenter:
         
         with pytest.raises(ValueError, match='Unsupported backbone type'):
             Segmenter(config)
+
+    def test_train_accuracy_metric(self, backbone_configs):
+        """Test train_accuracy metric computation."""
+        config = backbone_configs[0]['config']
+        model = Segmenter(config)
+        
+        # create sample predictions and targets
+        predictions = torch.tensor([
+            [0, 1, 2, 3, 0, 1, 2, 3, 0, 1],  # batch 1
+            [1, 2, 3, 0, 1, 2, 3, 0, 1, 2],  # batch 2
+        ])
+        
+        targets = torch.tensor([
+            [0, 1, 2, 3, 0, 1, 1, 3, 0, 1],  # batch 1 - 1 wrong (index 6)
+            [1, 2, 3, 0, 1, 2, 3, 0, 1, 2],  # batch 2 - all correct
+        ])
+        
+        # compute accuracy
+        accuracy = model.train_accuracy(predictions, targets)
+        
+        # manually calculate expected accuracy
+        # batch 1: 9/10 correct, batch 2: 10/10 correct
+        # total: 19/20 = 0.95
+        expected_accuracy = 19.0 / 20.0
+        
+        assert torch.allclose(accuracy, torch.tensor(expected_accuracy))
+
+    def test_train_f1_metric(self, backbone_configs):
+        """Test train_f1 metric computation."""
+        config = backbone_configs[0]['config']
+        model = Segmenter(config)
+        
+        # create sample predictions and targets with known F1 characteristics
+        predictions = torch.tensor([
+            [0, 0, 1, 1, 2, 2, 3, 3, 0, 1, 2, 3],  # batch 1
+            [0, 1, 1, 2, 2, 3, 3, 0, 1, 2, 3, 0],  # batch 2
+        ])
+        
+        targets = torch.tensor([
+            [0, 0, 1, 1, 2, 2, 3, 3, 0, 1, 2, 3],  # batch 1 - all correct
+            [0, 1, 2, 2, 2, 3, 3, 0, 1, 2, 3, 0],  # batch 2 - some wrong
+        ])
+        
+        # compute F1 score
+        f1 = model.train_f1(predictions, targets)
+        
+        # F1 should be between 0 and 1, and should be high since most predictions are correct
+        assert 0.0 <= f1 <= 1.0
+        assert f1 > 0.8  # should be quite high given the mostly correct predictions
+
+    def test_train_accuracy_with_ignore_index(self, backbone_configs):
+        """Test train_accuracy metric with ignore_index functionality."""
+        config = backbone_configs[0]['config']
+        # set ignore_index in data config
+        config['data'] = {'ignore_index': 0}
+        model = Segmenter(config)
+        
+        # create predictions and targets where class 0 should be ignored
+        predictions = torch.tensor([
+            [0, 1, 2, 3, 0, 1, 2, 3],  # batch 1
+            [1, 2, 3, 0, 1, 2, 3, 0],  # batch 2
+        ])
+        
+        targets = torch.tensor([
+            [0, 1, 2, 3, 0, 1, 1, 3],  # batch 1 - class 0 ignored, 1 wrong at index 6
+            [1, 2, 3, 0, 1, 2, 3, 0],  # batch 2 - class 0 ignored, all non-ignored correct
+        ])
+        
+        # compute accuracy
+        accuracy = model.train_accuracy(predictions, targets)
+        
+        # class 0 should be ignored, so we only count non-zero predictions
+        # batch 1: positions 1,2,3,5,6,7 -> 5/6 correct (position 6 is wrong)
+        # batch 2: positions 0,1,2,4,5,6 -> 6/6 correct
+        # total: 11/12 ≈ 0.9167
+        expected_accuracy = 11.0 / 12.0
+        
+        assert torch.allclose(accuracy, torch.tensor(expected_accuracy), atol=1e-3)
+
+    def test_train_f1_with_ignore_index(self, backbone_configs):
+        """Test train_f1 metric with ignore_index functionality."""
+        config = backbone_configs[0]['config']
+        # set ignore_index in data config
+        config['data'] = {'ignore_index': 0}
+        model = Segmenter(config)
+        
+        # create predictions and targets where class 0 should be ignored
+        predictions = torch.tensor([
+            [0, 1, 2, 3, 0, 1, 2, 3],  # batch 1
+            [1, 2, 3, 0, 1, 2, 3, 0],  # batch 2
+        ])
+        
+        targets = torch.tensor([
+            [0, 1, 2, 3, 0, 1, 1, 3],  # batch 1 - class 0 ignored, 1 wrong at index 6
+            [1, 2, 3, 0, 1, 2, 3, 0],  # batch 2 - class 0 ignored, all non-ignored correct
+        ])
+        
+        # compute F1 score
+        f1 = model.train_f1(predictions, targets)
+        
+        # F1 should be in [0, 1], should be high since most non-ignored predictions are correct
+        assert 0.0 <= f1 <= 1.0
+        assert f1 > 0.8  # should be quite high given the mostly correct predictions

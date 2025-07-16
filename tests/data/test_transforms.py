@@ -449,6 +449,6 @@ class TestTransformIntegration:
         # check that result is finite
         assert np.isfinite(result).all()
         
-        # check that original data structure is preserved (first half should be normalized original)
+        # check that original data structure is preserved (first half should be normalized orig)
         # and velocity structure is preserved (second half should be normalized velocity)
         assert result.shape[1] == 4  # doubled from original 2 features

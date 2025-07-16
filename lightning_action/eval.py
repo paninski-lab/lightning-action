@@ -19,10 +19,10 @@ def get_precision_recall(
     Args:
         true_classes: entries should be in [0, K-1] where K is the number of classes
         pred_classes: entries should be in [0, K-1] where K is the number of classes
-        background: defines the background class that identifies points with no supervised 
-            label; these time points are omitted from the precision and recall calculations; 
+        background: defines the background class that identifies points with no supervised
+            label; these time points are omitted from the precision and recall calculations;
             if None, no background class is utilized
-        n_classes: total number of non-background classes; if None, will be inferred from 
+        n_classes: total number of non-background classes; if None, will be inferred from
             true classes
 
     Returns:
@@ -80,7 +80,7 @@ def int_over_union(array1: np.ndarray, array2: np.ndarray) -> dict[int, float]:
         array2: integer array of shape (n,)
 
     Returns:
-        dictionary where keys are integer values in arrays and values are 
+        dictionary where keys are integer values in arrays and values are
         corresponding IoU (float)
     """
     vals = np.unique(np.concatenate([np.unique(array1), np.unique(array2)])).tolist()
@@ -100,7 +100,7 @@ def run_lengths(array: np.ndarray) -> dict[int, list[int]]:
         array: single-dimensional array
 
     Returns:
-        dictionary where keys are integer values up to max value in array and 
+        dictionary where keys are integer values up to max value in array and
         values are lists of run lengths
 
     Example:

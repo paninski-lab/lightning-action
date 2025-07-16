@@ -1,12 +1,12 @@
 """Integration tests for the Model API using real data."""
 
 import tempfile
-import yaml
 from pathlib import Path
 
+import numpy as np
 import pytest
 import torch
-import numpy as np
+import yaml
 
 from lightning_action.api.model import Model
 
@@ -62,6 +62,8 @@ class TestModelIntegration:
             model = Model.from_config(temp_config_path)
             
             assert model.model is not None
+            assert 'sequence_pad' in model.config['model']  # this gets added before model creation
+            del model.config['model']['sequence_pad']
             assert model.config == fast_config
             assert model.model_dir is None
         finally:
@@ -83,7 +85,7 @@ class TestModelIntegration:
             output_dir = Path(temp_dir) / 'test_run'
             
             # train model
-            model.train(output_dir=output_dir)
+            model.train(output_dir=output_dir, post_inference=False)
             
             # check that model was trained
             assert model.model is not None
@@ -106,7 +108,7 @@ class TestModelIntegration:
             output_dir = Path(temp_dir) / 'test_run_gpu'
             
             # train model
-            model.train(output_dir=output_dir)
+            model.train(output_dir=output_dir, post_inference=False)
             
             # check that model was trained
             assert model.model is not None
@@ -158,7 +160,7 @@ class TestModelIntegration:
         
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / 'test_run'
-            model.train(output_dir=output_dir)
+            model.train(output_dir=output_dir, post_inference=False)
             
             # test prediction
             prediction_dir = Path(temp_dir) / 'predictions'
@@ -195,7 +197,7 @@ class TestModelIntegration:
         
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / 'test_run_gpu'
-            model.train(output_dir=output_dir)
+            model.train(output_dir=output_dir, post_inference=False)
             
             # test prediction
             prediction_dir = Path(temp_dir) / 'predictions_gpu'
@@ -226,7 +228,7 @@ class TestModelIntegration:
         
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / 'test_run'
-            model.train(output_dir=output_dir)
+            model.train(output_dir=output_dir, post_inference=False)
             
             # test prediction on all experiments
             prediction_dir = Path(temp_dir) / 'predictions_all'
@@ -283,7 +285,7 @@ class TestModelIntegration:
                 output_dir = Path(temp_dir) / f'test_run_{backbone}'
                 
                 # train model
-                model.train(output_dir=output_dir)
+                model.train(output_dir=output_dir, post_inference=False)
                 
                 # check that model was trained successfully
                 assert model.model is not None
@@ -348,7 +350,7 @@ class TestModelIntegration:
             output_dir = Path(temp_dir) / 'test_run'
 
             # train model
-            model.train(output_dir=output_dir)
+            model.train(output_dir=output_dir, post_inference=False)
 
             # check that model was trained
             assert model.model is not None
@@ -358,3 +360,223 @@ class TestModelIntegration:
             assert output_dir.exists()
             assert (output_dir / 'config.yaml').exists()
             assert (output_dir / 'final_model.ckpt').exists()
+
+    def test_model_train_cpu_post_inference(self, data_dir, fast_config):
+        """Test that post-training inference runs automatically on all training experiments."""
+        # update data path to be absolute
+        fast_config['data']['data_path'] = str(data_dir)
+        
+        model = Model.from_config(fast_config)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / 'test_run'
+            
+            # train model with post-training inference enabled (default behavior)
+            model.train(output_dir=output_dir, post_inference=True)
+            
+            # check that model was trained
+            assert model.model is not None
+            assert model.model_dir == output_dir
+            
+            # check that training files were created
+            assert output_dir.exists()
+            assert (output_dir / 'config.yaml').exists()
+            assert (output_dir / 'final_model.ckpt').exists()
+            
+            # check that predictions directory was created
+            predictions_dir = output_dir / 'predictions'
+            assert predictions_dir.exists()
+            
+            # check that prediction files were created for all experiments
+            prediction_files = list(predictions_dir.glob('*_predictions.npy'))
+            assert len(prediction_files) >= 2  # should have multiple experiments
+            
+            # check that each prediction file exists for expected experiments
+            expected_experiments = ['2019_06_26_fly2', '2019_08_07_fly2']
+            found_experiments = []
+            
+            for pred_file in prediction_files:
+                # extract experiment ID from filename
+                expt_id = pred_file.name.replace('_predictions.npy', '')
+                found_experiments.append(expt_id)
+                
+                # load and check predictions
+                predictions = np.load(pred_file)
+                assert predictions.ndim == 2
+                assert predictions.shape[1] == fast_config['model']['output_size']
+                
+                # probabilities should sum to 1
+                prob_sums = np.sum(predictions, axis=1)
+                assert np.allclose(prob_sums, 1.0, atol=1e-6)
+                
+                # should have reasonable number of time steps
+                assert predictions.shape[0] > 10
+            
+            # verify that all expected experiments have predictions
+            for expected_expt in expected_experiments:
+                assert expected_expt in found_experiments, f'Missing predictions for {expected_expt}'
+
+
+class TestModelSequencePadding:
+    """Test sequence padding computation in Model.from_config."""
+    
+    def test_sequence_pad_temporal_mlp(self):
+        """Test sequence padding computation for TemporalMLP backbone."""
+        config = {
+            'data': {
+                'data_path': '/tmp/test',
+                'input_dir': 'markers',
+            },
+            'model': {
+                'input_size': 10,
+                'output_size': 4,
+                'backbone': 'temporalmlp',
+                'num_hid_units': 32,
+                'num_layers': 2,
+                'num_lags': 3,
+            },
+            'optimizer': {
+                'type': 'Adam',
+                'lr': 1e-3,
+            },
+            'training': {
+                'num_epochs': 1,
+                'batch_size': 4,
+            }
+        }
+        
+        model = Model.from_config(config)
+        
+        # For temporal-mlp, sequence_pad should equal num_lags
+        assert model.config['model']['sequence_pad'] == 3
+        
+    def test_sequence_pad_dilated_tcn(self):
+        """Test sequence padding computation for DilatedTCN backbone."""
+        config = {
+            'data': {
+                'data_path': '/tmp/test',
+                'input_dir': 'markers',
+            },
+            'model': {
+                'input_size': 10,
+                'output_size': 4,
+                'backbone': 'dtcn',
+                'num_hid_units': 32,
+                'num_layers': 3,
+                'num_lags': 2,
+            },
+            'optimizer': {
+                'type': 'Adam',
+                'lr': 1e-3,
+            },
+            'training': {
+                'num_epochs': 1,
+                'batch_size': 4,
+            }
+        }
+        
+        model = Model.from_config(config)
+        
+        # For DTCN, sequence_pad is sum of 2 * (2 ** n) * num_lags for n in range(num_layers)
+        # layers: 0, 1, 2
+        # dilations: 2**0=1, 2**1=2, 2**2=4
+        # pad per layer: 2*1*2=4, 2*2*2=8, 2*4*2=16
+        # total: 4 + 8 + 16 = 28
+        expected_pad = 2 * (2 ** 0) * 2 + 2 * (2 ** 1) * 2 + 2 * (2 ** 2) * 2
+        assert model.config['model']['sequence_pad'] == expected_pad
+        
+    def test_sequence_pad_lstm(self):
+        """Test sequence padding computation for LSTM backbone."""
+        config = {
+            'data': {
+                'data_path': '/tmp/test',
+                'input_dir': 'markers',
+            },
+            'model': {
+                'input_size': 10,
+                'output_size': 4,
+                'backbone': 'rnn',
+                'rnn_type': 'lstm',
+                'num_hid_units': 32,
+                'num_layers': 2,
+                'bidirectional': False,
+            },
+            'optimizer': {
+                'type': 'Adam',
+                'lr': 1e-3,
+            },
+            'training': {
+                'num_epochs': 1,
+                'batch_size': 4,
+            }
+        }
+        
+        model = Model.from_config(config)
+        
+        # For LSTM/GRU, sequence_pad should be fixed at 4
+        assert model.config['model']['sequence_pad'] == 4
+        
+    def test_sequence_pad_gru(self):
+        """Test sequence padding computation for GRU backbone."""
+        config = {
+            'data': {
+                'data_path': '/tmp/test',
+                'input_dir': 'markers',
+            },
+            'model': {
+                'input_size': 10,
+                'output_size': 4,
+                'backbone': 'rnn',
+                'rnn_type': 'gru',
+                'num_hid_units': 32,
+                'num_layers': 2,
+                'bidirectional': True,
+            },
+            'optimizer': {
+                'type': 'Adam',
+                'lr': 1e-3,
+            },
+            'training': {
+                'num_epochs': 1,
+                'batch_size': 4,
+            }
+        }
+        
+        model = Model.from_config(config)
+        
+        # For LSTM/GRU, sequence_pad should be fixed at 4
+        assert model.config['model']['sequence_pad'] == 4
+        
+    def test_sequence_pad_different_parameters(self):
+        """Test sequence padding with different parameter combinations."""
+        base_config = {
+            'data': {
+                'data_path': '/tmp/test',
+                'input_dir': 'markers',
+            },
+            'model': {
+                'input_size': 10,
+                'output_size': 4,
+                'backbone': 'temporalmlp',
+                'num_hid_units': 32,
+                'num_layers': 2,
+            },
+            'optimizer': {
+                'type': 'Adam',
+                'lr': 1e-3,
+            },
+            'training': {
+                'num_epochs': 1,
+                'batch_size': 4,
+            }
+        }
+        
+        # Test different num_lags values
+        for num_lags in [1, 2, 5, 10]:
+            config = base_config.copy()
+            config['model']['num_lags'] = num_lags
+            
+            model = Model.from_config(config)
+            
+            # sequence_pad should equal num_lags for temporal-mlp
+            assert model.config['model']['sequence_pad'] == num_lags

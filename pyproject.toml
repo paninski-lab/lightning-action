@@ -48,7 +48,7 @@ documentation = "https://github.com/paninski-lab/lightning-action"
 python = ">=3.10,<3.13"
 
 [tool.poetry.scripts]
-lightning-action = "lightning_action.cli.main:main"
+litaction = "lightning_action.cli.main:main"
 
 [project.optional-dependencies]
 dev = [

@@ -1,15 +1,12 @@
 """Tests for CLI main functionality."""
 
-import sys
 import tempfile
-import yaml
-from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
+import yaml
 
-from lightning_action.cli.main import build_parser, main
+from lightning_action.cli.main import main
 
 
 class TestMain:

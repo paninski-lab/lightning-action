@@ -43,11 +43,14 @@ class BaseModel(pl.LightningModule):
         self.input_size = self.model_config['input_size']
         self.output_size = self.model_config['output_size']
         self.sequence_length = self.model_config.get('sequence_length', 500)
-        
+
+        # ignore index
+        self.ignore_index = config.get('data', {}).get('ignore_index', -100)
+
         # set random seed for reproducibility
         if 'seed' in self.model_config:
             pl.seed_everything(self.model_config['seed'])
-        
+
         # initialize metrics
         self._setup_metrics()
         
@@ -57,14 +60,22 @@ class BaseModel(pl.LightningModule):
     def _setup_metrics(self):
         """Set up torchmetrics for evaluation."""
         num_classes = self.output_size
-        
+
         # training metrics
-        self.train_accuracy = Accuracy(task='multiclass', num_classes=num_classes)
-        self.train_f1 = F1Score(task='multiclass', num_classes=num_classes, average='macro')
-        
+        self.train_accuracy = Accuracy(
+            task='multiclass', num_classes=num_classes, ignore_index=self.ignore_index,
+        )
+        self.train_f1 = F1Score(
+            task='multiclass', num_classes=num_classes, ignore_index=self.ignore_index,
+        )
+
         # validation metrics
-        self.val_accuracy = Accuracy(task='multiclass', num_classes=num_classes)
-        self.val_f1 = F1Score(task='multiclass', num_classes=num_classes, average='macro')
+        self.val_accuracy = Accuracy(
+            task='multiclass', num_classes=num_classes, ignore_index=self.ignore_index,
+        )
+        self.val_f1 = F1Score(
+            task='multiclass', num_classes=num_classes, ignore_index=self.ignore_index,
+        )
 
     @abstractmethod
     def _build_model(self):
@@ -103,31 +114,46 @@ class BaseModel(pl.LightningModule):
             tuple of (loss tensor, metrics dictionary)
         """
         logits = outputs['logits']
-        
+
         # flatten for loss computation
         logits_flat = logits.view(-1, self.output_size)
         targets_flat = targets.view(-1, self.output_size)
         
         # compute cross entropy loss
-        loss = F.cross_entropy(logits_flat, targets_flat)
-        
+        loss = F.cross_entropy(
+            logits_flat,
+            torch.argmax(targets_flat, axis=-1),
+            ignore_index=self.ignore_index,
+        )
+
         # compute metrics
         with torch.no_grad():
             probabilities = outputs['probabilities']
             probs_flat = probabilities.view(-1, self.output_size)
-            
+
+            pred_classes = torch.argmax(probs_flat.clone(), axis=-1)
+            targ_classes = torch.argmax(targets_flat.clone(), axis=-1)
+
             if stage == 'train':
-                accuracy = self.train_accuracy(probs_flat, targets_flat)
-                f1 = self.train_f1(probs_flat, targets_flat)
+                accuracy = self.train_accuracy(pred_classes, targ_classes)
+                f1 = self.train_f1(pred_classes, targ_classes)
             else:  # val or test
-                accuracy = self.val_accuracy(probs_flat, targets_flat)
-                f1 = self.val_f1(probs_flat, targets_flat)
+                accuracy = self.val_accuracy(pred_classes, targ_classes)
+                f1 = self.val_f1(pred_classes, targ_classes)
+
+        # handle NaN losses (e.g., from batches with no ground truth labels)
+        loss_value = loss.item()
+        accuracy_value = accuracy.item()
+        f1_value = f1.item()
         
-        metrics = {
-            f'{stage}_loss': loss.item(),
-            f'{stage}_accuracy': accuracy.item(),
-            f'{stage}_f1': f1.item(),
-        }
+        # filter out NaN values to avoid contaminating epoch-level logging
+        metrics = {}
+        if not torch.isnan(loss):
+            metrics[f'{stage}_loss'] = loss_value
+        if not torch.isnan(accuracy):
+            metrics[f'{stage}_accuracy'] = accuracy_value
+        if not torch.isnan(f1):
+            metrics[f'{stage}_f1'] = f1_value
         
         return loss, metrics
 
@@ -146,7 +172,7 @@ class BaseModel(pl.LightningModule):
             loss tensor
         """
         # get inputs and targets
-        x = batch['markers']  # or 'features' depending on signal type
+        x = batch['input']
         targets = batch['labels']
         
         # forward pass
@@ -155,13 +181,14 @@ class BaseModel(pl.LightningModule):
         # compute loss and metrics
         loss, metrics = self.compute_loss(outputs, targets, stage='train')
         
-        # log metrics
-        self.log_dict(
-            metrics,
-            on_step=True, on_epoch=True, prog_bar=True, sync_dist=True,
-            batch_size=x.shape[0],
-        )
-        
+        # log metrics (only if we have valid metrics to log)
+        if metrics:  # will be empty if all metrics were NaN
+            self.log_dict(
+                metrics,
+                on_step=False, on_epoch=True, prog_bar=True, sync_dist=True,
+                batch_size=x.shape[0],
+            )
+
         return loss
 
     def validation_step(
@@ -176,7 +203,7 @@ class BaseModel(pl.LightningModule):
             batch_idx: batch index
         """
         # get inputs and targets
-        x = batch['markers']  # or 'features' depending on signal type
+        x = batch['input']
         targets = batch['labels']
         
         # forward pass
@@ -185,12 +212,13 @@ class BaseModel(pl.LightningModule):
         # compute loss and metrics
         loss, metrics = self.compute_loss(outputs, targets, stage='val')
         
-        # log metrics
-        self.log_dict(
-            metrics,
-            on_step=False, on_epoch=True, prog_bar=True, sync_dist=True,
-            batch_size=x.shape[0],
-        )
+        # log metrics (only if we have valid metrics to log)
+        if metrics:  # will be empty if all metrics were NaN
+            self.log_dict(
+                metrics,
+                on_step=False, on_epoch=True, prog_bar=True, sync_dist=True,
+                batch_size=x.shape[0],
+            )
 
         return None
 
@@ -209,7 +237,7 @@ class BaseModel(pl.LightningModule):
             dictionary with predictions
         """
         # get inputs
-        x = batch['markers']  # or 'features' depending on signal type
+        x = batch['input']
         
         # forward pass
         outputs = self.forward(x)
@@ -337,8 +365,8 @@ class Segmenter(BaseModel):
                 num_hid_units=self.model_config['num_hid_units'],
                 num_layers=self.model_config['num_layers'],
                 num_lags=self.model_config.get('num_lags', 1),
-                activation=self.model_config.get('activation', 'relu'),
-                dropout_rate=self.model_config.get('dropout_rate', 0.2),
+                activation=self.model_config.get('activation', 'lrelu'),
+                dropout_rate=self.model_config.get('dropout_rate', 0.1),
                 seed=self.model_config.get('seed', 42),
             )
         else:
@@ -375,16 +403,16 @@ class Segmenter(BaseModel):
             dictionary with 'logits' and 'probabilities'
         """
         batch_size, sequence_length, features = x.shape
-        
+
         # pass through backbone
         backbone_features = self.backbone(x)
-        
+
         # classify each time step
         logits = self.classifier(backbone_features)
-        
+
         # compute probabilities
         probabilities = F.softmax(logits, dim=-1)
-        
+
         return {
             'logits': logits,
             'probabilities': probabilities,

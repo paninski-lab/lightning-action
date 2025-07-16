@@ -5,8 +5,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from lightning_action.api.model import Model
-
 ROOT = Path(__file__).parent.parent
 
 

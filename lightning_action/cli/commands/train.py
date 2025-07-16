@@ -87,6 +87,10 @@ def handle(args):
     if not args.output:
         now = datetime.datetime.now()
         args.output = Path('runs') / now.strftime('%Y-%m-%d') / now.strftime('%H-%M-%S')
+        args.output.mkdir()
+
+    # Set up logging to the model directory
+    _setup_model_logging(args.output)
 
     # Apply command line overrides
     config = apply_overrides(config, args)
@@ -104,6 +108,29 @@ def handle(args):
     except Exception as e:
         logger.error(f'Training failed: {e}', exc_info=True)
         raise
+
+
+def _setup_model_logging(output_dir: Path):
+    """Set up additional logging to the model directory and remove original file handler."""
+
+    # Create log file path
+    log_file = output_dir / 'training.log'
+
+    # Get the root logger
+    root_logger = logging.getLogger()
+
+    # Create a new file handler for the model directory
+    model_handler = logging.FileHandler(log_file)
+    model_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter(
+        '%(asctime)s %(levelname)s  %(name)s : %(message)s'
+    )
+    model_handler.setFormatter(formatter)
+
+    # Add the new handler to the root logger
+    root_logger.addHandler(model_handler)
+
+    return model_handler
 
 
 @typechecked

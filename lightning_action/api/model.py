@@ -15,7 +15,7 @@ import torch
 import yaml
 from typeguard import typechecked
 
-from lightning_action.data import DataModule
+from lightning_action.data import DataModule, compute_sequence_pad
 from lightning_action.models.segmenter import Segmenter
 from lightning_action.train import train
 
@@ -141,23 +141,96 @@ class Model:
             if 'VelocityConcat' in config['data']['transforms']:
                 config['model']['input_size'] *= 2
 
+        # compute sequence pad
+        config['model']['sequence_pad'] = compute_sequence_pad(
+            config['model']['backbone'], **config['model'],
+        )
+
         model = Segmenter(config)
 
         return cls(model, config, model_dir=None)
 
-    def train(self, output_dir: str | Path = 'runs/default'):
+    def train(self, output_dir: str | Path = 'runs/default', post_inference: bool = True):
         """Train the model using PyTorch Lightning.
+
+        After training is complete, automatically runs inference on all experiment IDs
+        used for training and saves predictions to output_dir/predictions/.
 
         Args:
             output_dir: directory to save checkpoints and logs
+            post_inference: run inference on all training expts and store in model_dir/predictions
         """
         self.model_dir = Path(output_dir)
         self.model_dir.mkdir(exist_ok=True, parents=True)
         with chdir(self.model_dir):
             self.model = train(self.config, self.model, output_dir=self.model_dir)
+
+        # automatically run inference on training experiments
+        if post_inference:
+            self._run_post_training_inference()
+    
+    def _run_post_training_inference(self):
+        """Run inference on all training experiment IDs after training completes.
+        
+        This method extracts the experiment IDs from the training configuration,
+        determines the appropriate data path and input directory, and runs inference
+        on all experiments used for training.
+        """
+        if self.model is None:
+            print('Warning: No trained model found, skipping post-training inference')
+            return
+            
+        if self.model_dir is None:
+            print('Warning: No model directory found, skipping post-training inference')
+            return
+            
+        # extract data configuration to get experiment IDs and paths
+        data_config = self.config.get('data', {})
+        
+        # check if we have data_path configuration (simplified format)
+        if 'data_path' in data_config:
+            data_path = data_config['data_path']
+            input_dir = data_config.get('input_dir', 'markers')
+            expt_ids = data_config.get('expt_ids', None)  # None means all experiments
+        else:
+            # full format configuration - extract from ids
+            if 'ids' in data_config:
+                # we have full config format, but need to figure out data_path
+                print('Warning: Full data config format detected. Cannot determine '
+                      'data_path for automatic inference.')
+                print('Skipping post-training inference. Use predict() method manually '
+                      'if needed.')
+                return
+            else:
+                print('Warning: No data path found in configuration, skipping '
+                      'post-training inference')
+                return
+        
+        # create predictions directory
+        predictions_dir = self.model_dir / 'predictions'
+        predictions_dir.mkdir(exist_ok=True)
+        
+        print(f'Running post-training inference on all training experiments...')
+        print(f'Data path: {data_path}')
+        print(f'Input directory: {input_dir}')
+        print(f'Experiment IDs: {expt_ids if expt_ids else "all"}')
+        print(f'Predictions will be saved to: {predictions_dir}')
+        
+        try:
+            # run inference using the existing predict method
+            self.predict(
+                data_path=data_path,
+                input_dir=input_dir,
+                output_dir=predictions_dir,
+                expt_ids=expt_ids,
+            )
+            print('Post-training inference completed successfully!')
+        except Exception as e:
+            print(f'Warning: Post-training inference failed with error: {e}')
+            print('Training completed successfully, but automatic inference was skipped.')
     
     def predict(
-        self, 
+        self,
         data_path: str | Path,
         input_dir: str,
         output_dir: str | Path,

@@ -18,7 +18,6 @@ from lightning.pytorch.utilities import rank_zero_only
 from typeguard import typechecked
 
 from lightning_action.data import DataModule
-from lightning_action.data.transforms import ZScore
 from lightning_action.data import transforms as transform_module
 
 logger = logging.getLogger(__name__)
@@ -112,7 +111,7 @@ def train(
         logger.info("Computing class weights...")
         class_weights = compute_class_weights(
             datamodule,
-            ignore_class=data_config.get('ignore_class', 0)
+            ignore_index=data_config.get('ignore_index', -100),
         )
 
         # update model configuration with class weights
@@ -182,8 +181,6 @@ def train(
     trainer_config = {
         'max_epochs': num_epochs,
         'min_epochs': training_config.get('min_epochs', 1),
-        'check_val_every_n_epoch': training_config.get('check_val_every_n_epoch', 1),
-        'log_every_n_steps': training_config.get('log_every_n_steps', 10),
         'callbacks': callbacks,
         'logger': tb_logger,
         'default_root_dir': output_dir,
@@ -364,15 +361,15 @@ def build_data_config_from_path(
         for signal_type in signal_types:
 
             signal_dir = data_path / signal_type
-            signal_file = signal_dir / f"{expt_id}.csv"
+            signal_file = next(signal_dir.glob(f"{expt_id}*.csv"))
             if not signal_file.exists():
                 raise FileNotFoundError(f"Signal file not found: {signal_file}")
             expt_paths.append(signal_file)
 
             expt_signals.append(signal_type)
-            
+
             # set up transforms: configurable transforms for markers/features, None for labels
-            if signal_type.startswith(('markers', 'features')):
+            if not signal_type.startswith('labels'):
                 signal_transforms = []
                 for transform in transforms:
                     signal_transforms.append(create_transform_instance(transform))
@@ -402,7 +399,7 @@ def build_data_config_from_path(
 
 
 @typechecked
-def compute_class_weights(datamodule: DataModule, ignore_class: int = 0) -> list[float]:
+def compute_class_weights(datamodule: DataModule, ignore_index: int = -100) -> list[float]:
     """Compute class weights for imbalanced dataset.
     
     Computes weights inversely proportional to class frequency, with the most
@@ -410,7 +407,7 @@ def compute_class_weights(datamodule: DataModule, ignore_class: int = 0) -> list
     
     Args:
         datamodule: Lightning DataModule with class counting capability
-        ignore_class: class index to ignore (typically background class)
+        ignore_index: class index to ignore (typically background class)
         
     Returns:
         list of class weights
@@ -469,8 +466,8 @@ def compute_class_weights(datamodule: DataModule, ignore_class: int = 0) -> list
             totals[int(cls)] = count
     
     # ignore background class if specified
-    if 0 <= ignore_class < len(totals):
-        totals[ignore_class] = 0
+    if 0 <= ignore_index < len(totals):
+        totals[ignore_index] = 0
     
     # compute class weights: most frequent class gets weight 1.0,
     # others get weights inversely proportional to frequency

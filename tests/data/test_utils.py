@@ -35,18 +35,21 @@ class TestComputeSequencePad:
 
     def test_temporal_mlp(self):
         """Test padding calculation for temporal-mlp model."""
-        result = compute_sequence_pad('temporal-mlp', n_lags=5)
+        result = compute_sequence_pad('temporal-mlp', num_lags=5)
+        assert result == 5
+
+        result = compute_sequence_pad('temporalmlp', num_lags=5)
         assert result == 5
 
     def test_tcn(self):
         """Test padding calculation for tcn model."""
-        result = compute_sequence_pad('tcn', n_layers=3, n_lags=2)
+        result = compute_sequence_pad('tcn', num_layers=3, num_lags=2)
         expected = (2 ** 3) * 2  # 16
         assert result == expected
 
     def test_dtcn(self):
         """Test padding calculation for dtcn model."""
-        result = compute_sequence_pad('dtcn', n_lags=1, n_hid_layers=3)
+        result = compute_sequence_pad('dtcn', num_lags=1, num_layers=3)
         expected = sum([2 * (2 ** n) * 1 for n in range(3)])  # 2 + 4 + 8 = 14
         assert result == expected
 
@@ -62,8 +65,8 @@ class TestComputeSequencePad:
 
     def test_case_insensitive(self):
         """Test that model type is case insensitive."""
-        result_lower = compute_sequence_pad('temporal-mlp', n_lags=3)
-        result_upper = compute_sequence_pad('TEMPORAL-MLP', n_lags=3)
+        result_lower = compute_sequence_pad('temporal-mlp', num_lags=3)
+        result_upper = compute_sequence_pad('TEMPORAL-MLP', num_lags=3)
         assert result_lower == result_upper == 3
 
     def test_unknown_model_type(self):

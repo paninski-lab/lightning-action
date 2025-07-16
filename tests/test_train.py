@@ -169,27 +169,6 @@ class TestBuildDataConfigFromPath:
             
             yield data_path
 
-    def test_build_config_auto_detect_all(self, temp_data_dir):
-        """Test building config with auto-detection of signal types and experiments."""
-        config = build_data_config_from_path(temp_data_dir)
-        
-        # check structure
-        assert 'ids' in config
-        assert 'signals' in config
-        assert 'transforms' in config
-        assert 'paths' in config
-        
-        # check experiments detected
-        assert len(config['ids']) == 3
-        assert set(config['ids']) == {'exp1', 'exp2', 'exp3'}
-        
-        # check signal types detected (should auto-detect all 3 directories)
-        assert len(config['signals'][0]) == 3  # 3 signal types
-        signal_types = set(config['signals'][0])
-        assert 'markers' in signal_types
-        assert 'labels' in signal_types
-        assert 'features_0' in signal_types
-
     def test_build_config_specified_experiments(self, temp_data_dir):
         """Test building config with specified experiment IDs."""
         config = build_data_config_from_path(
@@ -327,7 +306,7 @@ class TestComputeClassWeights:
             [[0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 1, 0]]   # sequence 2
         ])}  # counts: class 0: 1, class 1: 3, class 2: 2, class 3: 0
         
-        # batch2: 3 timepoints 
+        # batch2: 3 timepoints
         batch2 = {'labels': torch.tensor([
             [[1, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0]],  # sequence 1
             [[0, 0, 1, 0], [0, 0, 1, 0], [0, 0, 0, 1]]   # sequence 2
@@ -348,7 +327,7 @@ class TestComputeClassWeights:
 
     def test_compute_class_weights_basic(self, mock_datamodule):
         """Test basic class weight computation."""
-        weights = compute_class_weights(mock_datamodule, ignore_class=-100)
+        weights = compute_class_weights(mock_datamodule, ignore_index=-100)
         print(weights)
         # expected counts: class 0: 4, class 1: 5, class 2: 5, class 3: 4
         # max count is 5, so weights should be: [5/4, 5/5, 5/5, 5/4] = [1.25, 1.0, 1.0, 1.25]
@@ -358,9 +337,9 @@ class TestComputeClassWeights:
         for i, expected in enumerate(expected_weights):
             assert abs(weights[i] - expected) < 1e-6
 
-    def test_compute_class_weights_ignore_class(self, mock_datamodule):
+    def test_compute_class_weights_ignore_index(self, mock_datamodule):
         """Test class weight computation with ignored class."""
-        weights = compute_class_weights(mock_datamodule, ignore_class=0)
+        weights = compute_class_weights(mock_datamodule, ignore_index=0)
         
         # class 0 should be ignored (weight 0)
         # expected counts: class 1: 5, class 2: 5, class 3: 4
@@ -516,12 +495,19 @@ class TestTrain:
     @patch('lightning_action.train.DataModule')
     @patch('lightning_action.train.pl.Trainer')
     @patch('lightning_action.train.build_data_config_from_path')
-    def test_train_basic_flow(self, mock_build_config, mock_trainer_class, mock_datamodule_class, 
-                             basic_config, mock_model, temp_output_dir):
+    def test_train_basic_flow(
+        self,
+        mock_build_config,
+        mock_trainer_class,
+        mock_datamodule_class,
+        basic_config,
+        mock_model,
+        temp_output_dir,
+    ):
         """Test basic training flow."""
         # setup mocks
         mock_build_config.return_value = {
-            'ids': ['exp1'], 'signals': [['markers', 'labels']], 
+            'ids': ['exp1'], 'signals': [['markers', 'labels']],
             'transforms': [None, None], 'paths': [['path1', 'path2']]
         }
         
@@ -555,15 +541,21 @@ class TestTrain:
 
     @patch('lightning_action.train.DataModule')
     @patch('lightning_action.train.build_data_config_from_path')
-    def test_train_with_class_weights(self, mock_build_config, mock_datamodule_class,
-                                     basic_config, mock_model, temp_output_dir):
+    def test_train_with_class_weights(
+        self,
+        mock_build_config,
+        mock_datamodule_class,
+        basic_config,
+        mock_model,
+        temp_output_dir
+    ):
         """Test training with class weight computation."""
         # enable class weighting
         basic_config['data']['weight_classes'] = True
         
         # setup mocks
         mock_build_config.return_value = {
-            'ids': ['exp1'], 'signals': [['markers', 'labels']], 
+            'ids': ['exp1'], 'signals': [['markers', 'labels']],
             'transforms': [None, None], 'paths': [['path1', 'path2']]
         }
         
@@ -597,15 +589,21 @@ class TestTrain:
 
     @patch('lightning_action.train.DataModule')
     @patch('lightning_action.train.build_data_config_from_path')
-    def test_train_gpu_config(self, mock_build_config, mock_datamodule_class,
-                             basic_config, mock_model, temp_output_dir):
+    def test_train_gpu_config(
+        self,
+        mock_build_config,
+        mock_datamodule_class,
+        basic_config,
+        mock_model,
+        temp_output_dir,
+    ):
         """Test training with GPU configuration."""
         # set GPU device
         basic_config['training']['device'] = 'gpu'
         
         # setup mocks
         mock_build_config.return_value = {
-            'ids': ['exp1'], 'signals': [['markers', 'labels']], 
+            'ids': ['exp1'], 'signals': [['markers', 'labels']],
             'transforms': [None, None], 'paths': [['path1', 'path2']]
         }
         

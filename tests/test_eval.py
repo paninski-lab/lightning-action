@@ -43,7 +43,7 @@ class TestGetPrecisionRecall:
         
         # class 1: 2 correct predictions out of 3 true → recall = 2/3
         # class 1: 2 correct predictions out of 3 predicted → precision = 2/3
-        # class 2: 2 correct predictions out of 3 true → recall = 2/3  
+        # class 2: 2 correct predictions out of 3 true → recall = 2/3
         # class 2: 2 correct predictions out of 3 predicted → precision = 2/3
         expected_precision = [1, 2/3, 2/3]
         expected_recall = [1, 2/3, 2/3]
