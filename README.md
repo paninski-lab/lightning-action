@@ -64,8 +64,9 @@ Create a YAML configuration file (see `configs/segmenter_example.yaml`):
 data:
   data_path: /path/to/your/data
   input_dir: markers
-  transforms: ['ZScore']  # optional, defaults to ZScore
-  
+  transforms:  # optional, defaults to ZScore
+    - ZScore
+
 model:
   input_size: 10
   output_size: 4
@@ -122,6 +123,36 @@ model.predict(
 ```
 
 See `configs/README.md` for detailed configuration options.
+
+## Monitoring Training with TensorBoard
+
+Lightning Action automatically logs training metrics to TensorBoard. To visualize your training progress:
+
+1. **Launch TensorBoard** after starting training:
+   ```bash
+   tensorboard --logdir /path/to/your/runs/directory
+   ```
+
+2. **Set the correct logdir**: Use the deepest directory that contains all your model directories. For example:
+   ```bash
+   # If your models are in:
+   # runs/experiment1/
+   # runs/experiment2/
+   # runs/baseline/
+   
+   # Launch TensorBoard with:
+   tensorboard --logdir runs/
+   ```
+
+3. **Open your browser** and navigate to `http://localhost:6006` to view the TensorBoard dashboard.
+
+4. **Available metrics** include:
+   - Training and validation loss
+   - Training and validation accuracy
+   - Training and validation F1 score
+   - Learning rate schedules
+
+**Tip**: Keep TensorBoard running while training multiple experiments to compare results in real-time.
 
 ## Development
 
