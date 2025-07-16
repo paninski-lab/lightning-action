@@ -85,7 +85,7 @@ class TestModelIntegration:
             output_dir = Path(temp_dir) / 'test_run'
             
             # train model
-            model.train(output_dir=output_dir)
+            model.train(output_dir=output_dir, post_inference=False)
             
             # check that model was trained
             assert model.model is not None
@@ -108,7 +108,7 @@ class TestModelIntegration:
             output_dir = Path(temp_dir) / 'test_run_gpu'
             
             # train model
-            model.train(output_dir=output_dir)
+            model.train(output_dir=output_dir, post_inference=False)
             
             # check that model was trained
             assert model.model is not None
@@ -160,7 +160,7 @@ class TestModelIntegration:
         
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / 'test_run'
-            model.train(output_dir=output_dir)
+            model.train(output_dir=output_dir, post_inference=False)
             
             # test prediction
             prediction_dir = Path(temp_dir) / 'predictions'
@@ -197,7 +197,7 @@ class TestModelIntegration:
         
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / 'test_run_gpu'
-            model.train(output_dir=output_dir)
+            model.train(output_dir=output_dir, post_inference=False)
             
             # test prediction
             prediction_dir = Path(temp_dir) / 'predictions_gpu'
@@ -228,7 +228,7 @@ class TestModelIntegration:
         
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / 'test_run'
-            model.train(output_dir=output_dir)
+            model.train(output_dir=output_dir, post_inference=False)
             
             # test prediction on all experiments
             prediction_dir = Path(temp_dir) / 'predictions_all'
@@ -285,7 +285,7 @@ class TestModelIntegration:
                 output_dir = Path(temp_dir) / f'test_run_{backbone}'
                 
                 # train model
-                model.train(output_dir=output_dir)
+                model.train(output_dir=output_dir, post_inference=False)
                 
                 # check that model was trained successfully
                 assert model.model is not None
@@ -350,7 +350,7 @@ class TestModelIntegration:
             output_dir = Path(temp_dir) / 'test_run'
 
             # train model
-            model.train(output_dir=output_dir)
+            model.train(output_dir=output_dir, post_inference=False)
 
             # check that model was trained
             assert model.model is not None
@@ -360,6 +360,61 @@ class TestModelIntegration:
             assert output_dir.exists()
             assert (output_dir / 'config.yaml').exists()
             assert (output_dir / 'final_model.ckpt').exists()
+
+    def test_model_train_cpu_post_inference(self, data_dir, fast_config):
+        """Test that post-training inference runs automatically on all training experiments."""
+        # update data path to be absolute
+        fast_config['data']['data_path'] = str(data_dir)
+        
+        model = Model.from_config(fast_config)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / 'test_run'
+            
+            # train model with post-training inference enabled (default behavior)
+            model.train(output_dir=output_dir, post_inference=True)
+            
+            # check that model was trained
+            assert model.model is not None
+            assert model.model_dir == output_dir
+            
+            # check that training files were created
+            assert output_dir.exists()
+            assert (output_dir / 'config.yaml').exists()
+            assert (output_dir / 'final_model.ckpt').exists()
+            
+            # check that predictions directory was created
+            predictions_dir = output_dir / 'predictions'
+            assert predictions_dir.exists()
+            
+            # check that prediction files were created for all experiments
+            prediction_files = list(predictions_dir.glob('*_predictions.npy'))
+            assert len(prediction_files) >= 2  # should have multiple experiments
+            
+            # check that each prediction file exists for expected experiments
+            expected_experiments = ['2019_06_26_fly2', '2019_08_07_fly2']
+            found_experiments = []
+            
+            for pred_file in prediction_files:
+                # extract experiment ID from filename
+                expt_id = pred_file.name.replace('_predictions.npy', '')
+                found_experiments.append(expt_id)
+                
+                # load and check predictions
+                predictions = np.load(pred_file)
+                assert predictions.ndim == 2
+                assert predictions.shape[1] == fast_config['model']['output_size']
+                
+                # probabilities should sum to 1
+                prob_sums = np.sum(predictions, axis=1)
+                assert np.allclose(prob_sums, 1.0, atol=1e-6)
+                
+                # should have reasonable number of time steps
+                assert predictions.shape[0] > 10
+            
+            # verify that all expected experiments have predictions
+            for expected_expt in expected_experiments:
+                assert expected_expt in found_experiments, f'Missing predictions for {expected_expt}'
 
 
 class TestModelSequencePadding:
