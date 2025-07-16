@@ -263,23 +263,24 @@ class Model:
             expt_ids=expt_ids,
             signal_types=[input_dir],
         )
-        
+
         # get training config
         training_config = self.config.get('training', {})
-        
+
         # loop over each experiment and create separate predictions
         experiment_ids = data_config['ids']
-        
+
         for expt_id in experiment_ids:
             print(f'Generating predictions for experiment: {expt_id}')
-            
+
             # create data config for single experiment
             single_expt_config = build_data_config_from_path(
                 data_path=data_path,
                 expt_ids=[expt_id],
                 signal_types=[input_dir],
+                transforms=self.config['data'].get('transforms', None),
             )
-            
+
             # create datamodule for this experiment
             datamodule = DataModule(
                 data_config=single_expt_config,
