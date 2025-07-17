@@ -1,5 +1,8 @@
 # Lightning Action
 
+![GitHub](https://img.shields.io/github/license/paninski-lab/lightning-action)
+![PyPI](https://img.shields.io/pypi/v/lightning-action)
+
 A modern action segmentation framework built with PyTorch Lightning for behavioral analysis.
 
 ## Features
@@ -112,7 +115,7 @@ litaction predict --model-dir runs/my_experiment --data-path /path/to/data --inp
 #### Using the Python API:
 ```python
 # Load trained model
-model = Model.from_checkpoint('runs/my_experiment')
+model = Model.from_dir('runs/my_experiment')
 
 # Generate predictions
 model.predict(
