@@ -11,6 +11,7 @@ from typing import Any
 
 import lightning as pl
 import numpy as np
+import pandas as pd
 import torch
 import yaml
 from typeguard import typechecked
@@ -319,8 +320,9 @@ class Model:
             
             # stack and save predictions for this experiment
             final_probs = np.vstack(all_probs)
-            output_file = output_dir / f'{expt_id}_predictions.npy'
-            np.save(output_file, final_probs)
+            df = pd.DataFrame(data=final_probs, columns=self.model.config['data']['label_names'])
+            output_file = output_dir / f'{expt_id}_predictions.csv'
+            df.to_csv(output_file)
             print(f'Saved predictions to {output_file}')
-        
+
         print(f'Completed predictions for {len(experiment_ids)} experiments in {output_dir}')
