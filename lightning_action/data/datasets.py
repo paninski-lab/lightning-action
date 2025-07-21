@@ -67,6 +67,7 @@ class FeatureDataset(Dataset):
         
         # data properties (set during loading)
         self.input_size = 0
+        self.data_lengths = []
         self.feature_names = []
         self.label_names = []
         
@@ -92,7 +93,7 @@ class FeatureDataset(Dataset):
             logger.debug(f'Loading dataset {dataset_id}')
             
             # load data for this dataset
-            dataset_data = self._load_dataset_data(dataset_idx)
+            dataset_data, dataset_length = self._load_dataset_data(dataset_idx)
             
             # create sequences for this dataset
             dataset_sequences = self._create_dataset_sequences(dataset_data, dataset_id)
@@ -105,6 +106,9 @@ class FeatureDataset(Dataset):
                     'dataset_idx': dataset_idx,
                     'sequence_idx': seq_idx
                 })
+                
+            # record length of original inputs
+            self.data_lengths.append(dataset_length)
 
     def _load_dataset_data(self, dataset_idx: int) -> OrderedDict:
         """Load raw data for a single dataset.
@@ -162,7 +166,7 @@ class FeatureDataset(Dataset):
         if len(set(data_lengths)) > 1:
             raise ValueError(f'All signals must have same length, got {data_lengths}')
         
-        return data
+        return data, data_lengths[0]
 
     def _load_markers(
         self,
