@@ -235,6 +235,7 @@ class Model:
         data_path: str | Path,
         input_dir: str,
         output_dir: str | Path,
+        output_file: str | Path | None = None,
         expt_ids: list[str] | None = None,
     ):
         """Generate predictions for data using the trained model.
@@ -245,6 +246,7 @@ class Model:
             data_path: path to data directory with signal directories
             input_dir: 'markers' | 'features' | etc.
             output_dir: directory to save prediction files (one per experiment)
+            output_file: full path to save prediction file; overwrites output_dir if not None
             expt_ids: list of experiment IDs to predict on (None for all)
             
         Raises:
@@ -252,10 +254,10 @@ class Model:
         """
         if self.model is None:
             raise ValueError('Model must be trained or loaded before prediction')
-            
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        
+
+        if output_file is not None and (expt_ids is not None and len(expt_ids) > 1):
+            raise RuntimeError('Can only supply `output_file` when specifying a single expt_id')
+
         # build data configuration to get available experiments
         from lightning_action.train import build_data_config_from_path
         
@@ -335,8 +337,12 @@ class Model:
             
             # create dataframe and save predictions for this experiment
             df = pd.DataFrame(data=final_probs, columns=self.model.config['data']['label_names'])
-            output_file = output_dir / f'{expt_id}_predictions.csv'
-            df.to_csv(output_file)
-            print(f'Saved predictions to {output_file}')
+            if output_file is not None:
+                output_file_ = Path(output_file)
+            else:
+                output_file_ = output_dir / f'{expt_id}_predictions.csv'
+            output_file_.parent.mkdir(exist_ok=True, parents=True)
+            df.to_csv(output_file_)
+            print(f'Saved predictions to {output_file_}')
 
         print(f'Completed predictions for {len(experiment_ids)} experiments in {output_dir}')
