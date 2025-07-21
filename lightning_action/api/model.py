@@ -271,7 +271,7 @@ class Model:
         # loop over each experiment and create separate predictions
         experiment_ids = data_config['ids']
 
-        for expt_id in experiment_ids:
+        for experiment_index, expt_id in enumerate(experiment_ids):
             print(f'Generating predictions for experiment: {expt_id}')
 
             # create data config for single experiment
@@ -318,8 +318,22 @@ class Model:
                 probs = batch_preds['probabilities'][0]  # remove batch dim
                 all_probs.append(probs.cpu().numpy())
             
-            # stack and save predictions for this experiment
+            # stack predictions from all sequences
             final_probs = np.vstack(all_probs)
+            
+            # get original data length for this experiment and pad with NaNs if needed
+            original_length = datamodule.dataset.data_lengths[0]  # single experiment
+            current_length = final_probs.shape[0]
+            
+            if current_length < original_length:
+                # pad with NaNs to match original input file length
+                num_classes = final_probs.shape[1]
+                padding_rows = original_length - current_length
+                nan_padding = np.full((padding_rows, num_classes), np.nan)
+                final_probs = np.vstack([final_probs, nan_padding])
+                print(f'Padded predictions from {current_length} to {original_length} rows')
+            
+            # create dataframe and save predictions for this experiment
             df = pd.DataFrame(data=final_probs, columns=self.model.config['data']['label_names'])
             output_file = output_dir / f'{expt_id}_predictions.csv'
             df.to_csv(output_file)

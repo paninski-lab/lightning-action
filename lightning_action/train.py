@@ -122,10 +122,9 @@ def train(
 
         # also store in main config for saving
         config['model']['class_weights'] = class_weights
-        config['model']['class_weights']
     else:
         logger.info("Class weighting disabled")
-        class_weights = None
+        config['model']['class_weights'] = None
 
     # save feature/label names to config
     feature_names = datamodule.dataset.feature_names
