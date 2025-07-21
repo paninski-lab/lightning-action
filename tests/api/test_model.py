@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 import torch
 import yaml
@@ -173,17 +174,17 @@ class TestModelIntegration:
             
             # check prediction directory and file were created
             assert prediction_dir.exists()
-            prediction_file = prediction_dir / '2019_06_26_fly2_predictions.npy'
+            prediction_file = prediction_dir / '2019_06_26_fly2_predictions.csv'
             assert prediction_file.exists()
             
             # load and check predictions
-            predictions = np.load(prediction_file)
-            assert predictions.ndim == 2  # (time_steps, num_classes)
+            predictions = pd.read_csv(prediction_file, index_col=0, header=[0])
+            assert len(predictions.shape) == 2  # (time_steps, num_classes)
             assert predictions.shape[0] < 50000
             assert predictions.shape[1] == fast_config['model']['output_size']
             
             # probabilities should sum to 1
-            prob_sums = np.sum(predictions, axis=1)
+            prob_sums = np.sum(predictions.to_numpy(), axis=1)
             assert np.allclose(prob_sums, 1.0, atol=1e-6)
 
     @pytest.mark.skipif(not torch.cuda.is_available(), reason="GPU not available")
@@ -210,12 +211,12 @@ class TestModelIntegration:
             
             # check prediction directory and file were created
             assert prediction_dir.exists()
-            prediction_file = prediction_dir / '2019_06_26_fly2_predictions.npy'
+            prediction_file = prediction_dir / '2019_06_26_fly2_predictions.csv'
             assert prediction_file.exists()
             
             # load and check predictions
-            predictions = np.load(prediction_file)
-            assert predictions.ndim == 2
+            predictions = pd.read_csv(prediction_file, index_col=0, header=[0])
+            assert len(predictions.shape) == 2  # (time_steps, num_classes)
             assert predictions.shape[1] == gpu_config['model']['output_size']
 
     def test_model_predict_all_experiments(self, data_dir, fast_config):
@@ -243,22 +244,22 @@ class TestModelIntegration:
             assert prediction_dir.exists()
             
             # check that separate files were created for each experiment
-            prediction_files = list(prediction_dir.glob('*_predictions.npy'))
+            prediction_files = list(prediction_dir.glob('*_predictions.csv'))
             assert len(prediction_files) >= 2  # should have multiple experiments
             
             # check each prediction file
             for pred_file in prediction_files:
                 # extract experiment ID from filename
-                expt_id = pred_file.name.replace('_predictions.npy', '')
+                expt_id = pred_file.name.replace('_predictions.csv', '')
                 assert expt_id in ['2019_06_26_fly2', '2019_08_07_fly2']
                 
                 # load and check predictions
-                predictions = np.load(pred_file)
-                assert predictions.ndim == 2
+                predictions = pd.read_csv(pred_file, index_col=0, header=[0])
+                assert len(predictions.shape) == 2  # (time_steps, num_classes)
                 assert predictions.shape[1] == fast_config['model']['output_size']
                 
                 # probabilities should sum to 1
-                prob_sums = np.sum(predictions, axis=1)
+                prob_sums = np.sum(predictions.to_numpy(), axis=1)
                 assert np.allclose(prob_sums, 1.0, atol=1e-6)
                 
                 # should have reasonable number of time steps
@@ -317,22 +318,22 @@ class TestModelIntegration:
             )
 
             # check that separate files were created for each experiment
-            prediction_files = list(output_dir.glob('*_predictions.npy'))
+            prediction_files = list(output_dir.glob('*_predictions.csv'))
             assert len(prediction_files) >= 2  # should have multiple experiments
 
             # check each prediction file
             for pred_file in prediction_files:
                 # extract experiment ID from filename
-                expt_id = pred_file.name.replace('_predictions.npy', '')
+                expt_id = pred_file.name.replace('_predictions.csv', '')
                 assert expt_id in ['2019_06_26_fly2', '2019_08_07_fly2']
 
                 # load and check predictions
-                predictions = np.load(pred_file)
-                assert predictions.ndim == 2
+                predictions = pd.read_csv(pred_file, index_col=0, header=[0])
+                assert len(predictions.shape) == 2  # (time_steps, num_classes)
                 assert predictions.shape[1] == fast_config['model']['output_size']
 
                 # probabilities should sum to 1
-                prob_sums = np.sum(predictions, axis=1)
+                prob_sums = np.sum(predictions.to_numpy(), axis=1)
                 assert np.allclose(prob_sums, 1.0, atol=1e-6)
 
                 # should have reasonable number of time steps
@@ -388,7 +389,7 @@ class TestModelIntegration:
             assert predictions_dir.exists()
             
             # check that prediction files were created for all experiments
-            prediction_files = list(predictions_dir.glob('*_predictions.npy'))
+            prediction_files = list(predictions_dir.glob('*_predictions.csv'))
             assert len(prediction_files) >= 2  # should have multiple experiments
             
             # check that each prediction file exists for expected experiments
@@ -397,18 +398,18 @@ class TestModelIntegration:
             
             for pred_file in prediction_files:
                 # extract experiment ID from filename
-                expt_id = pred_file.name.replace('_predictions.npy', '')
+                expt_id = pred_file.name.replace('_predictions.csv', '')
                 found_experiments.append(expt_id)
-                
+
                 # load and check predictions
-                predictions = np.load(pred_file)
-                assert predictions.ndim == 2
+                predictions = pd.read_csv(pred_file, index_col=0, header=[0])
+                assert len(predictions.shape) == 2  # (time_steps, num_classes)
                 assert predictions.shape[1] == fast_config['model']['output_size']
-                
+
                 # probabilities should sum to 1
-                prob_sums = np.sum(predictions, axis=1)
+                prob_sums = np.sum(predictions.to_numpy(), axis=1)
                 assert np.allclose(prob_sums, 1.0, atol=1e-6)
-                
+
                 # should have reasonable number of time steps
                 assert predictions.shape[0] > 10
             

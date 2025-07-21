@@ -122,9 +122,20 @@ def train(
 
         # also store in main config for saving
         config['model']['class_weights'] = class_weights
+        config['model']['class_weights']
     else:
         logger.info("Class weighting disabled")
         class_weights = None
+
+    # save feature/label names to config
+    feature_names = datamodule.dataset.feature_names
+    if len(feature_names) > 0:
+        config['data']['feature_names'] = feature_names
+        model.config['data']['feature_names'] = feature_names
+    label_names = datamodule.dataset.label_names
+    if len(label_names) > 0:
+        config['data']['label_names'] = label_names
+        model.config['data']['label_names'] = label_names
 
     # update training steps information for schedulers
     num_epochs = training_config.get('num_epochs', 100)
