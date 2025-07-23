@@ -252,6 +252,9 @@ class Model:
         Raises:
             ValueError: if model is not trained
         """
+
+        data_path = Path(data_path)
+
         if self.model is None:
             raise ValueError('Model must be trained or loaded before prediction')
 
