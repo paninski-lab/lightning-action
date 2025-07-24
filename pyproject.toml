@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "lightning-action"
-version = "0.1.0"
+version = "0.2.0"
 description = "Action segmentation framework built with PyTorch Lightning"
 license = "MIT"
 readme = "README.md"
