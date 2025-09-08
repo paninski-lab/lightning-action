@@ -17,6 +17,7 @@ import yaml
 from lightning.pytorch.utilities import rank_zero_only
 from typeguard import typechecked
 
+from lightning_action import __version__
 from lightning_action.data import DataModule
 from lightning_action.data import transforms as transform_module
 
@@ -158,6 +159,9 @@ def train(
 
     logger.info(f"Creating output directory: {output_dir}")
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # log package version
+    config['version'] = __version__
 
     # save config file
     dest_config_file = output_dir / 'config.yaml'

@@ -29,7 +29,7 @@ model:
   backbone: temporalmlp
   
   # Backbone parameters
-  num_hid_units: 256
+  num_hid_units: 64
   num_layers: 2
   num_lags: 2
   
@@ -39,7 +39,7 @@ model:
 # Optimizer configuration
 optimizer:
   type: Adam  # Adam or AdamW
-  lr: 1e-3
+  lr: 1e-4
   wd: 1e-4  # weight decay
   
   # Learning rate scheduler (optional)
