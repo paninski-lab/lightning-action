@@ -118,12 +118,18 @@ class BaseModel(pl.LightningModule):
         # flatten for loss computation
         logits_flat = logits.view(-1, self.output_size)
         targets_flat = targets.view(-1, self.output_size)
-        
+
+        # Get class weights from config and move to the correct device
+        class_weights = self.model_config.get('class_weights', None)
+        if class_weights is not None:
+            class_weights = torch.tensor(class_weights, device=self.device, dtype=torch.float)
+            
         # compute cross entropy loss
         loss = F.cross_entropy(
             logits_flat,
             torch.argmax(targets_flat, axis=-1),
             ignore_index=self.ignore_index,
+            weight=class_weights,
         )
 
         # compute metrics
