@@ -28,7 +28,7 @@ def register_parser(subparsers):
         help='Directory containing trained model',
     )
     required.add_argument(
-        '--data', '-d',
+        '--data-dir', '-d',
         type=valid_dir,
         required=True,
         help='Path to data directory with signal directories (markers, labels, etc.)',
@@ -37,7 +37,7 @@ def register_parser(subparsers):
     # Optional arguments
     optional = parser.add_argument_group('options')
     optional.add_argument(
-        '--output', '-o',
+        '--output-dir', '-o',
         type=Path,
         help='Directory to save prediction results (default: <model_dir>/predictions)',
     )
@@ -58,13 +58,13 @@ def register_parser(subparsers):
 def handle(args):
     """Handle the predict command execution."""
     # Set default output directory
-    if not args.output:
-        args.output = args.model / 'predictions'
+    if not args.output_dir:
+        args.output_dir = args.model / 'predictions'
 
     logger.info(f'Loading model from: {args.model}')
-    logger.info(f'Data directory: {args.data}')
+    logger.info(f'Data directory: {args.data_dir}')
     logger.info(f'Input signal type: {args.input_dir}')
-    logger.info(f'Output directory: {args.output}')
+    logger.info(f'Output directory: {args.output_dir}')
 
     if args.expt_ids:
         logger.info(f'Predicting on experiments: {args.expt_ids}')
@@ -82,9 +82,9 @@ def handle(args):
     # Run prediction
     try:
         model.predict(
-            data_path=args.data,
+            data_path=args.data_dir,
             input_dir=args.input_dir,
-            output_dir=args.output,
+            output_dir=args.output_dir,
             expt_ids=args.expt_ids,
         )
         logger.info('Predictions completed successfully')

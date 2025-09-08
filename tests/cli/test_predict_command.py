@@ -16,8 +16,8 @@ class TestHandle:
         """Create mock arguments."""
         args = MagicMock()
         args.model = Path('/test/model')
-        args.data = Path('/test/data')
-        args.output = None
+        args.data_dir = Path('/test/data')
+        args.output_dir = None
         args.input_dir = 'markers'
         args.expt_ids = None
         return args
@@ -32,12 +32,12 @@ class TestHandle:
             
             # check that default output was set
             expected_output = mock_args.model / 'predictions'
-            assert mock_args.output == expected_output
+            assert mock_args.output_dir == expected_output
 
     def test_handle_uses_custom_output(self, mock_args):
         """Test that handle uses custom output directory when provided."""
         custom_output = Path('/custom/output')
-        mock_args.output = custom_output
+        mock_args.output_dir = custom_output
         
         with patch('lightning_action.api.model.Model.from_dir') as mock_from_dir:
             mock_model = MagicMock()
@@ -46,7 +46,7 @@ class TestHandle:
             handle(mock_args)
             
             # check that custom output was preserved
-            assert mock_args.output == custom_output
+            assert mock_args.output_dir == custom_output
 
     def test_handle_loads_model(self, mock_args):
         """Test that handle loads model from directory."""
@@ -69,9 +69,9 @@ class TestHandle:
             
             # check that predict was called with correct arguments
             mock_model.predict.assert_called_once_with(
-                data_path=mock_args.data,
+                data_path=mock_args.data_dir,
                 input_dir=mock_args.input_dir,
-                output_dir=mock_args.output,
+                output_dir=mock_args.output_dir,
                 expt_ids=mock_args.expt_ids,
             )
 

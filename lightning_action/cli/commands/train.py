@@ -34,12 +34,12 @@ def register_parser(subparsers):
     # Optional arguments
     optional = parser.add_argument_group('options')
     optional.add_argument(
-        '--output', '-o',
+        '--output-dir', '-o',
         type=output_dir,
         help='Directory to save model outputs (default: ./runs/YYYY-MM-DD/HH-MM-SS)',
     )
     optional.add_argument(
-        '--data-path',
+        '--data-dir',
         type=Path,
         help='Override data path specified in config',
     )
@@ -84,18 +84,18 @@ def handle(args):
         config = yaml.safe_load(f)
 
     # Determine output directory
-    if not args.output:
+    if not args.output_dir:
         now = datetime.datetime.now()
-        args.output = Path('runs') / now.strftime('%Y-%m-%d') / now.strftime('%H-%M-%S')
-        args.output.mkdir()
+        args.output_dir = Path('runs') / now.strftime('%Y-%m-%d') / now.strftime('%H-%M-%S')
+        args.output_dir.mkdir()
 
     # Set up logging to the model directory
-    _setup_model_logging(args.output)
+    _setup_model_logging(args.output_dir)
 
     # Apply command line overrides
     config = apply_overrides(config, args)
 
-    logger.info(f'Output directory: {args.output}')
+    logger.info(f'Output directory: {args.output_dir}')
     logger.info(f'Config: {config}')
 
     # Create model from config
@@ -103,7 +103,7 @@ def handle(args):
 
     # Train model
     try:
-        model.train(output_dir=args.output)
+        model.train(output_dir=args.output_dir)
         logger.info('Training completed successfully')
     except Exception as e:
         logger.error(f'Training failed: {e}', exc_info=True)
@@ -137,8 +137,8 @@ def _setup_model_logging(output_dir: Path):
 def apply_overrides(config: dict[str, Any], args) -> dict[str, Any]:
     """Apply command line overrides to config."""
     # Apply direct overrides
-    if args.data_path:
-        config['data']['data_path'] = str(args.data_path)
+    if args.data_dir:
+        config['data']['data_path'] = str(args.data_dir)
     
     if args.device:
         config.setdefault('training', {})['device'] = args.device

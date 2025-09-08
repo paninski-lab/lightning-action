@@ -109,7 +109,7 @@ model.train(output_dir='runs/my_experiment')
 
 #### Using the CLI:
 ```bash
-litaction predict --model-dir runs/my_experiment --data-path /path/to/data --input-dir markers --output-dir predictions/
+litaction predict --model-dir runs/my_experiment --data-dir /path/to/data --input-dir markers --output-dir predictions/
 ```
 
 #### Using the Python API:

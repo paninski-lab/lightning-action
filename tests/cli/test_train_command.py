@@ -108,7 +108,7 @@ class TestApplyOverrides:
         """Test data path override."""
         config = {'data': {'data_path': '/old/path'}}
         args = MagicMock()
-        args.data_path = '/new/path'
+        args.data_dir = '/new/path'
         args.device = None
         args.epochs = None
         args.batch_size = None
@@ -123,7 +123,7 @@ class TestApplyOverrides:
         """Test training parameter overrides."""
         config = {}
         args = MagicMock()
-        args.data_path = None
+        args.data_dir = None
         args.device = 'gpu'
         args.epochs = 100
         args.batch_size = 32
@@ -142,7 +142,7 @@ class TestApplyOverrides:
         """Test custom overrides via --overrides."""
         config = {}
         args = MagicMock()
-        args.data_path = None
+        args.data_dir = None
         args.device = None
         args.epochs = None
         args.batch_size = None
@@ -172,8 +172,8 @@ class TestHandle:
     def mock_args(self, tmpdir):
         """Create mock arguments."""
         args = MagicMock()
-        args.output = tmpdir
-        args.data_path = None
+        args.output_dir = tmpdir
+        args.data_dir = None
         args.device = None
         args.epochs = None
         args.batch_size = None
@@ -199,6 +199,7 @@ class TestHandle:
             # check that Model.from_config was called
             mock_model_class.assert_called_once()
             config_arg = mock_model_class.call_args[0][0]
+            print(config_arg['data']['data_path'])
             assert config_arg['data']['data_path'] == '/test/data'
 
         # cleanup
