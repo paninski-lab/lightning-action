@@ -1,0 +1,43 @@
+data:
+  videos_dir: /teamspace/studios/this_studio/lightning-action/data/videos  # MP4 directory
+  labels_dir: /teamspace/studios/this_studio/lightning-action/data/labels_numpy  # Numpy directory
+  expt_ids:
+  - 1.1.28R
+  - 1.1.28L
+  - 1.2.2R
+  - 1.2.28R
+  - 1.3.1R
+  - 1.4.1R
+  - 2.1.28L
+  - 3.1.28L
+  - 3.2.28L
+  ignore_index: -100
+  seed: 1
+model:
+  backbone: dtcn
+  activation: lrelu
+  dropout_rate: 0.1
+  input_size: 1536
+  num_hid_units: 64
+  num_lags: 2
+  num_layers: 4
+  output_size: 3
+  seed: 1
+  beast_checkpoint: /teamspace/studios/this_studio/lightning-action/data/checkpoints/beast/vitm.ckpt
+  freeze_beast: true
+optimizer:
+  T_max: 400
+  lr: 0.000347687001741302
+  scheduler: null
+  type: Adam
+  wd: 0.0001
+training:
+  batch_size: 1  
+  device: gpu
+  early_stopping: true
+  early_stopping_patience: 40
+  num_epochs: 400
+  num_workers: 0
+  sequence_length: 128
+  train_probability: 0.95
+  val_probability: 0.05
