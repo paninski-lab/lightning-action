@@ -28,9 +28,7 @@ class VideoDataset(Dataset):
         videos_dir: str,
         labels_dir: str,
         chunk_size: int = 128,
-        overlap: int = 0,
         resolution: int = 224,
-        max_frames: int = 72000,
         expt_ids: list[str] | None = None,
         input_size: int = 1536,
         num_lags: int = 0,
@@ -42,9 +40,7 @@ class VideoDataset(Dataset):
             videos_dir: directory containing MP4 video files
             labels_dir: directory containing NumPy (.npy) label files
             chunk_size: number of frames per chunk for predictions
-            overlap: frame overlap between chunks
             resolution: output frame resolution
-            max_frames: maximum frames per video
             expt_ids: list of experiment IDs to filter videos (optional)
             input_size: dimensionality of input features after processing
             num_lags: number of context frames on each side
@@ -60,9 +56,7 @@ class VideoDataset(Dataset):
         self.videos_dir = videos_dir
         self.labels_dir = labels_dir
         self.chunk_size = chunk_size
-        self.overlap = overlap
         self.resolution = resolution
-        self.max_frames = max_frames
         self.input_size = input_size
         self.num_lags = num_lags
         self.ignore_index = ignore_index
@@ -88,13 +82,8 @@ class VideoDataset(Dataset):
                     if not self.label_names:
                         self.num_classes = int(max(unique_labels) + 1) if unique_labels.size > 0 else 1
                         self.label_names = [f'class_{i}' for i in range(self.num_classes)]
-                total_frames = min(len(labels), max_frames)
-                stride = chunk_size - overlap
-                num_chunks = max(1, (total_frames - chunk_size) // stride + 1)
-                if total_frames > chunk_size:
-                    last_start = num_chunks * stride
-                    if last_start < total_frames:
-                        num_chunks += 1  # Add final chunk to cover remaining frames
+                total_frames = len(labels)
+                num_chunks = (total_frames + self.chunk_size - 1) // self.chunk_size
                 self.video_chunks.extend([(video, i) for i in range(num_chunks)])
         if missing_npy:
             raise FileNotFoundError(f"Missing .npy files for {len(missing_npy)} videos: {missing_npy[:5]}...")
@@ -129,14 +118,12 @@ class VideoDataset(Dataset):
         labels = np.load(label_path)
         if labels.ndim > 1:
             labels = np.argmax(labels, axis=1)
-        total_frames = min(len(labels), self.max_frames)
+        total_frames = len(labels)
         
         # compute middle chunk window
-        stride = self.chunk_size - self.overlap
-        start_middle = chunk_idx * stride
+        start_middle = chunk_idx * self.chunk_size
         end_middle = min(start_middle + self.chunk_size, total_frames)
-        if end_middle - start_middle < self.chunk_size:
-            start_middle = max(0, end_middle - self.chunk_size)
+        middle_len = end_middle - start_middle
         
         # compute extended window for context
         start_frame = max(0, start_middle - self.num_lags)
@@ -197,9 +184,21 @@ class VideoDataset(Dataset):
         left_pad = self.num_lags - loaded_pre
         right_pad = self.num_lags - loaded_post
         
-        # pad frames with replicate
+        # pad frames with replicate manually
         if left_pad > 0 or right_pad > 0:
-            frames = torch.nn.functional.pad(frames, (0, 0, 0, 0, 0, 0, left_pad, right_pad), mode='replicate')
+            if left_pad > 0:
+                left_padding = frames[0:1].repeat(left_pad, 1, 1, 1)
+                frames = torch.cat([left_padding, frames], dim=0)
+            if right_pad > 0:
+                right_padding = frames[-1:].repeat(right_pad, 1, 1, 1)
+                frames = torch.cat([frames, right_padding], dim=0)
+        
+        # add extra padding if middle_len < chunk_size
+        current_len = frames.shape[0]
+        if current_len < extended_size:
+            extra_right_pad = extended_size - current_len
+            extra_padding = frames[-1:].repeat(extra_right_pad, 1, 1, 1)
+            frames = torch.cat([frames, extra_padding], dim=0)
         
         # validate frame shape
         if frames.shape[0] != extended_size:
