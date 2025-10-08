@@ -47,7 +47,6 @@ class VideoDataModule(pl.LightningDataModule):
                 - 'expt_ids': list of dataset identifiers
                 - 'resolution': output frame resolution (optional)
                 - 'num_lags': number of context frames on each side
-                - 'overlap': overlap between chunks
             sequence_length: length of each video chunk for predictions
             batch_size: batch size for DataLoaders
             num_workers: number of worker processes for data loading
@@ -84,7 +83,6 @@ class VideoDataModule(pl.LightningDataModule):
             videos_dir=self.data_config['videos_dir'],
             labels_dir=self.data_config['labels_dir'],
             chunk_size=self.sequence_length,
-            overlap=self.data_config.get('overlap', 0),
             resolution=self.data_config.get('resolution', 224),
             expt_ids=self.data_config['expt_ids'],
             input_size=self.data_config.get('input_size', 1536),
@@ -104,6 +102,11 @@ class VideoDataModule(pl.LightningDataModule):
         Args:
             stage: training stage ('fit', 'validate', 'test', or None)
         """
+
+        if stage in ['test', 'predict']:
+            # no test data support as requested
+            return
+            
         if stage in [None, 'fit', 'validate']:
             if self.dataset_train is None or self.dataset_val is None:
                 total_size = len(self.dataset)
