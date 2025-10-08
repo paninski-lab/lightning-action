@@ -179,6 +179,14 @@ class TestBuildDataConfigFromPath:
         assert len(config['ids']) == 2
         assert set(config['ids']) == {'exp1', 'exp2'}
 
+    def test_build_config_missing_experiments(self, temp_data_dir):
+        """Test building config with missing experiment IDs."""
+        with pytest.raises(FileNotFoundError, match="Did not find expt_id="):
+            build_data_config_from_path(
+                temp_data_dir,
+                expt_ids=['exp1', 'exp2', 'exp4']
+            )
+
     def test_build_config_specified_signal_types(self, temp_data_dir):
         """Test building config with specified signal types."""
         config = build_data_config_from_path(
@@ -190,32 +198,6 @@ class TestBuildDataConfigFromPath:
         assert len(config['signals'][0]) == 2
         signal_types = set(config['signals'][0])
         assert signal_types == {'markers', 'labels'}
-
-    def test_build_config_nonexistent_path(self):
-        """Test error handling for nonexistent data path."""
-        with pytest.raises(FileNotFoundError, match="Data path does not exist"):
-            build_data_config_from_path('/nonexistent/path')
-
-    def test_build_config_no_experiments(self):
-        """Test error handling when no experiments are found."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            data_path = Path(temp_dir)
-            
-            # create signal directory but no CSV files
-            markers_dir = data_path / 'markers'
-            markers_dir.mkdir()
-            
-            with pytest.raises(ValueError, match="No experiment CSV files found"):
-                build_data_config_from_path(data_path)
-
-    def test_build_config_no_signal_dirs(self):
-        """Test error handling when no signal directories are found."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            data_path = Path(temp_dir)
-            # empty directory
-            
-            with pytest.raises(ValueError, match="No signal directories found"):
-                build_data_config_from_path(data_path)
 
     def test_build_config_default_transforms(self, temp_data_dir):
         """Test that default transforms are applied when none specified."""
@@ -278,6 +260,20 @@ class TestBuildDataConfigFromPath:
         labels_idx = signals.index('labels')
         assert transforms[labels_idx] is None
 
+    def test_build_config_nonexistent_path(self):
+        """Test error handling for nonexistent data path."""
+        with pytest.raises(FileNotFoundError, match="Data path does not exist"):
+            build_data_config_from_path('/nonexistent/path')
+
+    def test_build_config_no_signal_dirs(self):
+        """Test error handling when no signal directories are found."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_path = Path(temp_dir)
+            # empty directory
+
+            with pytest.raises(ValueError, match="No signal directories found"):
+                build_data_config_from_path(data_path)
+
     def test_build_config_invalid_transform(self, temp_data_dir):
         """Test error handling for invalid transform class name."""
         with pytest.raises(ValueError, match="Unknown transform class: InvalidTransform"):
@@ -285,6 +281,34 @@ class TestBuildDataConfigFromPath:
                 temp_data_dir,
                 transforms=['InvalidTransform']
             )
+
+    def test_build_config_no_signal_dir(self):
+        """Test error handling when no experiments are found."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_path = Path(temp_dir)
+
+            with pytest.raises(NotADirectoryError, match="Signal directory not found"):
+                build_data_config_from_path(data_path, signal_types=['markers'])
+
+            # create signal directory but no CSV files
+            markers_dir = data_path / 'markers'
+            markers_dir.mkdir()
+            markers_dir.joinpath('session1.csv').touch()
+
+            with pytest.raises(NotADirectoryError, match="Signal directory not found"):
+                build_data_config_from_path(data_path, signal_types=['markers', 'labels'])
+
+    def test_build_config_no_experiments(self):
+        """Test error handling when no experiments are found."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_path = Path(temp_dir)
+
+            # create signal directory but no CSV files
+            markers_dir = data_path / 'markers'
+            markers_dir.mkdir()
+
+            with pytest.raises(ValueError, match="No experiment CSV files found"):
+                build_data_config_from_path(data_path)
 
 
 class TestComputeClassWeights:
