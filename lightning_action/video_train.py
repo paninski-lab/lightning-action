@@ -17,6 +17,7 @@ from lightning.pytorch.utilities import rank_zero_only
 from typeguard import typechecked
 from tqdm import tqdm
 from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint, EarlyStopping
+from lightning.pytorch.loggers import TensorBoardLogger
 
 from lightning_action import __version__
 from lightning_action.data.video_datamodule import VideoDataModule
@@ -77,28 +78,6 @@ def train_video(
         num_lags = 0 if not model_config.get('bidirectional', False) else model_config.get('num_lags', 1)
     data_config['num_lags'] = num_lags
 
-    # Compute overlap to ensure perfect sequence length coverage
-    sequence_length = training_config.get('sequence_length', 128)
-    videos_dir = Path(data_config['videos_dir'])  # Convert to Path for local use
-    video_files = [f for f in os.listdir(videos_dir) if f.endswith('.mp4')]
-    total_frames_list = []
-    for video in video_files:
-        label_path = os.path.join(data_config['labels_dir'], video.replace('.mp4', '.npy'))
-        if os.path.exists(label_path):
-            labels = np.load(label_path)
-            total_frames = min(len(labels), 72000)  # max_frames from VideoDataset
-            total_frames_list.append(total_frames)
-    avg_total_frames = int(np.mean(total_frames_list)) if total_frames_list else 72000
-
-    # Try overlap = num_lags and num_lags * 2, choose the one that minimizes remainder
-    stride1 = sequence_length - num_lags
-    stride2 = sequence_length - num_lags * 2
-    remainder1 = (avg_total_frames - sequence_length) % stride1 if stride1 > 0 else float('inf')
-    remainder2 = (avg_total_frames - sequence_length) % stride2 if stride2 > 0 else float('inf')
-    overlap = num_lags if remainder1 <= remainder2 else num_lags * 2
-    data_config['overlap'] = overlap
-    logger.info(f"Selected overlap: {overlap} for num_lags: {num_lags}, sequence_length: {sequence_length}")
-
     # create datamodule
     datamodule = VideoDataModule(
         data_config=data_config,
@@ -118,7 +97,7 @@ def train_video(
         logger.info(f"Training dataset size: {len(datamodule.dataset_train)} chunks")
         logger.info(f"Validation dataset size: {len(datamodule.dataset_val)} chunks")
 
-    # compute class weights if enabled
+    # compute class weights
     weight_classes = data_config.get('weight_classes', True)
     if weight_classes:
         logger.info("Computing class weights...")
@@ -145,54 +124,49 @@ def train_video(
         config['data']['label_names'] = label_names
         model.config['data']['label_names'] = label_names
 
-    # update training steps information for schedulers
-    num_epochs = training_config.get('num_epochs', 400)
-    batch_size = training_config.get('batch_size', 1)
-    steps_per_epoch = int(np.ceil(len(datamodule.dataset_train) / batch_size))
-    total_steps = steps_per_epoch * num_epochs
+    # save outputs
+    if rank_zero_only.rank == 0:
+        (output_dir / 'config.yaml').parent.mkdir(exist_ok=True, parents=True)
+        with open(output_dir / 'config.yaml', 'w') as f:
+            yaml.dump(config, f, default_flow_style=False)
 
-    # update model config with step information
-    if hasattr(model, 'config'):
-        if 'optimizer' not in model.config:
-            model.config['optimizer'] = {}
-        model.config['optimizer']['steps_per_epoch'] = steps_per_epoch
-        model.config['optimizer']['total_steps'] = total_steps
+    # ----------------------------------------------------------------------------------
+    # Set up trainer
+    # ----------------------------------------------------------------------------------
 
-    logger.info(f"Training steps: {steps_per_epoch} per epoch, {total_steps} total")
+    logger.info("Setting up trainer...")
 
-    # save configuration in output directory
-    logger.info(f"Creating output directory: {output_dir}")
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # log package version
-    config['version'] = __version__
-
-    # save config
-    config_yaml = yaml.dump(config)
-    with open(output_dir / 'config.yaml', 'w') as f:
-        f.write(config_yaml)
-
-    # set up callbacks
-    callbacks = get_callbacks(
-        checkpointing=training_config.get('checkpointing', True),
-        lr_monitor=training_config.get('lr_monitor', True),
-        ckpt_every_n_epochs=training_config.get('ckpt_every_n_epochs'),
-        early_stopping=training_config.get('early_stopping', True),
-        early_stopping_patience=training_config.get('early_stopping_patience', 40),
-    )
+    # trainer configuration
+    trainer_config = {
+        'accelerator': training_config.get('device', 'cpu'),
+        'devices': 1,
+        'max_epochs': training_config.get('num_epochs', 100),
+        'precision': training_config.get('precision', '32-true'),
+        'enable_checkpointing': training_config.get('checkpointing', True),
+        'callbacks': get_callbacks(
+            checkpointing=training_config.get('checkpointing', True),
+            lr_monitor=training_config.get('lr_monitor', True),
+            ckpt_every_n_epochs=training_config.get('ckpt_every_n_epochs', None),
+            early_stopping=training_config.get('early_stopping', False),
+            early_stopping_patience=training_config.get('early_stopping_patience', 10),
+        ),
+        'logger': TensorBoardLogger(
+            save_dir=str(output_dir),
+            name='',
+            version='',
+        ),
+        'enable_progress_bar': training_config.get('enable_progress_bar', True),
+        'num_sanity_val_steps': 0,
+    }
 
     # create trainer
-    trainer = pl.Trainer(
-        accelerator=training_config.get('device', 'gpu'),
-        devices=1,
-        max_epochs=num_epochs,
-        default_root_dir=str(output_dir),
-        callbacks=callbacks,
-        enable_progress_bar=training_config.get('progress_bar', True),
-        enable_model_summary=training_config.get('model_summary', True),
-        precision='16-mixed',
-    )
+    trainer = pl.Trainer(**trainer_config)
 
+    # ----------------------------------------------------------------------------------
+    # Train model
+    # ----------------------------------------------------------------------------------
+
+    num_epochs = training_config.get('num_epochs', 100)
     logger.info(f"Starting training for {num_epochs} epochs...")
 
     # train model
@@ -206,8 +180,9 @@ def reset_seeds(seed: int = 0):
     """Reset random seeds for reproducibility.
     
     Args:
-        seed: seed value
+        seed: seed value to use
     """
+    os.environ['PYTHONHASHSEED'] = str(seed)
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -252,14 +227,12 @@ def compute_class_weights(datamodule: pl.LightningDataModule, ignore_index: int 
             label_cache[video] = np.load(label_path)
         
         labels = label_cache[video]
-        total_frames = min(len(labels), datamodule.dataset.max_frames)
+        total_frames = len(labels)
         
         # Compute chunk window (mirroring VideoDataset.__getitem__)
-        stride = datamodule.dataset.chunk_size - datamodule.dataset.overlap
+        stride = datamodule.dataset.chunk_size
         start_frame = chunk_idx * stride
         end_frame = min(start_frame + datamodule.dataset.chunk_size, total_frames)
-        if end_frame - start_frame < datamodule.dataset.chunk_size:
-            start_frame = max(0, end_frame - datamodule.dataset.chunk_size)
         
         # Slice labels
         labels_slice = labels[start_frame:end_frame]
