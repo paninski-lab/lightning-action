@@ -353,7 +353,7 @@ def build_data_config_from_path(
             expt_ids = [f.stem for f in csv_files]  # use filename without .csv extension
             logger.info(f"Auto-detected {len(expt_ids)} experiments: {expt_ids}")
         else:
-            raise ValueError(f"Signal directory {first_signal_dir} not found")
+            raise NotADirectoryError(f"Signal directory not found: {first_signal_dir}")
     else:
         logger.info(f"Using specified experiments: {expt_ids}")
     
@@ -375,11 +375,13 @@ def build_data_config_from_path(
         for signal_type in signal_types:
 
             signal_dir = data_path / signal_type
-            signal_file = next(signal_dir.glob(f"{expt_id}*.csv"))
-            if not signal_file.exists():
-                raise FileNotFoundError(f"Signal file not found: {signal_file}")
+            if not signal_dir.is_dir():
+                raise NotADirectoryError(f"Signal directory not found: {signal_dir}")
+            try:
+                signal_file = next(signal_dir.glob(f"{expt_id}*.csv"))
+            except StopIteration:
+                raise FileNotFoundError(f"Did not find expt_id={expt_id} in {signal_dir}")
             expt_paths.append(signal_file)
-
             expt_signals.append(signal_type)
 
             # set up transforms: configurable transforms for markers/features, None for labels

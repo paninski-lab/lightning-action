@@ -7,6 +7,7 @@ of behavioral data including markers and labels.
 
 import logging
 from collections import OrderedDict
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -34,7 +35,7 @@ class FeatureDataset(Dataset):
         ids: list[str],
         signals: list[list[str]],
         transforms: list[list[Any]],
-        paths: list[list[str | None]],
+        paths: list[list[str | Path | None]],
         sequence_length: int = 500,
         sequence_pad: int = 0,
     ):
@@ -170,7 +171,7 @@ class FeatureDataset(Dataset):
 
     def _load_markers(
         self,
-        file_path: str,
+        file_path: str | Path,
         include_likelihoods: bool = False,
     ) -> Float[np.ndarray, 'n_frames n_features']:
         """Load marker data from CSV file.
@@ -206,7 +207,7 @@ class FeatureDataset(Dataset):
         
         return data.astype(np.float32)
 
-    def _load_features(self, file_path: str) -> Float[np.ndarray, 'n_frames n_features']:
+    def _load_features(self, file_path: str | Path) -> Float[np.ndarray, 'n_frames n_features']:
         """Load feature data from CSV file.
 
         Args:
@@ -227,7 +228,7 @@ class FeatureDataset(Dataset):
 
         return data.astype(np.float32)
 
-    def _load_labels(self, file_path: str) -> Int[np.ndarray, 'n_frames n_classes']:
+    def _load_labels(self, file_path: str | Path) -> Int[np.ndarray, 'n_frames n_classes']:
         """Load label data from CSV file.
         
         Args:
