@@ -283,7 +283,7 @@ def split_sizes_from_probabilities(
     val_number = total_number - train_number
 
     # make sure that we have at least one validation sample
-    if val_number == 0:
+    if val_number == 0 and val_probability > 0:
         train_number -= 1
         val_number += 1
         if train_number < 1:
