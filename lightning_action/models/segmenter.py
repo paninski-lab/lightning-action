@@ -47,9 +47,6 @@ class BaseModel(pl.LightningModule):
         self.output_size = self.model_config['output_size']
         self.sequence_length = self.model_config.get('sequence_length', 500)
 
-        # compute sequence padding
-        self.sequence_pad = compute_sequence_pad(config['model']['backbone'], **config['model'])
-
         # ignore index
         self.ignore_index = config.get('data', {}).get('ignore_index', -100)
 
@@ -62,6 +59,9 @@ class BaseModel(pl.LightningModule):
         
         # build model architecture (implemented by subclasses)
         self._build_model()
+
+        # compute sequence padding (after _build_model to make it easier to test unsupported backbones)
+        self.sequence_pad = compute_sequence_pad(config['model']['backbone'], **config['model'])
 
     def _setup_metrics(self):
         """Set up torchmetrics for evaluation."""

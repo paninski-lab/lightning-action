@@ -293,7 +293,7 @@ class Model:
                 val_probability=0.0,
                 seed=training_config.get('seed', 42),
             )
-            
+
             # setup for prediction
             datamodule.setup('predict')
             

@@ -55,7 +55,7 @@ def compute_sequences(
         batch_dims = (sequence_length + 2 * sequence_pad,)
 
     n_batches = int(np.floor(data.shape[0] / sequence_length))
-    batched_data = [np.zeros(batch_dims) for _ in range(n_batches)]
+    batched_data = [np.zeros(batch_dims, dtype=data.dtype) for _ in range(n_batches)]
     for b in range(n_batches):
         idx_beg = b * sequence_length
         idx_end = (b + 1) * sequence_length
@@ -100,7 +100,7 @@ def compute_sequence_pad(model_type: str, **model_params: Any) -> int:
         num_lags = model_params['num_lags']
         return (2 ** num_layers) * num_lags
 
-    elif model_type == 'dtcn':
+    elif model_type in ['dtcn', 'dilatedtcn']:
         # dilated TCN with more complex calculation
         # dilattion of each dilation block is 2 ** layer_num
         # 2 conv layers per dilation block
