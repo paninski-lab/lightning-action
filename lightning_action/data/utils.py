@@ -96,9 +96,9 @@ def compute_sequence_pad(model_type: str, **model_params: Any) -> int:
         return model_params['num_lags']
     
     elif model_type == 'tcn':
-        n_layers = model_params['num_layers']
-        n_lags = model_params['num_lags']
-        return (2 ** n_layers) * n_lags
+        num_layers = model_params['num_layers']
+        num_lags = model_params['num_lags']
+        return (2 ** num_layers) * num_lags
 
     elif model_type == 'dtcn':
         # dilated TCN with more complex calculation

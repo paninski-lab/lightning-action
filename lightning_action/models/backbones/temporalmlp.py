@@ -17,7 +17,7 @@ class TemporalMLP(nn.Module):
     followed by dense layers for feature extraction.
     
     Architecture:
-    1. 1D Conv layer with temporal window (2*n_lags + 1)
+    1. 1D Conv layer with temporal window (2 * num_lags + 1)
     2. n_hid_layers dense layers with activations
     3. Final dense layer (no activation)
     
@@ -42,7 +42,7 @@ class TemporalMLP(nn.Module):
             input_size: number of input features per timestep
             num_hid_units: number of hidden units in dense layers
             num_layers: number of hidden dense layers
-            num_lags: number of temporal lags for 1D conv window (creates 2*n_lags + 1 kernel)
+            num_lags: number of temporal lags for 1D conv window (creates 2 * num_lags + 1 kernel)
             activation: activation function ('relu', 'lrelu', 'sigmoid', 'tanh', 'linear')
             dropout_rate: dropout probability (0.0 = no dropout)
             seed: random seed for weight initialization
