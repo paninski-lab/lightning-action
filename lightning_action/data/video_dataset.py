@@ -53,7 +53,7 @@ class VideoDataset:
         self,
         videos_dir: str,
         labels_dir: str,
-        chunk_size: int = 128,
+        sequence_length: int = 128,
         resolution: int = 224,
         expt_ids: Optional[list[str]] = None,
         input_size: int = 1536,
@@ -61,7 +61,7 @@ class VideoDataset:
         ignore_index: int = -100,
         num_threads: int = 2,
         backbone: str = 'dtcn',
-        num_layers: int = 4,
+        num_layers: int = 2,
     ):
         """Initialize the VideoDataset.
         
@@ -71,7 +71,7 @@ class VideoDataset:
                 Labels should be either:
                 - 1D array of class indices, shape (num_frames,)
                 - 2D one-hot array, shape (num_frames, num_classes)
-            chunk_size: Number of frames per chunk (used for TCN padding calc).
+            sequence_length: Number of frames per chunk (used for TCN padding calc).
             resolution: Target frame resolution for preprocessing (square).
             expt_ids: Optional list of experiment IDs to include. If provided,
                 only videos whose names start with one of these IDs are used.
@@ -88,7 +88,7 @@ class VideoDataset:
         # Store configuration
         self.videos_dir = videos_dir
         self.labels_dir = labels_dir
-        self.chunk_size = chunk_size
+        self.sequence_length = sequence_length
         self.resolution = resolution
         self.input_size = input_size
         self.num_lags = num_lags
