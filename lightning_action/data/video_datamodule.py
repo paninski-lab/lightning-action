@@ -426,7 +426,7 @@ class VideoDataModule(pl.LightningDataModule):
         self.dataset = VideoDataset(
             videos_dir=self.data_config['videos_dir'],
             labels_dir=self.data_config['labels_dir'],
-            chunk_size=self.sequence_length,
+            sequence_length=self.sequence_length,
             resolution=self.data_config.get('resolution', 224),
             expt_ids=self.data_config.get('expt_ids'),
             input_size=self.data_config.get('input_size', 1536),
