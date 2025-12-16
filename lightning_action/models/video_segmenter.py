@@ -722,15 +722,15 @@ class VideoSegmenter(VideoBaseModel):
         self.num_lags = config.get('model', {}).get('num_lags', 0)
         super().__init__(config)
         
-        # Load ViT configuration
-        vit_config_path = self.model_config.get('vit_config_path')
+        # Load encoder configuration
+        encoder_config_path = self.model_config.get('encoder_config_path')
         
-        if vit_config_path and os.path.exists(vit_config_path):
-            with open(vit_config_path, "r") as f:
-                vit_config = yaml.safe_load(f)
+        if encoder_config_path and os.path.exists(encoder_config_path):
+            with open(encoder_config_path, "r") as f:
+                encoder_config = yaml.safe_load(f)
         else:
             # Default ViT-Base configuration
-            vit_config = {
+            encoder_config = {
                 'hidden_size': 768,
                 'num_channels': 3,
                 'mask_ratio': 0,
@@ -739,13 +739,13 @@ class VideoSegmenter(VideoBaseModel):
                 'num_attention_heads': 12,
             }
         
-        self.embed_dim = vit_config.get('hidden_size', 768)
-        vit_config["mask_ratio"] = 0  # Disable masking for inference
-        self.vit_config = vit_config
+        self.embed_dim = encoder_config.get('hidden_size', 768)
+        encoder_config["mask_ratio"] = 0  # Disable masking for inference
+        self.encoder_config = encoder_config
         
         # Initialize ViT-MAE encoder
         encoder_ckpt = self.model_config.get('encoder_checkpoint')
-        self.encoder = ImageEncoderViTMAE(vit_config)
+        self.encoder = ImageEncoderViTMAE(encoder_config)
         
         # Load pretrained weights if available
         if encoder_ckpt and os.path.exists(encoder_ckpt):
