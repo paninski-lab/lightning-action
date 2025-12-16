@@ -36,7 +36,7 @@ from typeguard import typechecked
 
 from lightning_action.data.video_datamodule import VideoDataModule
 from lightning_action.models.video_segmenter import VideoSegmenter
-from lightning_action.train import reset_seeds
+from lightning_action.train import reset_seeds, get_callbacks
 
 logger = logging.getLogger(__name__)
 
@@ -199,48 +199,3 @@ def train_video(
     trainer.fit(model, datamodule)
 
     return model
-
-@typechecked
-def get_callbacks(
-    checkpointing: bool = True,
-    lr_monitor: bool = True,
-    ckpt_every_n_epochs: Optional[int] = None,
-    early_stopping: bool = False,
-    early_stopping_patience: int = 10,
-) -> list[pl.Callback]:
-    """Configure Lightning callbacks for training."""
-    callbacks = []
-    
-    if lr_monitor:
-        callbacks.append(LearningRateMonitor(logging_interval='epoch'))
-    
-    if checkpointing:
-        callbacks.append(ModelCheckpoint(
-            monitor='val_loss',
-            mode='min',
-            filename='best-{epoch:02d}-{val_loss:.3f}',
-            save_top_k=1,
-            verbose=False,
-            save_on_train_epoch_end=True,
-            auto_insert_metric_name=False,
-        ))
-    
-    if ckpt_every_n_epochs is not None:
-        callbacks.append(ModelCheckpoint(
-            monitor=None,
-            every_n_epochs=ckpt_every_n_epochs,
-            save_top_k=-1,
-            filename='epoch-{epoch:02d}-step-{step}',
-            verbose=False,
-            auto_insert_metric_name=False,
-        ))
-    
-    if early_stopping:
-        callbacks.append(EarlyStopping(
-            monitor='val_loss',
-            mode='min',
-            patience=early_stopping_patience,
-            verbose=False,
-        ))
-    
-    return callbacks
