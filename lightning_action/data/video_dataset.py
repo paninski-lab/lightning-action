@@ -59,7 +59,6 @@ class VideoDataset:
         input_size: int = 1536,
         num_lags: int = 0,
         ignore_index: int = -100,
-        num_threads: int = 2,
         backbone: str = 'dtcn',
         num_layers: int = 2,
     ):
@@ -78,7 +77,6 @@ class VideoDataset:
             input_size: Feature dimension for the temporal backbone.
             num_lags: Number of temporal lags for the backbone (affects padding).
             ignore_index: Label value to ignore in loss computation (default -100).
-            num_threads: Number of threads for DALI video decoding.
             backbone: Type of temporal backbone ('dtcn', 'temporalmlp', 'rnn').
             num_layers: Number of layers in the temporal backbone.
         
@@ -93,7 +91,6 @@ class VideoDataset:
         self.input_size = input_size
         self.num_lags = num_lags
         self.ignore_index = ignore_index
-        self.num_threads = num_threads
         self.backbone = backbone
         self.num_layers = num_layers
         
