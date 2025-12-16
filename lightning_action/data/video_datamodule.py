@@ -432,7 +432,6 @@ class VideoDataModule(pl.LightningDataModule):
             input_size=self.data_config.get('input_size', 1536),
             num_lags=num_lags,
             ignore_index=self.data_config.get('ignore_index', -100),
-            num_threads=self.num_threads,
             backbone=self.model_config.get('backbone', 'dtcn'),
             num_layers=self.model_config.get('num_layers', 4),
         )
