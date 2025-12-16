@@ -23,7 +23,7 @@ model:
   output_size: 3
   seed: 42
   encoder_checkpoint: /teamspace/studios/this_studio/lightning-action/data/checkpoints/encoder/vitm.ckpt
-  vit_config_path: /teamspace/studios/this_studio/lightning-action/configs/vit_mae/vit_m-betta.yaml
+  encoder_config_path: /teamspace/studios/this_studio/lightning-action/configs/vit_mae/vit_m-betta.yaml
   freeze_encoder: true
 optimizer:
   T_max: 200
