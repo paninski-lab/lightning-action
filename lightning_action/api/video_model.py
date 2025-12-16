@@ -331,16 +331,15 @@ class VideoModel:
         # Configure trainer for prediction
         training_config = self.config.get('training', {})
         batch_size = training_config.get('batch_size', 1)
-        device = training_config.get('device', 'cpu')
         num_gpus = torch.cuda.device_count()
         
         # Use single GPU for prediction (simpler and more reliable)
-        if device == 'gpu' and num_gpus > 0:
-            accelerator = 'gpu'
-            devices = 1
-        else:
-            accelerator = 'cpu'
-            devices = 1
+        if num_gpus == 0:
+            raise RuntimeError(
+                'No GPU detected. DALI-based video processing requires a GPU.'
+            )
+        accelerator = 'gpu'
+        devices = 1
         
         trainer_config = {
             'accelerator': accelerator,
