@@ -36,6 +36,7 @@ from typeguard import typechecked
 
 from lightning_action.data.video_datamodule import VideoDataModule
 from lightning_action.models.video_segmenter import VideoSegmenter
+from lightning_action.train import reset_seeds
 
 logger = logging.getLogger(__name__)
 
@@ -198,18 +199,6 @@ def train_video(
     trainer.fit(model, datamodule)
 
     return model
-
-
-@typechecked
-def reset_seeds(seed: int = 0) -> None:
-    """Reset all random seeds for reproducibility."""
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    pl.seed_everything(seed)
-
 
 @typechecked
 def get_callbacks(
