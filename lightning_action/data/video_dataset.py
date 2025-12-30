@@ -212,48 +212,36 @@ class VideoDataset:
         Class weights help handle imbalanced datasets by giving higher weight
         to underrepresented classes in the loss function.
         
-        The weight for class c is: sqrt(max_count / count_c)
-        
-        This uses square root dampening to avoid over-weighting very rare classes.
+        Uses square root dampening to avoid over-weighting very rare classes.
         Classes with zero counts get a weight of 0.0.
         
         Returns:
             List of class weights, one per class.
         """
+        from lightning_action.utils.class_weights import (
+            compute_class_weights,
+            collect_labels_from_files,
+        )
+        
         if not self.label_paths:
             return [1.0] * self.num_classes
         
-        counts = np.zeros(self.num_classes)
+        # Collect all labels from files
+        all_labels, inferred_num_classes = collect_labels_from_files(
+            self.label_paths, 
+            ignore_index=self.ignore_index,
+        )
         
-        for label_path in tqdm(self.label_paths, desc="Computing class weights"):
-            labels = np.load(label_path)
-            
-            # Handle one-hot encoded labels
-            if labels.ndim > 1 and labels.shape[1] > 1:
-                labels = np.argmax(labels, axis=1)
-            elif labels.ndim > 1:
-                labels = labels.squeeze()
-            
-            # Count only valid (non-ignored) labels
-            valid_labels = labels[labels != self.ignore_index]
-            unique, label_counts = np.unique(valid_labels, return_counts=True)
-            
-            for cls, count in zip(unique, label_counts):
-                if 0 <= cls < self.num_classes:
-                    counts[cls] += count
+        # Use inferred num_classes if we don't have one yet
+        num_classes = self.num_classes if self.num_classes > 0 else inferred_num_classes
         
-        # Handle edge case of empty dataset
-        if np.sum(counts) == 0:
-            return [1.0] * self.num_classes
-        
-        # Compute inverse frequency weights with square root dampening
-        max_count = np.max(counts)
-        weights = (max_count / (counts + 1e-10)) ** 0.5
-        
-        # Zero weight for classes with no samples
-        weights[counts == 0] = 0.0
-        
-        return weights.tolist()
+        # Compute weights with sqrt dampening (video pipeline default)
+        return compute_class_weights(
+            labels=all_labels,
+            num_classes=num_classes,
+            ignore_index=self.ignore_index,
+            sqrt_dampening=True,
+        )
 
     def _calculate_tcn_padding(
         self, 
