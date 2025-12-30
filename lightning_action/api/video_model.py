@@ -18,7 +18,6 @@ Example usage:
     # Run predictions on new videos
     model.predict(
         videos_dir='/path/to/videos',
-        labels_dir='/path/to/labels',
         output_dir='/path/to/predictions',
     )
     
@@ -32,6 +31,7 @@ import os
 from pathlib import Path
 from typing import Any, Optional
 
+import cv2
 import lightning as pl
 import numpy as np
 import pandas as pd
@@ -70,6 +70,31 @@ def chdir(path: Path):
         os.chdir(old_cwd)
 
 
+def _get_video_frame_count(video_path: str | Path) -> int:
+    """Get the total frame count of a video using OpenCV.
+    
+    Args:
+        video_path: Path to the video file.
+    
+    Returns:
+        Number of frames in the video.
+    
+    Raises:
+        RuntimeError: If the video cannot be opened or frame count is invalid.
+    """
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise RuntimeError(f"Could not open video: {video_path}")
+    
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
+    
+    if frame_count <= 0:
+        raise RuntimeError(f"Invalid frame count ({frame_count}) for video: {video_path}")
+    
+    return frame_count
+
+
 @typechecked
 class VideoModel:
     """High-level wrapper for video action segmentation models.
@@ -92,7 +117,6 @@ class VideoModel:
         model = VideoModel.from_dir('runs/exp1')
         model.predict(
             videos_dir='data/videos',
-            labels_dir='data/labels',
             output_dir='results',
         )
     """
@@ -116,6 +140,7 @@ class VideoModel:
         self.model = model
         self.config = config
         self.model_dir = Path(model_dir) if model_dir is not None else None
+        self._trainer: Optional[pl.Trainer] = None
 
     @classmethod
     def from_dir(cls, model_dir: str | Path) -> 'VideoModel':
@@ -243,7 +268,6 @@ class VideoModel:
             return
             
         videos_dir = self.config['data']['videos_dir']
-        labels_dir = self.config['data']['labels_dir']
         expt_ids = self.config['data']['expt_ids']
         
         predictions_dir = self.model_dir / 'predictions'
@@ -252,119 +276,92 @@ class VideoModel:
         try:
             self.predict(
                 videos_dir=videos_dir,
-                labels_dir=labels_dir,
                 output_dir=predictions_dir,
                 expt_ids=expt_ids,
             )
         except Exception as e:
             print(f'Warning: Post-training inference failed: {e}')
     
-    def predict(
-        self,
-        videos_dir: str | Path,
-        labels_dir: str | Path,
-        output_dir: str | Path,
-        output_file: Optional[str | Path] = None,
-        expt_ids: Optional[list[str]] = None,
-    ) -> None:
-        """Generate predictions for videos using single GPU.
+    def _setup_trainer(self) -> pl.Trainer:
+        """Set up a Lightning Trainer for prediction.
         
-        Processes videos sequentially on a single GPU for simplicity
-        and reliability. For large-scale inference, videos can be split
-        across multiple calls.
-        
-        Output format is CSV with columns:
-        - frame: Frame index (0-based)
-        - class_0, class_1, ...: Probability for each class
-        
-        Args:
-            videos_dir: Directory containing .mp4 video files.
-            labels_dir: Directory containing .npy label files.
-                (Labels are needed for determining video lengths)
-            output_dir: Directory to save prediction CSV files.
-            output_file: If predicting a single video, specify output filename.
-            expt_ids: List of experiment IDs to predict. If None, predicts
-                all videos in videos_dir.
+        Returns:
+            Configured Trainer instance for single-GPU prediction.
         
         Raises:
-            ValueError: If model hasn't been trained/loaded.
-            RuntimeError: If output_file specified with multiple videos.
-            FileNotFoundError: If video or label files are missing.
+            RuntimeError: If no GPU is available.
         """
-        videos_dir = Path(videos_dir)
-        labels_dir = Path(labels_dir)
-        output_dir = Path(output_dir)
-
-        if self.model is None:
-            raise ValueError('Model must be trained or loaded before prediction')
-
-        # Validate output_file usage
-        if output_file is not None and (expt_ids is not None and len(expt_ids) > 1):
-            raise RuntimeError(
-                'Can only supply `output_file` when specifying a single expt_id'
-            )
-
-        # Discover videos if not specified
-        if expt_ids is None:
-            expt_ids = [f[:-4] for f in os.listdir(videos_dir) if f.endswith('.mp4')]
-
-        num_videos = len(expt_ids)
-        if num_videos == 0:
-            print("No videos to predict")
-            return
-
-        # Validate that all required files exist
-        missing_files = []
-        for expt_id in expt_ids:
-            video_path = videos_dir / f'{expt_id}.mp4'
-            label_path = labels_dir / f'{expt_id}.npy'
-            if not video_path.exists():
-                missing_files.append(f"Video missing: {video_path}")
-            if not label_path.exists():
-                missing_files.append(f"Label missing: {label_path}")
-        
-        if missing_files:
-            raise FileNotFoundError(
-                f"Missing files for prediction:\n" + "\n".join(missing_files)
-            )
-
-        # Configure trainer for prediction
-        training_config = self.config.get('training', {})
-        batch_size = training_config.get('batch_size', 1)
         num_gpus = torch.cuda.device_count()
         
-        # Use single GPU for prediction (simpler and more reliable)
         if num_gpus == 0:
             raise RuntimeError(
                 'No GPU detected. DALI-based video processing requires a GPU.'
             )
-        accelerator = 'gpu'
-        devices = 1
         
         trainer_config = {
-            'accelerator': accelerator,
-            'devices': devices,
+            'accelerator': 'gpu',
+            'devices': 1,
             'strategy': 'auto',
             'logger': False,
             'enable_checkpointing': False,
             'enable_progress_bar': True,
-            'precision': '16-mixed' if accelerator == 'gpu' else '32-true',
+            'precision': '16-mixed',
             'use_distributed_sampler': False,
         }
         
-        trainer = pl.Trainer(**trainer_config)
+        return pl.Trainer(**trainer_config)
+    
+    def _predict_single_video(
+        self,
+        video_path: Path,
+        output_path: Path,
+        trainer: pl.Trainer,
+    ) -> None:
+        """Run prediction on a single video and save results.
         
-        # Create datamodule for prediction
-        data_config = self.config['data'].copy()
-        data_config['expt_ids'] = expt_ids
-        data_config['videos_dir'] = str(videos_dir)
-        data_config['labels_dir'] = str(labels_dir)
-
+        This method handles the complete prediction pipeline for one video:
+        1. Get video length using OpenCV
+        2. Set up a VideoDataModule for this video
+        3. Run inference
+        4. Reformat predictions and save to CSV
+        
+        Args:
+            video_path: Path to the input video file.
+            output_path: Path where the prediction CSV will be saved.
+            trainer: Lightning Trainer instance for running prediction.
+        
+        Raises:
+            FileNotFoundError: If the video file doesn't exist.
+            RuntimeError: If prediction fails.
+        """
+        if not video_path.exists():
+            raise FileNotFoundError(f"Video not found: {video_path}")
+        
+        # Get video metadata using OpenCV
+        video_frame_count = _get_video_frame_count(video_path)
+        
+        # Extract config values
+        training_config = self.config.get('training', {})
+        batch_size = training_config.get('batch_size', 1)
+        sequence_length = training_config.get('sequence_length', 128)
+        
+        # Create data config for single video
+        model_config = self.config.get('model', {})
+        data_config_from_model = self.config.get('data', {})
+        data_config = {
+            'videos_dir': str(video_path.parent),
+            'expt_ids': [video_path.stem],
+            'video_lengths': {video_path.stem: video_frame_count},
+            'num_classes': model_config.get('output_size', 3),
+            'label_names': data_config_from_model.get('label_names'),
+        }
+        
+        # Create datamodule for this single video
         datamodule = VideoDataModule(
             data_config=data_config,
-            sequence_length=training_config.get('sequence_length', 128),
+            sequence_length=sequence_length,
             batch_size=batch_size,
-            num_workers=0,  # Avoid multiprocessing issues during prediction
+            num_workers=0,
             train_probability=1.0,
             val_probability=0.0,
             seed=training_config.get('seed', 42),
@@ -377,13 +374,8 @@ class VideoModel:
         # Run prediction
         predictions = trainer.predict(self.model, datamodule=datamodule)
         
-        if predictions is None:
-            return
-        
-        # Get the videos that were processed
-        processed_videos = datamodule._predict_video_paths
-        
-        if processed_videos is None or len(processed_videos) == 0:
+        if predictions is None or len(predictions) == 0:
+            print(f"Warning: No predictions generated for {video_path.name}")
             return
         
         # Flatten predictions from batches
@@ -394,76 +386,122 @@ class VideoModel:
                     flat_predictions.append(sample_probs.cpu().numpy())
         
         if not flat_predictions:
+            print(f"Warning: Empty predictions for {video_path.name}")
             return
         
-        # Calculate how many chunks each video produced
-        step_size = datamodule.sequence_length
-        chunk_counts = []
-        for video_path in processed_videos:
-            video_name = os.path.basename(video_path)
-            label_path = labels_dir / video_name.replace('.mp4', '.npy')
-            if label_path.exists():
-                labels_array = np.load(str(label_path), mmap_mode='r')
-                video_frames = len(labels_array)
-                num_chunks = max(1, (video_frames + step_size - 1) // step_size)
-                chunk_counts.append(num_chunks)
-            else:
-                chunk_counts.append(0)
+        # Stack all chunk predictions
+        stacked_probs = np.vstack(flat_predictions)
+        num_classes = stacked_probs.shape[1]
+        predicted_frames = stacked_probs.shape[0]
         
-        # Assign predictions to videos and save
-        chunk_idx = 0
-        for video_idx, video_path in enumerate(processed_videos):
-            video_name = Path(video_path).stem
-            num_chunks = chunk_counts[video_idx]
-            
-            # Collect all predictions for this video
-            video_probs = []
-            for _ in range(num_chunks):
-                if chunk_idx < len(flat_predictions):
-                    video_probs.append(flat_predictions[chunk_idx])
-                    chunk_idx += 1
-            
-            if not video_probs:
-                continue
-            
-            # Stack predictions from all chunks
-            stacked_probs = np.vstack(video_probs)
-            num_classes = stacked_probs.shape[1]
-            
-            # Adjust prediction count to match actual video length
-            label_path = labels_dir / f'{video_name}.npy'
-            if label_path.exists():
-                labels_array = np.load(str(label_path), mmap_mode='r')
-                total_frames = labels_array.shape[0]
-                
-                predicted_frames = stacked_probs.shape[0]
-                if predicted_frames != total_frames:
-                    if predicted_frames > total_frames:
-                        # Trim excess predictions
-                        final_probs = stacked_probs[:total_frames, :]
-                    else:
-                        # Pad with NaN for missing frames
-                        pad_rows = total_frames - predicted_frames
-                        nan_pad = np.full((pad_rows, num_classes), np.nan)
-                        final_probs = np.vstack([stacked_probs, nan_pad])
-                else:
-                    final_probs = stacked_probs
+        # Adjust to match actual video length
+        if predicted_frames != video_frame_count:
+            if predicted_frames > video_frame_count:
+                # Trim excess predictions
+                final_probs = stacked_probs[:video_frame_count, :]
             else:
-                final_probs = stacked_probs
-            
-            # Create output DataFrame
-            df = pd.DataFrame(
-                data=final_probs, 
-                columns=datamodule.get_label_names()
+                # Pad with NaN for missing frames
+                pad_rows = video_frame_count - predicted_frames
+                nan_pad = np.full((pad_rows, num_classes), np.nan)
+                final_probs = np.vstack([stacked_probs, nan_pad])
+        else:
+            final_probs = stacked_probs
+        
+        # Get label names from datamodule or generate defaults
+        label_names = datamodule.get_label_names()
+        if not label_names:
+            label_names = [f'class_{i}' for i in range(num_classes)]
+        
+        # Create output DataFrame
+        df = pd.DataFrame(data=final_probs, columns=label_names)
+        df.insert(0, 'frame', np.arange(len(df)))
+        
+        # Save predictions
+        output_path.parent.mkdir(exist_ok=True, parents=True)
+        df.to_csv(output_path, index=False)
+    
+    def predict(
+        self,
+        videos_dir: str | Path,
+        output_dir: str | Path,
+        output_file: Optional[str | Path] = None,
+        expt_ids: Optional[list[str]] = None,
+    ) -> None:
+        """Generate predictions for videos.
+        
+        Processes each video sequentially on a single GPU. For large-scale
+        inference, videos can be split across multiple calls.
+        
+        Output format is CSV with columns:
+        - frame: Frame index (0-based)
+        - class_0, class_1, ...: Probability for each class
+        
+        Args:
+            videos_dir: Directory containing .mp4 video files.
+            output_dir: Directory to save prediction CSV files.
+            output_file: If predicting a single video, specify output filename.
+                Only valid when expt_ids contains exactly one video.
+            expt_ids: List of experiment IDs (video stems) to predict.
+                If None, predicts all .mp4 files in videos_dir.
+        
+        Raises:
+            ValueError: If model hasn't been trained/loaded.
+            RuntimeError: If output_file specified with multiple videos.
+            FileNotFoundError: If any video file is missing.
+        """
+        videos_dir = Path(videos_dir)
+        output_dir = Path(output_dir)
+
+        if self.model is None:
+            raise ValueError('Model must be trained or loaded before prediction')
+
+        # Validate output_file usage
+        if output_file is not None and expt_ids is not None and len(expt_ids) > 1:
+            raise RuntimeError(
+                'Can only supply `output_file` when specifying a single expt_id'
             )
-            df.insert(0, 'frame', np.arange(len(df)))
+
+        # Discover videos if not specified
+        if expt_ids is None:
+            expt_ids = [f.stem for f in videos_dir.glob('*.mp4')]
+
+        if len(expt_ids) == 0:
+            print("No videos to predict")
+            return
+
+        # Validate that all video files exist
+        missing_videos = []
+        for expt_id in expt_ids:
+            video_path = videos_dir / f'{expt_id}.mp4'
+            if not video_path.exists():
+                missing_videos.append(str(video_path))
+        
+        if missing_videos:
+            raise FileNotFoundError(
+                f"Missing video files:\n" + "\n".join(missing_videos)
+            )
+
+        # Set up trainer once for all predictions
+        trainer = self._setup_trainer()
+        
+        # Process each video
+        for i, expt_id in enumerate(expt_ids):
+            video_path = videos_dir / f'{expt_id}.mp4'
             
             # Determine output path
             if output_file is not None and len(expt_ids) == 1:
-                output_file_ = Path(output_file)
+                output_path = Path(output_file)
             else:
-                output_file_ = output_dir / f'{video_name}_predictions.csv'
+                output_path = output_dir / f'{expt_id}_predictions.csv'
             
-            # Save predictions
-            output_file_.parent.mkdir(exist_ok=True, parents=True)
-            df.to_csv(output_file_, index=False)
+            print(f"Processing video {i+1}/{len(expt_ids)}: {expt_id}")
+            
+            try:
+                self._predict_single_video(
+                    video_path=video_path,
+                    output_path=output_path,
+                    trainer=trainer,
+                )
+            except Exception as e:
+                print(f"Error processing {expt_id}: {e}")
+                raise
