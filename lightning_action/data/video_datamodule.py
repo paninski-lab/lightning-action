@@ -36,6 +36,7 @@ import os
 import tempfile
 from typing import Any, Optional, Union
 
+import cv2
 import lightning as pl
 import numpy as np
 import torch
@@ -261,24 +262,44 @@ class DALIIterator(DALIGenericIterator):
         return frames, None, metadata
 
 
+def _get_video_frame_count_cv2(video_path: str) -> int:
+    """Get frame count from video file using OpenCV.
+    
+    Args:
+        video_path: Path to video file.
+    
+    Returns:
+        Number of frames, or 0 if video cannot be opened.
+    """
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        return 0
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
+    return frame_count
+
 
 def load_labels_for_videos(
     video_paths: list[str], 
-    labels_dir: str, 
+    labels_dir: Optional[str], 
     max_frames: int, 
     ignore_index: int = -100,
-) -> torch.Tensor:
+) -> Optional[torch.Tensor]:
     """Load labels into a 2D tensor for efficient batched lookup.
     
     Args:
         video_paths: List of video file paths (order matches DALI file_list).
-        labels_dir: Directory containing .npy label files.
+        labels_dir: Directory containing .npy label files, or None.
         max_frames: Maximum frame count across all videos.
         ignore_index: Value for padding/missing frames.
     
     Returns:
-        Tensor of shape (num_videos, max_frames) with class labels.
+        Tensor of shape (num_videos, max_frames) with class labels,
+        or None if labels_dir is not provided.
     """
+    if labels_dir is None:
+        return None
+    
     num_videos = len(video_paths)
     all_labels = np.full((num_videos, max_frames), ignore_index, dtype=np.int64)
     
@@ -302,27 +323,92 @@ def load_labels_for_videos(
     return torch.from_numpy(all_labels)
 
 
-def get_video_lengths(video_paths: list[str], labels_dir: str) -> dict[int, int]:
-    """Get video lengths (frame counts) for each video index."""
+def get_video_lengths(
+    video_paths: list[str], 
+    labels_dir: Optional[str] = None,
+    precomputed_lengths: Optional[dict[str, int]] = None,
+) -> dict[int, int]:
+    """Get video lengths (frame counts) for each video index.
+    
+    Attempts to get lengths from:
+    1. Precomputed lengths dict (if provided)
+    2. Label files (if labels_dir provided)
+    3. OpenCV as fallback
+    
+    Args:
+        video_paths: List of video file paths.
+        labels_dir: Directory containing .npy label files, or None.
+        precomputed_lengths: Optional dict mapping video stem -> frame count.
+    
+    Returns:
+        Dict mapping video index -> frame count.
+    """
     lengths = {}
+    
     for idx, video_path in enumerate(video_paths):
         video_name = os.path.basename(video_path)
-        label_path = os.path.join(labels_dir, video_name.replace('.mp4', '.npy'))
-        if os.path.exists(label_path):
-            labels = np.load(label_path, mmap_mode='r')
-            lengths[idx] = len(labels)
+        video_stem = video_name.replace('.mp4', '')
+        
+        # Try precomputed lengths first
+        if precomputed_lengths and video_stem in precomputed_lengths:
+            lengths[idx] = precomputed_lengths[video_stem]
+            continue
+        
+        # Try label files
+        if labels_dir:
+            label_path = os.path.join(labels_dir, video_name.replace('.mp4', '.npy'))
+            if os.path.exists(label_path):
+                labels = np.load(label_path, mmap_mode='r')
+                lengths[idx] = len(labels)
+                continue
+        
+        # Fall back to OpenCV
+        frame_count = _get_video_frame_count_cv2(video_path)
+        if frame_count > 0:
+            lengths[idx] = frame_count
+    
     return lengths
 
 
-def get_max_frames(video_paths: list[str], labels_dir: str) -> int:
-    """Get maximum frame count across a list of videos."""
+def get_max_frames(
+    video_paths: list[str], 
+    labels_dir: Optional[str] = None,
+    precomputed_lengths: Optional[dict[str, int]] = None,
+) -> int:
+    """Get maximum frame count across a list of videos.
+    
+    Args:
+        video_paths: List of video file paths.
+        labels_dir: Directory containing .npy label files, or None.
+        precomputed_lengths: Optional dict mapping video stem -> frame count.
+    
+    Returns:
+        Maximum frame count across all videos.
+    """
     max_frames = 0
+    
     for video_path in video_paths:
         video_name = os.path.basename(video_path)
-        label_path = os.path.join(labels_dir, video_name.replace('.mp4', '.npy'))
-        if os.path.exists(label_path):
-            labels = np.load(label_path, mmap_mode='r')
-            max_frames = max(max_frames, len(labels))
+        video_stem = video_name.replace('.mp4', '')
+        
+        # Try precomputed lengths first
+        if precomputed_lengths and video_stem in precomputed_lengths:
+            max_frames = max(max_frames, precomputed_lengths[video_stem])
+            continue
+        
+        # Try label files
+        if labels_dir:
+            label_path = os.path.join(labels_dir, video_name.replace('.mp4', '.npy'))
+            if os.path.exists(label_path):
+                labels = np.load(label_path, mmap_mode='r')
+                max_frames = max(max_frames, len(labels))
+                continue
+        
+        # Fall back to OpenCV
+        frame_count = _get_video_frame_count_cv2(video_path)
+        if frame_count > 0:
+            max_frames = max(max_frames, frame_count)
+    
     return max_frames
 
 
@@ -364,7 +450,8 @@ class VideoDataModule(pl.LightningDataModule):
         """Initialize the VideoDataModule.
         
         Args:
-            data_config: Dict containing videos_dir, labels_dir, expt_ids, etc.
+            data_config: Dict containing videos_dir, and optionally labels_dir,
+                expt_ids, video_lengths, etc.
             sequence_length: Number of frames per chunk middle section.
             batch_size: Sequences per batch.
             num_workers: CPU workers for data loading.
@@ -389,7 +476,8 @@ class VideoDataModule(pl.LightningDataModule):
         self.model_config = model_config or {}
         
         self.videos_dir = data_config['videos_dir']
-        self.labels_dir = data_config['labels_dir']
+        self.labels_dir = data_config.get('labels_dir')  # Now optional
+        self.precomputed_lengths = data_config.get('video_lengths')  # Optional precomputed
         
         # Validate probabilities
         if not 0 <= train_probability <= 1:
@@ -422,10 +510,10 @@ class VideoDataModule(pl.LightningDataModule):
                 else self.model_config.get('num_lags', 2)
             )
 
-        # Create dataset (discovers videos, computes class weights)
+        # Create dataset (discovers videos, computes class weights if labels available)
         self.dataset = VideoDataset(
             videos_dir=self.data_config['videos_dir'],
-            labels_dir=self.data_config['labels_dir'],
+            labels_dir=self.labels_dir,
             sequence_length=self.sequence_length,
             resolution=self.data_config.get('resolution', 224),
             expt_ids=self.data_config.get('expt_ids'),
@@ -434,6 +522,9 @@ class VideoDataModule(pl.LightningDataModule):
             ignore_index=self.data_config.get('ignore_index', -100),
             backbone=self.model_config.get('backbone', 'dtcn'),
             num_layers=self.model_config.get('num_layers', 4),
+            require_labels=self.labels_dir is not None,
+            num_classes=self.data_config.get('num_classes'),
+            label_names=self.data_config.get('label_names'),
         )
 
     def setup(self, stage: Optional[str] = None) -> None:
@@ -565,7 +656,11 @@ class VideoDataModule(pl.LightningDataModule):
         if torch.cuda.is_available() and labels_2d is not None:
             labels_2d = labels_2d.to(device_id)
 
-        video_lengths = get_video_lengths(video_list, self.labels_dir)
+        video_lengths = get_video_lengths(
+            video_list, 
+            self.labels_dir,
+            self.precomputed_lengths,
+        )
 
         return DALIIterator(
             pipe, 
@@ -586,7 +681,11 @@ class VideoDataModule(pl.LightningDataModule):
             self.current_epoch = self.trainer.current_epoch
         
         # Compute max frames and load labels for training videos
-        max_frames = get_max_frames(self.train_video_paths, self.labels_dir)
+        max_frames = get_max_frames(
+            self.train_video_paths, 
+            self.labels_dir,
+            self.precomputed_lengths,
+        )
         max_frames += self.sequence_length + 2 * self.dataset.tcn_padding
         
         labels_2d = load_labels_for_videos(
@@ -612,7 +711,11 @@ class VideoDataModule(pl.LightningDataModule):
         if not self.validation_enabled or not self.val_video_paths:
             return DataLoader(TensorDataset(torch.empty(0)), batch_size=1)
         
-        max_frames = get_max_frames(self.val_video_paths, self.labels_dir)
+        max_frames = get_max_frames(
+            self.val_video_paths, 
+            self.labels_dir,
+            self.precomputed_lengths,
+        )
         max_frames += self.sequence_length + 2 * self.dataset.tcn_padding
         
         labels_2d = load_labels_for_videos(
