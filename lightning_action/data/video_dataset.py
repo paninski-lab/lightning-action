@@ -25,6 +25,7 @@ Typical usage:
 import os
 from typing import Optional
 
+import cv2
 import numpy as np
 from tqdm import tqdm
 from typeguard import typechecked
@@ -40,8 +41,9 @@ class VideoDataset:
     Attributes:
         videos_dir: Directory containing .mp4 video files.
         labels_dir: Directory containing .npy label files (same basename as videos).
+            Optional - can be None for prediction-only mode.
         video_paths: List of full paths to valid video files.
-        label_paths: List of full paths to corresponding label files.
+        label_paths: List of full paths to corresponding label files (may be empty).
         num_classes: Number of action classes detected from label files.
         label_names: List of class names (auto-generated if not provided).
         class_weights: Inverse-frequency weights for handling class imbalance.
@@ -52,7 +54,7 @@ class VideoDataset:
     def __init__(
         self,
         videos_dir: str,
-        labels_dir: str,
+        labels_dir: Optional[str] = None,
         sequence_length: int = 128,
         resolution: int = 224,
         expt_ids: Optional[list[str]] = None,
@@ -61,12 +63,16 @@ class VideoDataset:
         ignore_index: int = -100,
         backbone: str = 'dtcn',
         num_layers: int = 2,
+        require_labels: bool = True,
+        num_classes: Optional[int] = None,
+        label_names: Optional[list[str]] = None,
     ):
         """Initialize the VideoDataset.
         
         Args:
             videos_dir: Path to directory containing .mp4 video files.
-            labels_dir: Path to directory containing .npy label files.
+            labels_dir: Path to directory containing .npy label files, or None
+                for prediction-only mode.
                 Labels should be either:
                 - 1D array of class indices, shape (num_frames,)
                 - 2D one-hot array, shape (num_frames, num_classes)
@@ -79,9 +85,16 @@ class VideoDataset:
             ignore_index: Label value to ignore in loss computation (default -100).
             backbone: Type of temporal backbone ('dtcn', 'temporalmlp', 'rnn').
             num_layers: Number of layers in the temporal backbone.
+            require_labels: If True (default), raise error if labels are missing.
+                If False, allow videos without labels (for prediction).
+            num_classes: Number of classes (required if labels_dir is None).
+            label_names: Optional list of class names. If not provided and labels
+                are available, will be auto-generated as class_0, class_1, etc.
         
         Raises:
-            FileNotFoundError: If any video is missing its corresponding .npy label file.
+            FileNotFoundError: If require_labels=True and any video is missing
+                its corresponding .npy label file.
+            ValueError: If labels_dir is None and num_classes is not provided.
         """
         # Store configuration
         self.videos_dir = videos_dir
@@ -93,6 +106,7 @@ class VideoDataset:
         self.ignore_index = ignore_index
         self.backbone = backbone
         self.num_layers = num_layers
+        self.require_labels = require_labels
         
         # Calculate TCN padding based on backbone architecture
         self.tcn_padding = self._calculate_tcn_padding(backbone, num_layers, num_lags)
@@ -100,16 +114,30 @@ class VideoDataset:
         # Discover videos and validate label files
         self.video_paths: list[str] = []
         self.label_paths: list[str] = []
-        self.label_names: list[str] = []
-        self.num_classes: int = 0
+        self.label_names: list[str] = label_names if label_names is not None else []
+        self.num_classes: int = num_classes if num_classes is not None else 0
+        
+        # Set default label names if num_classes provided but label_names not
+        if num_classes is not None and num_classes > 0 and not self.label_names:
+            self.label_names = [f'class_{i}' for i in range(num_classes)]
         
         self._discover_videos(expt_ids)
         
+        # Validate we have num_classes if no labels
+        if self.labels_dir is None and self.num_classes == 0:
+            raise ValueError(
+                "num_classes must be provided when labels_dir is None"
+            )
+        
         # Compute class weights for handling imbalanced datasets
-        self.class_weights = self._compute_class_weights()
+        if self.labels_dir is not None and len(self.label_paths) > 0:
+            self.class_weights = self._compute_class_weights()
+        else:
+            # Default uniform weights when no labels available
+            self.class_weights = [1.0] * self.num_classes
 
     def _discover_videos(self, expt_ids: Optional[list[str]] = None) -> None:
-        """Discover videos and validate corresponding label files exist.
+        """Discover videos and optionally validate corresponding label files exist.
         
         Populates video_paths, label_paths, and extracts class information.
         
@@ -117,7 +145,8 @@ class VideoDataset:
             expt_ids: Optional list of experiment IDs to filter by.
         
         Raises:
-            FileNotFoundError: If any video is missing its label file.
+            FileNotFoundError: If require_labels=True and any video is missing 
+                its label file.
         """
         # Find all MP4 files
         all_videos = [f for f in os.listdir(self.videos_dir) if f.endswith('.mp4')]
@@ -133,33 +162,45 @@ class VideoDataset:
         
         for video_name in tqdm(all_videos, desc="Discovering videos"):
             video_path = os.path.join(self.videos_dir, video_name)
-            label_path = os.path.join(self.labels_dir, video_name.replace('.mp4', '.npy'))
             
-            # Check label file exists
-            if not os.path.exists(label_path):
-                missing_labels.append(video_name)
-                continue
-            
-            # Load labels to extract class information (only need to do once)
-            if self.num_classes == 0:
-                labels = np.load(label_path)
+            # Check for labels if labels_dir is provided
+            if self.labels_dir is not None:
+                label_path = os.path.join(self.labels_dir, video_name.replace('.mp4', '.npy'))
                 
-                if labels.ndim > 1 and labels.shape[1] > 1:
-                    # One-hot encoded: shape (num_frames, num_classes)
-                    self.num_classes = labels.shape[1]
-                else:
-                    # Class indices: shape (num_frames,)
-                    if labels.ndim > 1:
-                        labels = labels.squeeze()
-                    unique_labels = np.unique(labels[labels >= 0])
-                    self.num_classes = int(max(unique_labels) + 1) if unique_labels.size > 0 else 1
+                if not os.path.exists(label_path):
+                    if self.require_labels:
+                        missing_labels.append(video_name)
+                        continue
+                    else:
+                        # Add video without label
+                        self.video_paths.append(video_path)
+                        continue
                 
-                self.label_names = [f'class_{i}' for i in range(self.num_classes)]
-            
-            self.video_paths.append(video_path)
-            self.label_paths.append(label_path)
+                # Load labels to extract class information (only need to do once)
+                if self.num_classes == 0:
+                    labels = np.load(label_path)
+                    
+                    if labels.ndim > 1 and labels.shape[1] > 1:
+                        # One-hot encoded: shape (num_frames, num_classes)
+                        self.num_classes = labels.shape[1]
+                    else:
+                        # Class indices: shape (num_frames,)
+                        if labels.ndim > 1:
+                            labels = labels.squeeze()
+                        unique_labels = np.unique(labels[labels >= 0])
+                        self.num_classes = int(max(unique_labels) + 1) if unique_labels.size > 0 else 1
+                    
+                    # Only set default label names if not already provided
+                    if not self.label_names:
+                        self.label_names = [f'class_{i}' for i in range(self.num_classes)]
+                
+                self.video_paths.append(video_path)
+                self.label_paths.append(label_path)
+            else:
+                # No labels_dir - just add the video
+                self.video_paths.append(video_path)
         
-        if missing_labels:
+        if missing_labels and self.require_labels:
             raise FileNotFoundError(
                 f"Missing .npy label files for {len(missing_labels)} videos: "
                 f"{missing_labels[:5]}{'...' if len(missing_labels) > 5 else ''}"
@@ -179,6 +220,9 @@ class VideoDataset:
         Returns:
             List of class weights, one per class.
         """
+        if not self.label_paths:
+            return [1.0] * self.num_classes
+        
         counts = np.zeros(self.num_classes)
         
         for label_path in tqdm(self.label_paths, desc="Computing class weights"):
@@ -260,5 +304,17 @@ class VideoDataset:
         Returns:
             Number of frames in the video.
         """
-        labels = np.load(self.label_paths[video_idx], mmap_mode='r')
-        return len(labels)
+        # Try to get from label file first
+        if video_idx < len(self.label_paths) and self.label_paths[video_idx]:
+            labels = np.load(self.label_paths[video_idx], mmap_mode='r')
+            return len(labels)
+        
+        # Fall back to OpenCV
+        video_path = self.video_paths[video_idx]
+        cap = cv2.VideoCapture(video_path)
+        if cap.isOpened():
+            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            cap.release()
+            return frame_count
+        
+        return 0
