@@ -26,7 +26,6 @@ Reference:
 
 import math
 from pathlib import Path
-from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -43,18 +42,16 @@ class ImageEncoderViTMAE(nn.Module):
     structure, which can be useful for spatial attention or pooling.
     
     Attributes:
+        vit_mae: The underlying ViT-MAE model from HuggingFace.
+        
+    Properties:
         hidden_size: Dimension of transformer hidden states.
         num_channels: Number of input image channels (typically 3 for RGB).
         image_size: Expected input image size (square).
         patch_size: Size of image patches for the transformer.
-        vit_mae: The underlying ViT-MAE model from HuggingFace.
     
     Example:
-        encoder = ImageEncoderViTMAE({
-            'hidden_size': 768,
-            'image_size': 224,
-            'patch_size': 16,
-        })
+        encoder = ImageEncoderViTMAE()
         
         # Load pretrained weights
         encoder.load_pretrained_weights('path/to/checkpoint.ckpt')
@@ -64,35 +61,42 @@ class ImageEncoderViTMAE(nn.Module):
         features = encoder(images)  # (4, 768, 14, 14)
     """
     
-    def __init__(self, config: dict):
+    def __init__(self, config: dict = None):
         """Initialize the ViT-MAE image encoder.
         
         Args:
-            config: Configuration dictionary containing:
-                - hidden_size: Transformer hidden dimension (default 768)
-                - num_channels: Input channels (default 3)
-                - image_size: Input image size (default 224)
-                - patch_size: Patch size (default 16)
+            config: Optional configuration dictionary. Currently unused as
+                model configuration is determined by the pretrained weights.
+                Kept for API compatibility.
         """
         super().__init__()
-        self.config = config
-        
-        # Extract configuration with defaults
-        self.hidden_size = config.get('hidden_size', 768)
-        self.num_channels = config.get('num_channels', 3)
-        self.image_size = config.get('image_size', 224)
-        self.patch_size = config.get('patch_size', 16)
         
         # Initialize ViT-MAE from HuggingFace with Facebook's pretrained weights
         # We use mask_ratio=0 since we want full image encoding (no masking)
         self.vit_mae = ViTMAEModel.from_pretrained(
             "facebook/vit-mae-base",
-            hidden_size=self.hidden_size,
-            num_channels=self.num_channels,
-            image_size=self.image_size,
-            patch_size=self.patch_size,
             mask_ratio=0.0,  # No masking during feature extraction
         )
+    
+    @property
+    def hidden_size(self) -> int:
+        """Dimension of transformer hidden states."""
+        return self.vit_mae.config.hidden_size
+    
+    @property
+    def num_channels(self) -> int:
+        """Number of input image channels."""
+        return self.vit_mae.config.num_channels
+    
+    @property
+    def image_size(self) -> int:
+        """Expected input image size (square)."""
+        return self.vit_mae.config.image_size
+    
+    @property
+    def patch_size(self) -> int:
+        """Size of image patches for the transformer."""
+        return self.vit_mae.config.patch_size
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through ViT-MAE encoder.
