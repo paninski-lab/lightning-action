@@ -323,7 +323,7 @@ class BaseModel(pl.LightningModule):
         # Optimizer settings
         optimizer_type = optimizer_config.get('type', 'Adam')
         lr = float(optimizer_config.get('lr', 1e-3))
-        weight_decay = float(optimizer_config.get('wd', 0.0))
+        weight_decay = float(optimizer_config.get('wd', 0.1))
         
         # Get parameters to optimize (allows subclass customization)
         params = self._get_optimizer_params()
