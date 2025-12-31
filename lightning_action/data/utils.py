@@ -75,21 +75,37 @@ def compute_sequences(
 
 
 @typechecked
-def compute_sequence_pad(model_type: str, **model_params: Any) -> int:
+def compute_sequence_pad(
+    model_type: str, 
+    default: Optional[int] = None,
+    **model_params: Any,
+) -> int:
     """Compute required sequence padding based on model architecture.
     
     Different model types require different amounts of padding to maintain
     temporal context and handle boundary effects.
     
     Args:
-        model_type: type of model ('temporal-mlp', 'tcn', 'dtcn', 'lstm', 'gru', etc.)
-        **model_params: model-specific parameters
+        model_type: type of model ('temporal-mlp', 'tcn', 'dtcn', 'dilatedtcn', 
+            'lstm', 'gru', 'rnn', etc.)
+        default: if provided, return this value for unknown model types instead
+            of raising ValueError. Use default=0 to silently handle unknown types.
+        **model_params: model-specific parameters:
+            - num_lags: number of temporal lags (required for mlp, tcn, dtcn)
+            - num_layers: number of layers (required for tcn, dtcn)
         
     Returns:
         required padding in number of timesteps
         
     Raises:
-        ValueError: if model_type is not recognized
+        ValueError: if model_type is not recognized and default is None
+    
+    Examples:
+        # Dilated TCN with 4 layers and 2 lags
+        pad = compute_sequence_pad('dtcn', num_layers=4, num_lags=2)
+        
+        # Unknown model type with default fallback
+        pad = compute_sequence_pad('transformer', default=0, num_layers=4)
     """
     model_type = model_type.lower()
     
@@ -101,9 +117,9 @@ def compute_sequence_pad(model_type: str, **model_params: Any) -> int:
         n_lags = model_params['num_lags']
         return (2 ** n_layers) * n_lags
 
-    elif model_type == 'dtcn':
+    elif model_type in ['dtcn', 'dilatedtcn']:
         # dilated TCN with more complex calculation
-        # dilattion of each dilation block is 2 ** layer_num
+        # dilation of each dilation block is 2 ** layer_num
         # 2 conv layers per dilation block
         return sum(
             [2 * (2 ** n) * model_params['num_lags'] for n in range(model_params['num_layers'])]
@@ -114,6 +130,8 @@ def compute_sequence_pad(model_type: str, **model_params: Any) -> int:
         return 4
     
     else:
+        if default is not None:
+            return default
         raise ValueError(f'Unknown model type: {model_type}')
 
 
