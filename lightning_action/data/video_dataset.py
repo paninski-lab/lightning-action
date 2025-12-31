@@ -115,7 +115,12 @@ class VideoDataset:
         self.require_labels = require_labels
         
         # Calculate TCN padding based on backbone architecture
-        self.tcn_padding = self._calculate_tcn_padding(backbone, num_layers, num_lags)
+        self.tcn_padding = compute_sequence_pad(
+            model_type=backbone,
+            num_lags=num_lags,
+            num_layers=num_layers,
+            default=0,
+        )
         
         # Discover videos and validate label files
         self.video_paths: list[str] = []
@@ -243,42 +248,6 @@ class VideoDataset:
             ignore_index=self.ignore_index,
             sqrt_dampening=True,
         )
-
-    def _calculate_tcn_padding(
-        self, 
-        backbone: str = 'dtcn', 
-        num_layers: int = 4, 
-        num_lags: int = 2,
-    ) -> int:
-        """Calculate padding needed for temporal backbone receptive field.
-        
-        Different backbone architectures have different receptive fields:
-        - DilatedTCN: Exponentially growing dilation pattern
-        - TemporalMLP: Simple fixed lag
-        - RNN: Fixed warmup period
-        
-        Args:
-            backbone: Type of backbone ('dtcn', 'dilatedtcn', 'temporalmlp', 'rnn').
-            num_layers: Number of layers in the backbone.
-            num_lags: Number of lags/kernel size for temporal convolutions.
-        
-        Returns:
-            Number of frames of padding needed on each side of a chunk.
-        """
-        # Map backbone names to compute_sequence_pad model types
-        backbone_lower = backbone.lower()
-        if backbone_lower == 'dilatedtcn':
-            backbone_lower = 'dtcn'
-        
-        try:
-            return compute_sequence_pad(
-                model_type=backbone_lower,
-                num_lags=num_lags,
-                num_layers=num_layers,
-            )
-        except ValueError:
-            # Unknown backbone type - return 0 padding
-            return 0
 
     def __len__(self) -> int:
         """Return the number of videos in the dataset."""
