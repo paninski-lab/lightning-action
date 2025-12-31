@@ -151,24 +151,12 @@ class BaseModel(pl.LightningModule):
             targets_flat = targets.reshape(-1)
 
         # Handle edge case where all targets are ignore_index
-        # This can happen with certain data splits or padding
         if torch.all(targets_flat == self.ignore_index):
-            # Return zero loss (maintain gradient graph for DDP compatibility)
-            loss = logits_flat.sum() * 0.0
-            
-            with torch.no_grad():
-                pred_classes = torch.argmax(logits_flat, dim=-1)
-                if stage == 'train':
-                    accuracy = self.train_accuracy(pred_classes, targets_flat)
-                    f1 = self.train_f1(pred_classes, targets_flat)
-                else:
-                    accuracy = self.val_accuracy(pred_classes, targets_flat)
-                    f1 = self.val_f1(pred_classes, targets_flat)
-            
-            return loss, {
-                f'{stage}_loss': loss.item(),
-                f'{stage}_accuracy': accuracy.item(),
-                f'{stage}_f1': f1.item(),
+            # Loss is 0, metrics are meaningless so set to 1.0
+            return torch.tensor(0.0, device=self.device), {
+                f'{stage}_loss': 0.0,
+                f'{stage}_accuracy': 1.0,
+                f'{stage}_f1': 1.0,
             }
 
         # Get class weights from config and move to the correct device
