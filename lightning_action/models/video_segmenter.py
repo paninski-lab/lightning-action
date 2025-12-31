@@ -43,7 +43,6 @@ Example usage:
     }
     model = VideoSegmenter(config)
 """
-
 import math
 import os
 from abc import abstractmethod
@@ -53,7 +52,6 @@ import lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import yaml
 from jaxtyping import Float, Int
 from torchmetrics import Accuracy, F1Score
 from typeguard import typechecked
@@ -61,175 +59,7 @@ from typeguard import typechecked
 from lightning_action.models.encoders.vitmae import ImageEncoderViTMAE
 from lightning_action.models.backbones import DilatedTCN, TemporalMLP, RNN
 from lightning_action.data.utils import compute_sequence_pad
-
-class MAB(nn.Module):
-    """Multi-head Attention Block.
-    
-    Implements cross-attention where queries attend to keys/values.
-    Used as a building block for Pooling by Multi-head Attention (PMA).
-    
-    Architecture:
-        Q = W_q @ query_input
-        K = W_k @ key_input  
-        V = W_v @ key_input
-        
-        Attention = softmax(Q @ K^T / sqrt(d))
-        Output = Q + Attention @ V  (with residual)
-        Output = Output + ReLU(W_o @ Output)  (with FFN residual)
-    
-    Attributes:
-        dim_V: Output dimension (and attention dimension).
-        num_heads: Number of attention heads.
-    """
-    
-    def __init__(
-        self, 
-        dim_Q: int, 
-        dim_K: int, 
-        dim_V: int, 
-        num_heads: int, 
-        ln: bool = False,
-    ):
-        """Initialize the Multi-head Attention Block.
-        
-        Args:
-            dim_Q: Input dimension for queries.
-            dim_K: Input dimension for keys and values.
-            dim_V: Output dimension (must be divisible by num_heads).
-            num_heads: Number of attention heads.
-            ln: Whether to apply layer normalization.
-        """
-        super().__init__()
-        self.dim_V = dim_V
-        self.num_heads = num_heads
-        
-        # Projection layers
-        self.fc_q = nn.Linear(dim_Q, dim_V)
-        self.fc_k = nn.Linear(dim_K, dim_V)
-        self.fc_v = nn.Linear(dim_K, dim_V)
-        
-        # Optional layer normalization
-        if ln:
-            self.ln0 = nn.LayerNorm(dim_V)
-            self.ln1 = nn.LayerNorm(dim_V)
-        
-        # Output projection (for FFN residual)
-        self.fc_o = nn.Linear(dim_V, dim_V)
-
-    def forward(
-        self, 
-        Q: torch.Tensor, 
-        K: torch.Tensor, 
-        return_attention: bool = False,
-    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
-        """Forward pass through attention block.
-        
-        Args:
-            Q: Query tensor, shape (B, L_q, dim_Q).
-            K: Key/Value tensor, shape (B, L_k, dim_K).
-            return_attention: If True, also return attention weights.
-        
-        Returns:
-            Output tensor, shape (B, L_q, dim_V).
-            If return_attention=True, also returns attention weights (B, heads, L_q, L_k).
-        """
-        # Project to attention space
-        Q = self.fc_q(Q)
-        K, V = self.fc_k(K), self.fc_v(K)
-
-        # Split into heads: (B, L, dim_V) -> (B*heads, L, dim_V/heads)
-        dim_split = self.dim_V // self.num_heads
-        Q_ = torch.cat(Q.split(dim_split, 2), 0)
-        K_ = torch.cat(K.split(dim_split, 2), 0)
-        V_ = torch.cat(V.split(dim_split, 2), 0)
-
-        # Compute attention weights
-        A = torch.softmax(Q_.bmm(K_.transpose(1, 2)) / math.sqrt(self.dim_V), 2)
-        
-        # Apply attention and concatenate heads
-        O = torch.cat((Q_ + A.bmm(V_)).split(Q.size(0), 0), 2)
-        
-        # Apply layer norm if configured
-        O = O if getattr(self, "ln0", None) is None else self.ln0(O)
-        
-        # FFN with residual
-        O = O + F.relu(self.fc_o(O))
-        O = O if getattr(self, "ln1", None) is None else self.ln1(O)
-        
-        if return_attention:
-            # Reshape attention weights: (B*heads, L_q, L_k) -> (B, heads, L_q, L_k)
-            B, L_q, _ = Q.shape
-            L_k = K.size(1)
-            A = A.view(B, self.num_heads, L_q, L_k)
-            return O, A
-        
-        return O
-
-
-class PMA(nn.Module):
-    """Pooling by Multi-head Attention.
-    
-    Uses learnable seed vectors as queries to pool a variable-length
-    sequence into a fixed number of output vectors via attention.
-    
-    This is used to pool spatial features from ViT patches into a
-    single frame representation.
-    
-    For num_seeds=1, this reduces (B, num_patches, dim) -> (B, 1, dim),
-    effectively summarizing all patches into one vector per frame.
-    
-    Attributes:
-        S: Learnable seed vectors, shape (1, num_seeds, dim).
-        mab: Multi-head Attention Block for pooling.
-    """
-    
-    def __init__(
-        self, 
-        dim: int, 
-        num_heads: int, 
-        num_seeds: int, 
-        ln: bool = False,
-    ):
-        """Initialize Pooling by Multi-head Attention.
-        
-        Args:
-            dim: Feature dimension for both input and output.
-            num_heads: Number of attention heads.
-            num_seeds: Number of output vectors (typically 1 for frame pooling).
-            ln: Whether to apply layer normalization.
-        """
-        super().__init__()
-        
-        # Learnable seed vectors (queries for pooling)
-        self.S = nn.Parameter(torch.Tensor(1, num_seeds, dim))
-        nn.init.xavier_uniform_(self.S)
-        
-        # Attention block for pooling
-        self.mab = MAB(dim, dim, dim, num_heads, ln=ln)
-
-    def forward(
-        self, 
-        X: torch.Tensor, 
-        return_attention: bool = False,
-    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
-        """Pool input sequence using attention.
-        
-        Args:
-            X: Input features, shape (B, L, dim).
-            return_attention: If True, return attention weights.
-        
-        Returns:
-            Pooled output, shape (B, num_seeds, dim).
-            If return_attention=True, also returns attention weights.
-        """
-        # Expand seeds for batch
-        S = self.S.repeat(X.size(0), 1, 1)
-        
-        if return_attention:
-            O, A = self.mab(S, X, return_attention=True)
-            return O, A
-        
-        return self.mab(S, X)
+from lightning_action.models.necks.mha_pooling import MultiheadAttentionPooling
 
 
 
@@ -756,11 +586,13 @@ class VideoSegmenter(VideoBaseModel):
                 param.requires_grad = False
         
         # Spatial pooling using learned queries
-        self.pooling = PMA(
-            dim=self.embed_dim,
+        self.pooling = MultiheadAttentionPooling(
+            embed_dim=self.embed_dim,
             num_heads=8,
             num_seeds=1,  # Pool to single vector per frame
-            ln=False,
+            dropout=0.0,
+            use_ffn=True,  # Matches original MAB behavior
+            layer_norm=False,
         )
         
         # Build temporal backbone and classifier
