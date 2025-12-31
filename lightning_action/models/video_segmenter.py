@@ -60,6 +60,7 @@ from typeguard import typechecked
 
 from lightning_action.models.backbones.image_encoder_vitmae import ImageEncoderViTMAE
 from lightning_action.models.backbones import DilatedTCN, TemporalMLP, RNN
+from lightning_action.data.utils import compute_sequence_pad
 
 class MAB(nn.Module):
     """Multi-head Attention Block.
@@ -729,7 +730,7 @@ class VideoSegmenter(VideoBaseModel):
             with open(encoder_config_path, "r") as f:
                 encoder_config = yaml.safe_load(f)
         else:
-            # Default ViT-Base configuration
+            # Default encoder-Base configuration
             encoder_config = {
                 'hidden_size': 768,
                 'num_channels': 3,
@@ -743,7 +744,7 @@ class VideoSegmenter(VideoBaseModel):
         encoder_config["mask_ratio"] = 0  # Disable masking for inference
         self.encoder_config = encoder_config
         
-        # Initialize ViT-MAE encoder
+        # Initialize encoder
         encoder_ckpt = self.model_config.get('encoder_checkpoint')
         self.encoder = ImageEncoderViTMAE(encoder_config)
         
@@ -789,36 +790,12 @@ class VideoSegmenter(VideoBaseModel):
         backbone_output_size = self._get_backbone_output_size()
         self.classifier = nn.Linear(backbone_output_size, self.output_size)
         self._initialize_weights()
-        self.tcn_padding = self._calculate_tcn_padding()
-
-    def _calculate_tcn_padding(self) -> int:
-        """Calculate padding needed for temporal backbone receptive field.
-        
-        Different backbones have different receptive field sizes:
-        - DilatedTCN: Exponentially growing dilation pattern
-        - TemporalMLP: Fixed lag window
-        - RNN: No padding needed (processes sequentially)
-        
-        Returns:
-            Number of frames of padding needed on each side.
-        """
-        backbone_type = self.model_config.get('backbone', 'dtcn').lower()
-        
-        if backbone_type in ['dtcn', 'dilatedtcn']:
-            # DilatedTCN: dilation doubles each layer (1, 2, 4, 8, ...)
-            # Receptive field grows exponentially
-            num_layers = self.model_config['num_layers']
-            num_lags = self.model_config.get('num_lags', 1)
-            total_pad = sum([2 * (2**n) * num_lags for n in range(num_layers)])
-            return total_pad
-        elif backbone_type == 'temporalmlp':
-            # Simple fixed window
-            return self.model_config.get('num_lags', 0)
-        else:
-            # RNN: only needs padding if bidirectional
-            if self.model_config.get('bidirectional', False):
-                return self.model_config.get('num_lags', 0)
-            return 0
+        self.tcn_padding = compute_sequence_pad(
+            model_type=self.model_config.get('backbone', 'dtcn'),
+            num_lags=self.model_config.get('num_lags', 1),
+            num_layers=self.model_config.get('num_layers', 4),
+            default=0,
+        )
 
     def _build_backbone(self) -> nn.Module:
         """Construct temporal backbone for sequence modeling.
