@@ -29,10 +29,13 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 from typeguard import typechecked
+
 from lightning_action.data.utils import (
-            compute_class_weights,
-            collect_labels_from_files,
-        )
+    compute_class_weights,
+    collect_labels_from_files,
+    compute_sequence_pad,
+)
+
 
 class VideoDataset:
     """Dataset for video action segmentation - manages video metadata.
@@ -221,7 +224,6 @@ class VideoDataset:
         Returns:
             List of class weights, one per class.
         """
-        
         if not self.label_paths:
             return [1.0] * self.num_classes
         
@@ -253,7 +255,7 @@ class VideoDataset:
         Different backbone architectures have different receptive fields:
         - DilatedTCN: Exponentially growing dilation pattern
         - TemporalMLP: Simple fixed lag
-        - RNN: No padding needed (unless bidirectional)
+        - RNN: Fixed warmup period
         
         Args:
             backbone: Type of backbone ('dtcn', 'dilatedtcn', 'temporalmlp', 'rnn').
@@ -263,15 +265,19 @@ class VideoDataset:
         Returns:
             Number of frames of padding needed on each side of a chunk.
         """
-        if backbone.lower() in ['dtcn', 'dilatedtcn']:
-            # DilatedTCN uses exponentially increasing dilations: 1, 2, 4, 8, ...
-            # Total receptive field = sum of per-layer receptive fields
-            total_pad = sum([2 * (2**n) * num_lags for n in range(num_layers)])
-            return total_pad
-        elif backbone.lower() == 'temporalmlp':
-            return num_lags
-        else:
-            # RNN and other architectures: no padding needed
+        # Map backbone names to compute_sequence_pad model types
+        backbone_lower = backbone.lower()
+        if backbone_lower == 'dilatedtcn':
+            backbone_lower = 'dtcn'
+        
+        try:
+            return compute_sequence_pad(
+                model_type=backbone_lower,
+                num_lags=num_lags,
+                num_layers=num_layers,
+            )
+        except ValueError:
+            # Unknown backbone type - return 0 padding
             return 0
 
     def __len__(self) -> int:
