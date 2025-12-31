@@ -6,249 +6,74 @@ This module implements a video action segmentation model that:
 3. Models temporal dynamics using a backbone network (TCN, MLP, or RNN)
 4. Classifies each frame into an action class
 
-Architecture Overview:
-    Input: (B, T, C, H, W) video frames
-    
-    1. Frame Encoding (per-frame):
-       - ViT-MAE: (B*T, C, H, W) -> (B*T, num_patches, hidden_dim)
-       
-    2. Spatial Pooling (per-frame):
-       - PMA: (B*T, num_patches, hidden_dim) -> (B*T, 1, hidden_dim)
-       
-    3. Temporal Modeling:
-       - Reshape: (B, T, hidden_dim)
-       - Add frame differences for velocity features
-       - Backbone: (B, T, 2*hidden_dim) -> (B, T, num_hid_units)
-       
-    4. Classification:
-       - Linear: (B, T, num_hid_units) -> (B, T, num_classes)
-
-Supported temporal backbones:
-- DilatedTCN: Dilated temporal convolutions with exponentially growing receptive field
-- TemporalMLP: Simple MLP with sliding window
-- RNN: LSTM or GRU, optionally bidirectional
-
-Example usage:
-    config = {
-        'model': {
-            'input_size': 1536,
-            'output_size': 3,
-            'backbone': 'dtcn',
-            'num_layers': 4,
-            'num_hid_units': 32,
-            'num_lags': 2,
-        },
-        'data': {'ignore_index': -100},
-        'optimizer': {'lr': 0.001, 'type': 'Adam'},
-    }
-    model = VideoSegmenter(config)
+VideoBaseModel inherits from BaseModel (models/segmenter.py) and overrides
+only the methods that need video-specific behavior.
 """
-import math
+
 import os
-from abc import abstractmethod
 from typing import Any, List, Optional, Tuple, Union
 
-import lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from jaxtyping import Float, Int
-from torchmetrics import Accuracy, F1Score
+from jaxtyping import Float
 from typeguard import typechecked
 
+from lightning_action.models.segmenter import BaseModel
 from lightning_action.models.encoders.vitmae import ImageEncoderViTMAE
-from lightning_action.models.backbones import DilatedTCN, TemporalMLP, RNN
-from lightning_action.data.utils import compute_sequence_pad
 from lightning_action.models.necks.mha_pooling import MultiheadAttentionPooling
+from lightning_action.models.backbones import DilatedTCN, TemporalMLP, RNN
 
 
-
-class VideoBaseModel(pl.LightningModule):
-    """Base Lightning model for video action segmentation.
+class VideoBaseModel(BaseModel):
+    """Base model for video action segmentation.
     
-    Provides common functionality for all video segmentation models:
-    - Metric tracking (accuracy, F1)
-    - Loss computation with class weighting
-    - Training/validation step implementations
-    - Optimizer configuration with scheduler support
+    Inherits common functionality from BaseModel and adds video-specific
+    behavior for handling:
+    - Tuple-based batches (frames, labels, metadata) from DALI
+    - Boundary-aware prediction slicing for video chunks
+    - DDP coordination for skipping all-ignored batches
     
     Subclasses must implement:
     - _build_model(): Construct the model architecture
     - forward(): Define the forward pass
-    
-    Attributes:
-        config: Full configuration dictionary.
-        model_config: Model-specific configuration.
-        input_size: Input feature dimension.
-        output_size: Number of output classes.
-        ignore_index: Label value to ignore in loss/metrics.
     """
 
-    @typechecked
-    def __init__(self, config: dict[str, Any]):
-        """Initialize the base video model.
+    def _get_inputs_and_targets(
+        self, 
+        batch: Union[Tuple, dict],
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[List[dict]]]:
+        """Extract inputs and targets from batch.
+        
+        Handles both tuple format (from DALI) and dict format (from standard loaders).
         
         Args:
-            config: Configuration dictionary containing:
-                - model: Model architecture settings
-                - data: Data settings including ignore_index
-                - optimizer: Optimizer and scheduler settings
-                - training: Training settings
-        """
-        super().__init__()
-        self.save_hyperparameters(config)
-        self.config = config
-        
-        # Extract model configuration
-        self.model_config = config.get('model', {})
-        self.input_size = self.model_config['input_size']
-        self.output_size = self.model_config['output_size']
-        self.sequence_length = self.model_config.get('sequence_length', 128)
-        self.ignore_index = config.get('data', {}).get('ignore_index', -100)
-
-        # Set random seed if specified
-        if 'seed' in self.model_config:
-            pl.seed_everything(self.model_config['seed'])
-
-        self._setup_metrics()
-        self._build_model()
-
-    def _setup_metrics(self) -> None:
-        """Initialize torchmetrics for tracking performance.
-        
-        Creates separate metric instances for train and validation
-        to avoid metric state contamination.
-        """
-        num_classes = self.output_size
-
-        # Training metrics
-        self.train_accuracy = Accuracy(
-            task='multiclass', 
-            num_classes=num_classes, 
-            ignore_index=self.ignore_index,
-        )
-        self.train_f1 = F1Score(
-            task='multiclass', 
-            num_classes=num_classes, 
-            ignore_index=self.ignore_index,
-        )
-
-        # Validation metrics (separate instances)
-        self.val_accuracy = Accuracy(
-            task='multiclass', 
-            num_classes=num_classes, 
-            ignore_index=self.ignore_index,
-        )
-        self.val_f1 = F1Score(
-            task='multiclass', 
-            num_classes=num_classes, 
-            ignore_index=self.ignore_index,
-        )
-
-    @abstractmethod
-    def _build_model(self) -> None:
-        """Build the model architecture. Must be implemented by subclasses."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def forward(
-        self,
-        x: Float[torch.Tensor, 'batch sequence features'],
-    ) -> dict[str, torch.Tensor]:
-        """Forward pass. Must be implemented by subclasses."""
-        raise NotImplementedError
-
-    @typechecked
-    def compute_loss(
-        self,
-        outputs: dict[str, torch.Tensor],
-        targets: Int[torch.Tensor, 'batch sequence'],
-        stage: str = 'train',
-    ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
-        """Compute loss and metrics for a batch.
-        
-        Handles TCN padding by trimming predictions and targets to the
-        "middle" region where we have full temporal context.
-        
-        Args:
-            outputs: Model outputs dict containing 'logits'.
-            targets: Ground truth labels, shape (B, T).
-            stage: Either 'train' or 'val' for metric selection.
+            batch: Either tuple (frames, labels, metadata) or dict with 'input'/'labels'.
         
         Returns:
-            Tuple of (loss, metrics_dict).
+            Tuple of (inputs, targets, metadata).
         """
-        logits = outputs['logits']
+        if isinstance(batch, dict):
+            # Standard dataloader format
+            return batch['input'], batch.get('labels'), None
         
-        # Trim TCN padding regions (model can't make good predictions there)
-        if hasattr(self, 'tcn_padding') and self.tcn_padding > 0:
-            logits = logits[:, self.tcn_padding:-self.tcn_padding, :]
-            targets = targets[:, self.tcn_padding:-self.tcn_padding]
+        # DALI tuple format: (frames, labels, metadata) or (frames, labels)
+        if len(batch) == 3:
+            frames, labels, metadata = batch
+        elif len(batch) == 2:
+            frames, labels = batch
+            metadata = None
+        else:
+            frames = batch[0]
+            labels = None
+            metadata = None
         
-        # Flatten for cross-entropy
-        logits_flat = logits.reshape(-1, self.output_size)
-        targets_flat = targets.reshape(-1)
-
-        # Handle edge case where all targets are ignore_index
-        # This can happen with certain data splits
-        if torch.all(targets_flat == self.ignore_index):
-            # Return zero loss (but maintain gradient graph)
-            loss = logits_flat.sum() * 0.0
-            
-            with torch.no_grad():
-                pred_classes = torch.argmax(logits_flat, dim=-1)
-                if stage == 'train':
-                    accuracy = self.train_accuracy(pred_classes, targets_flat)
-                    f1 = self.train_f1(pred_classes, targets_flat)
-                else:
-                    accuracy = self.val_accuracy(pred_classes, targets_flat)
-                    f1 = self.val_f1(pred_classes, targets_flat)
-            
-            metrics = {
-                f'{stage}_loss': loss,
-                f'{stage}_accuracy': accuracy,
-                f'{stage}_f1': f1,
-            }
-            return loss, metrics
-
-        # Get optional class weights for handling imbalanced data
-        class_weights = self.model_config.get('class_weights', None)
-        if class_weights is not None:
-            class_weights = torch.tensor(
-                class_weights, device=self.device, dtype=torch.float
-            )
-            
-        # Compute cross-entropy loss
-        loss = F.cross_entropy(
-            logits_flat,
-            targets_flat,
-            ignore_index=self.ignore_index,
-            weight=class_weights,
-        )
-
-        # Compute metrics (no gradients needed)
-        with torch.no_grad():
-            pred_classes = torch.argmax(logits_flat, dim=-1)
-
-            if stage == 'train':
-                accuracy = self.train_accuracy(pred_classes, targets_flat)
-                f1 = self.train_f1(pred_classes, targets_flat)
-            else:
-                accuracy = self.val_accuracy(pred_classes, targets_flat)
-                f1 = self.val_f1(pred_classes, targets_flat)
-
-        metrics = {
-            f'{stage}_loss': loss,
-            f'{stage}_accuracy': accuracy,
-            f'{stage}_f1': f1,
-        }
-        
-        return loss, metrics
+        return frames, labels, metadata
 
     @typechecked
     def training_step(
         self,
-        batch: Union[Tuple[torch.Tensor, torch.Tensor, List[dict]], List[torch.Tensor]],
+        batch: Union[Tuple[torch.Tensor, torch.Tensor, List[dict]], dict],
         batch_idx: int,
     ) -> Optional[torch.Tensor]:
         """Execute one training step.
@@ -258,17 +83,17 @@ class VideoBaseModel(pl.LightningModule):
         all GPUs to skip only if ALL GPUs have all-ignore batches.
         
         Args:
-            batch: Tuple of (frames, labels, metadata).
+            batch: Tuple of (frames, labels, metadata) or dict.
             batch_idx: Index of this batch.
         
         Returns:
             Loss tensor, or None if batch should be skipped.
         """
-        frames, labels, _ = batch
+        frames, labels, _ = self._get_inputs_and_targets(batch)
         
         # Check if all labels are ignored (after trimming padding)
-        if hasattr(self, 'tcn_padding') and self.tcn_padding > 0:
-            trimmed_labels = labels[:, self.tcn_padding:-self.tcn_padding]
+        if self.sequence_pad and self.sequence_pad > 0:
+            trimmed_labels = labels[:, self.sequence_pad:-self.sequence_pad]
         else:
             trimmed_labels = labels
         
@@ -288,55 +113,68 @@ class VideoBaseModel(pl.LightningModule):
         elif all_ignored:
             return None
         
-        # Standard forward and loss computation
+        # Forward pass
         outputs = self.forward(frames)
-        loss, metrics = self.compute_loss(outputs, labels, stage='train')
+        
+        # Remove padding
+        outputs_no_pad = self._remove_padding(outputs)
+        labels_no_pad = self._remove_padding(labels)
+        
+        # Compute loss and metrics
+        loss, metrics = self.compute_loss(outputs_no_pad, labels_no_pad, stage='train')
         
         # Log metrics
-        self.log('train_loss', loss, prog_bar=True, on_step=False, on_epoch=True, sync_dist=True)
-        self.log('train_accuracy', self.train_accuracy, prog_bar=True, on_step=False, on_epoch=True, sync_dist=True)
-        self.log('train_f1', self.train_f1, prog_bar=True, on_step=False, on_epoch=True, sync_dist=True)
+        if metrics:
+            self.log_dict(
+                metrics,
+                on_step=False, on_epoch=True, prog_bar=True, sync_dist=True,
+                batch_size=frames.shape[0],
+            )
         
         return loss
 
     @typechecked
     def validation_step(
         self,
-        batch: Union[Tuple[torch.Tensor, torch.Tensor, List[dict]], List[torch.Tensor]],
+        batch: Union[Tuple[torch.Tensor, torch.Tensor, List[dict]], dict],
         batch_idx: int,
     ) -> None:
         """Execute one validation step.
         
         Args:
-            batch: Tuple of (frames, labels, metadata) or (frames, labels).
+            batch: Tuple of (frames, labels, metadata) or dict.
             batch_idx: Index of this batch.
         """
-        if len(batch) == 3:
-            frames, labels, _ = batch
-        else:
-            frames, labels = batch
+        frames, labels, _ = self._get_inputs_and_targets(batch)
         
+        # Forward pass
         outputs = self.forward(frames)
-        loss, metrics = self.compute_loss(outputs, labels, stage='val')
         
-        # Log validation metrics
-        self.log('val_loss', metrics['val_loss'], 
-                 prog_bar=True, sync_dist=True, on_step=False, on_epoch=True)
-        self.log('val_accuracy', metrics['val_accuracy'], 
-                 prog_bar=True, sync_dist=True, on_step=False, on_epoch=True)
-        self.log('val_f1', metrics['val_f1'], 
-                 prog_bar=True, sync_dist=True, on_step=False, on_epoch=True)
+        # Remove padding
+        outputs_no_pad = self._remove_padding(outputs)
+        labels_no_pad = self._remove_padding(labels)
+        
+        # Compute loss and metrics
+        loss, metrics = self.compute_loss(outputs_no_pad, labels_no_pad, stage='val')
+        
+        # Log metrics
+        if metrics:
+            self.log_dict(
+                metrics,
+                on_step=False, on_epoch=True, prog_bar=True, sync_dist=True,
+                batch_size=frames.shape[0],
+            )
 
     @typechecked
     def predict_step(
         self,
-        batch: Union[Tuple[torch.Tensor, List[int], List[dict]], List[torch.Tensor]],
+        batch: Union[Tuple[torch.Tensor, List[int], List[dict]], dict],
         batch_idx: int,
         dataloader_idx: Optional[int] = None,
     ) -> List[torch.Tensor]:
         """Execute one prediction step with boundary-aware output slicing.
         
-        The extended sequence from DALI provides TCN context on both sides.
+        The extended sequence from DALI provides context on both sides.
         For boundary chunks (first/last in a video), we adjust slicing to
         include predictions for frames that would normally be cut off:
         
@@ -345,18 +183,14 @@ class VideoBaseModel(pl.LightningModule):
         - End chunk: include predictions to video end (use [pad:] slice)
         
         Args:
-            batch: Tuple of (frames, actual_lengths, metadata).
+            batch: Tuple of (frames, actual_lengths, metadata) or dict.
             batch_idx: Index of this batch.
             dataloader_idx: Index of dataloader (for multiple dataloaders).
         
         Returns:
             List of probability tensors, one per sample in batch.
         """
-        if len(batch) == 3:
-            frames, actual_lengths, metadata = batch
-        else:
-            frames, actual_lengths = batch
-            metadata = None
+        frames, _, metadata = self._get_inputs_and_targets(batch)
         
         # Extract boundary flags from metadata
         is_start = None
@@ -370,39 +204,34 @@ class VideoBaseModel(pl.LightningModule):
         probabilities = outputs['probabilities']  # (B, extended_seq, num_classes)
         
         result = []
+        pad = self.sequence_pad or 0
+        
         for i in range(probabilities.shape[0]):
             sample_probs = probabilities[i]  # (extended_seq, num_classes)
             sample_is_start = is_start[i] if is_start else False
             sample_is_end = is_end[i] if is_end else False
             
             # Adjust slicing based on chunk position in video
-            if self.tcn_padding > 0:
+            if pad > 0:
                 if sample_is_start and sample_is_end:
                     # Single chunk covers entire video - use standard slice
-                    valid_probs = sample_probs[self.tcn_padding:-self.tcn_padding]
+                    valid_probs = sample_probs[pad:-pad]
                 elif sample_is_start:
                     # First chunk - include predictions from frame 0
-                    valid_probs = sample_probs[:-self.tcn_padding]
+                    valid_probs = sample_probs[:-pad]
                 elif sample_is_end:
                     # Last chunk - include predictions to end
-                    valid_probs = sample_probs[self.tcn_padding:]
+                    valid_probs = sample_probs[pad:]
                 else:
                     # Middle chunk - standard trimming
-                    valid_probs = sample_probs[self.tcn_padding:-self.tcn_padding]
+                    valid_probs = sample_probs[pad:-pad]
             else:
-                # No TCN padding - use all predictions
+                # No padding - use all predictions
                 valid_probs = sample_probs
             
             result.append(valid_probs)
         
         return result
-            
-    def on_train_epoch_end(self) -> None:
-        """Called at the end of each training epoch. Clears GPU cache."""
-        import gc
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
 
     def on_validation_epoch_end(self) -> None:
         """Called at the end of each validation epoch. Clears GPU cache."""
@@ -411,106 +240,16 @@ class VideoBaseModel(pl.LightningModule):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    @typechecked
-    def configure_optimizers(self) -> dict[str, Any]:
-        """Configure optimizer and learning rate scheduler.
+    def _get_optimizer_params(self):
+        """Get parameters to optimize.
         
-        Supports:
-        - Optimizers: Adam, AdamW, SGD
-        - Schedulers: CosineAnnealingWarmRestarts, CosineAnnealingLR, ReduceLROnPlateau
+        Override in subclasses for custom parameter groups.
+        Default returns self.parameters().
         
         Returns:
-            Dict with 'optimizer' and optionally 'lr_scheduler'.
+            Parameters or list of parameter group dicts.
         """
-        optimizer_config = self.config.get('optimizer', {})
-        optimizer_type = optimizer_config.get('type', 'Adam')
-        lr = optimizer_config.get('lr', 1e-3)
-        weight_decay = optimizer_config.get('wd', 0.0)
-        
-        # Collect parameters from all trainable components
-        trainable_params = [
-            {'params': self.pooling.parameters()},
-            {'params': self.backbone.parameters()},
-            {'params': self.classifier.parameters()},
-        ]
-        
-        # Create optimizer
-        if optimizer_type.lower() == 'adam':
-            optimizer = torch.optim.Adam(
-                trainable_params, lr=lr, weight_decay=weight_decay
-            )
-        elif optimizer_type.lower() == 'adamw':
-            optimizer = torch.optim.AdamW(
-                trainable_params, lr=lr, weight_decay=weight_decay
-            )
-        elif optimizer_type.lower() == 'sgd':
-            momentum = optimizer_config.get('momentum', 0.9)
-            optimizer = torch.optim.SGD(
-                trainable_params, lr=lr, weight_decay=weight_decay, momentum=momentum
-            )
-        else:
-            raise ValueError(f'Unsupported optimizer type: {optimizer_type}')
-
-        # Configure learning rate scheduler
-        scheduler_config = optimizer_config.get('scheduler', {})
-        use_scheduler = scheduler_config.get('use_scheduler', False)
-        
-        if use_scheduler:
-            scheduler_type = scheduler_config.get('type', 'CosineAnnealingLR')
-            
-            if scheduler_type == 'CosineAnnealingWarmRestarts':
-                # Warm restarts: restart LR schedule periodically
-                T_0 = scheduler_config.get('T_0', 34)
-                T_mult = scheduler_config.get('T_mult', 2)
-                eta_min_factor = scheduler_config.get('eta_min_factor', 20)
-                eta_min = lr / eta_min_factor
-                
-                scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-                    optimizer, T_0=T_0, T_mult=T_mult, eta_min=eta_min
-                )
-                
-            elif scheduler_type == 'CosineAnnealingLR':
-                # Single cosine decay
-                T_max = optimizer_config.get('T_max', 200)
-                eta_min_factor = scheduler_config.get('eta_min_factor', 20)
-                eta_min = lr / eta_min_factor
-                
-                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                    optimizer, T_max=T_max, eta_min=eta_min
-                )
-                
-            elif scheduler_type == 'ReduceLROnPlateau':
-                # Reduce LR when validation loss plateaus
-                factor = scheduler_config.get('factor', 0.5)
-                patience = scheduler_config.get('patience', 10)
-                
-                scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                    optimizer, mode='min', factor=factor, patience=patience, verbose=True
-                )
-                
-                return {
-                    'optimizer': optimizer,
-                    'lr_scheduler': {
-                        'scheduler': scheduler,
-                        'monitor': 'val_loss',
-                        'interval': 'epoch',
-                        'frequency': 1,
-                    }
-                }
-            else:
-                raise ValueError(f'Unsupported scheduler type: {scheduler_type}')
-            
-            return {
-                'optimizer': optimizer,
-                'lr_scheduler': {
-                    'scheduler': scheduler,
-                    'interval': 'epoch',
-                    'frequency': 1,
-                }
-            }
-        
-        return optimizer
-
+        return self.parameters()
 
 
 class VideoSegmenter(VideoBaseModel):
@@ -518,7 +257,7 @@ class VideoSegmenter(VideoBaseModel):
     
     This model processes video frames through:
     1. ViT-MAE encoder: Extract patch-level features from each frame
-    2. PMA pooling: Aggregate patches into frame-level features
+    2. Attention pooling: Aggregate patches into frame-level features
     3. Feature augmentation: Concatenate positions with velocities
     4. Temporal backbone: Model temporal dynamics
     5. Classifier: Predict action class per frame
@@ -528,33 +267,20 @@ class VideoSegmenter(VideoBaseModel):
     
     Attributes:
         encoder: ViT-MAE image encoder.
-        pooling: PMA for spatial pooling.
+        pooling: MultiheadAttentionPooling for spatial pooling.
         backbone: Temporal sequence model.
         classifier: Linear classification head.
-        tcn_padding: Required padding for temporal receptive field.
     """
-    
-    @typechecked
-    def __init__(self, config: dict[str, Any]):
-        """Initialize the VideoSegmenter.
-        
-        Args:
-            config: Configuration dictionary containing model, data,
-                optimizer, and training settings.
-        """
-        # Store num_lags before parent init (needed for padding calculation)
-        self.num_lags = config.get('model', {}).get('num_lags', 0)
-        super().__init__(config)
-        
-        # Initialize encoder (config comes from pretrained model)
+
+    def _build_model(self) -> None:
+        """Build the complete video segmentation model."""
+        # Initialize encoder
         self.encoder = ImageEncoderViTMAE()
         
-        # Load custom pretrained weights if available
         encoder_ckpt = self.model_config.get('encoder_checkpoint')
         if encoder_ckpt and os.path.exists(encoder_ckpt):
             self.encoder.load_pretrained_weights(encoder_ckpt)
         
-        # Get embed_dim from the encoder's config
         self.embed_dim = self.encoder.hidden_size
         
         # Configure encoder freezing
@@ -582,27 +308,21 @@ class VideoSegmenter(VideoBaseModel):
         self.pooling = MultiheadAttentionPooling(
             embed_dim=self.embed_dim,
             num_heads=8,
-            num_seeds=1,  # Pool to single vector per frame
+            num_seeds=1,
             dropout=0.0,
-            use_ffn=True,  # Matches original MAB behavior
+            use_ffn=True,
             layer_norm=False,
         )
         
-        # Build temporal backbone and classifier
-        self._build_model()
-
-    def _build_model(self) -> None:
-        """Build temporal backbone and classification head."""
+        # Build temporal backbone
         self.backbone = self._build_backbone()
+        
+        # Classification head
         backbone_output_size = self._get_backbone_output_size()
         self.classifier = nn.Linear(backbone_output_size, self.output_size)
+        
+        # Initialize weights (excluding encoder)
         self._initialize_weights()
-        self.tcn_padding = compute_sequence_pad(
-            model_type=self.model_config.get('backbone', 'dtcn'),
-            num_lags=self.model_config.get('num_lags', 1),
-            num_layers=self.model_config.get('num_layers', 4),
-            default=0,
-        )
 
     def _build_backbone(self) -> nn.Module:
         """Construct temporal backbone for sequence modeling.
@@ -654,11 +374,27 @@ class VideoSegmenter(VideoBaseModel):
 
     def _initialize_weights(self) -> None:
         """Initialize weights using Xavier uniform initialization."""
-        for module in self.modules():
-            if isinstance(module, nn.Linear):
-                nn.init.xavier_uniform_(module.weight)
-                if module.bias is not None:
-                    nn.init.zeros_(module.bias)
+        for module in [self.pooling, self.backbone, self.classifier]:
+            for submodule in module.modules():
+                if isinstance(submodule, nn.Linear):
+                    nn.init.xavier_uniform_(submodule.weight)
+                    if submodule.bias is not None:
+                        nn.init.zeros_(submodule.bias)
+
+    def _get_optimizer_params(self):
+        """Get parameters to optimize with specific groups.
+        
+        Returns parameters from pooling, backbone, and classifier.
+        Encoder parameters are handled separately (frozen or partially frozen).
+        
+        Returns:
+            List of parameter group dicts.
+        """
+        return [
+            {'params': self.pooling.parameters()},
+            {'params': self.backbone.parameters()},
+            {'params': self.classifier.parameters()},
+        ]
 
     @typechecked
     def forward(
