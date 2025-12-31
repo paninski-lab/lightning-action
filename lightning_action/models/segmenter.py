@@ -122,14 +122,16 @@ class BaseModel(pl.LightningModule):
     def compute_loss(
         self,
         outputs: dict[str, torch.Tensor],
-        targets: Int[torch.Tensor, 'batch sequence'],
+        targets: torch.Tensor,
         stage: str = 'train',
     ) -> tuple[torch.Tensor, dict[str, float]]:
         """Compute loss and metrics.
         
         Args:
-            outputs: model outputs dictionary
-            targets: ground truth labels
+            outputs: model outputs dictionary containing 'logits' and 'probabilities'
+            targets: ground truth labels, either:
+                - One-hot encoded: shape (batch, sequence, num_classes)
+                - Class indices: shape (batch, sequence)
             stage: training stage ('train', 'val', 'test')
             
         Returns:
@@ -137,51 +139,70 @@ class BaseModel(pl.LightningModule):
         """
         logits = outputs['logits']
 
-        # flatten for loss computation
+        # Flatten for loss computation
         logits_flat = logits.reshape(-1, self.output_size)
-        targets_flat = targets.reshape(-1, self.output_size)
+        
+        # Handle both one-hot and class index targets
+        if targets.dim() == 3 and targets.shape[-1] == self.output_size:
+            # One-hot encoded: (batch, sequence, num_classes) -> class indices
+            targets_flat = torch.argmax(targets.reshape(-1, self.output_size), dim=-1)
+        else:
+            # Already class indices: (batch, sequence)
+            targets_flat = targets.reshape(-1)
+
+        # Handle edge case where all targets are ignore_index
+        # This can happen with certain data splits or padding
+        if torch.all(targets_flat == self.ignore_index):
+            # Return zero loss (maintain gradient graph for DDP compatibility)
+            loss = logits_flat.sum() * 0.0
+            
+            with torch.no_grad():
+                pred_classes = torch.argmax(logits_flat, dim=-1)
+                if stage == 'train':
+                    accuracy = self.train_accuracy(pred_classes, targets_flat)
+                    f1 = self.train_f1(pred_classes, targets_flat)
+                else:
+                    accuracy = self.val_accuracy(pred_classes, targets_flat)
+                    f1 = self.val_f1(pred_classes, targets_flat)
+            
+            return loss, {
+                f'{stage}_loss': loss.item(),
+                f'{stage}_accuracy': accuracy.item(),
+                f'{stage}_f1': f1.item(),
+            }
 
         # Get class weights from config and move to the correct device
         class_weights = self.model_config.get('class_weights', None)
         if class_weights is not None:
             class_weights = torch.tensor(class_weights, device=self.device, dtype=torch.float)
             
-        # compute cross entropy loss
+        # Compute cross entropy loss
         loss = F.cross_entropy(
             logits_flat,
-            torch.argmax(targets_flat, axis=-1),
+            targets_flat,
             ignore_index=self.ignore_index,
             weight=class_weights,
         )
 
-        # compute metrics
+        # Compute metrics
         with torch.no_grad():
-            probabilities = outputs['probabilities']
-            probs_flat = probabilities.reshape(-1, self.output_size)
-
-            pred_classes = torch.argmax(probs_flat.clone(), axis=-1)
-            targ_classes = torch.argmax(targets_flat.clone(), axis=-1)
+            pred_classes = torch.argmax(logits_flat, dim=-1)
 
             if stage == 'train':
-                accuracy = self.train_accuracy(pred_classes, targ_classes)
-                f1 = self.train_f1(pred_classes, targ_classes)
+                accuracy = self.train_accuracy(pred_classes, targets_flat)
+                f1 = self.train_f1(pred_classes, targets_flat)
             else:  # val or test
-                accuracy = self.val_accuracy(pred_classes, targ_classes)
-                f1 = self.val_f1(pred_classes, targ_classes)
+                accuracy = self.val_accuracy(pred_classes, targets_flat)
+                f1 = self.val_f1(pred_classes, targets_flat)
 
-        # handle NaN losses (e.g., from batches with no ground truth labels)
-        loss_value = loss.item()
-        accuracy_value = accuracy.item()
-        f1_value = f1.item()
-        
-        # filter out NaN values to avoid contaminating epoch-level logging
+        # Handle NaN values to avoid contaminating epoch-level logging
         metrics = {}
         if not torch.isnan(loss):
-            metrics[f'{stage}_loss'] = loss_value
-        if not torch.isnan(accuracy):
-            metrics[f'{stage}_accuracy'] = accuracy_value
-        if not torch.isnan(f1):
-            metrics[f'{stage}_f1'] = f1_value
+            metrics[f'{stage}_loss'] = loss.item()
+        if not torch.isnan(torch.tensor(accuracy)):
+            metrics[f'{stage}_accuracy'] = accuracy.item()
+        if not torch.isnan(torch.tensor(f1)):
+            metrics[f'{stage}_f1'] = f1.item()
         
         return loss, metrics
 
@@ -291,48 +312,108 @@ class BaseModel(pl.LightningModule):
     def configure_optimizers(self) -> dict[str, Any]:
         """Configure optimizers and learning rate schedulers.
         
+        Supports:
+        - Optimizers: Adam, AdamW, SGD
+        - Schedulers: step, cosine, cosine_warm_restarts, reduce_on_plateau
+        
+        Config structure:
+            optimizer:
+                type: Adam  # or AdamW, SGD
+                lr: 0.001
+                wd: 0.0  # weight decay
+                momentum: 0.9  # for SGD only
+                scheduler:
+                    use_scheduler: true
+                    type: cosine  # or step, cosine_warm_restarts, reduce_on_plateau
+                    # Scheduler-specific params (T_max, step_size, etc.)
+        
         Returns:
             optimizer configuration dictionary
         """
         optimizer_config = self.config.get('optimizer', {})
         
-        # default optimizer settings
+        # Optimizer settings
         optimizer_type = optimizer_config.get('type', 'Adam')
-        lr = optimizer_config.get('lr', 1e-3)
-        weight_decay = optimizer_config.get('wd', 0.0)
+        lr = float(optimizer_config.get('lr', 1e-3))
+        weight_decay = float(optimizer_config.get('wd', 0.0))
         
-        # create optimizer
+        # Get parameters to optimize (allows subclass customization)
+        params = self._get_optimizer_params()
+        
+        # Create optimizer
         if optimizer_type.lower() == 'adam':
-            optimizer = torch.optim.Adam(
-                self.parameters(),
-                lr=float(lr),
-                weight_decay=float(weight_decay),
-            )
+            optimizer = torch.optim.Adam(params, lr=lr, weight_decay=weight_decay)
         elif optimizer_type.lower() == 'adamw':
-            optimizer = torch.optim.AdamW(
-                self.parameters(),
-                lr=float(lr),
-                weight_decay=float(weight_decay),
+            optimizer = torch.optim.AdamW(params, lr=lr, weight_decay=weight_decay)
+        elif optimizer_type.lower() == 'sgd':
+            momentum = float(optimizer_config.get('momentum', 0.9))
+            optimizer = torch.optim.SGD(
+                params, lr=lr, weight_decay=weight_decay, momentum=momentum
             )
         else:
             raise ValueError(f'Unsupported optimizer type: {optimizer_type}')
         
-        # setup scheduler if specified
-        scheduler_type = optimizer_config.get('scheduler', None)
-        if scheduler_type is None:
-            return optimizer
+        # Parse scheduler config (support both flat and nested structures)
+        scheduler_config = optimizer_config.get('scheduler', None)
         
-        if scheduler_type.lower() == 'step':
+        # Handle flat scheduler specification: scheduler: 'cosine'
+        if isinstance(scheduler_config, str):
+            scheduler_type = scheduler_config.lower()
+            scheduler_config = {}
+        elif scheduler_config is None:
+            # No scheduler
+            return {'optimizer': optimizer}
+        elif not scheduler_config.get('use_scheduler', True):
+            # Scheduler explicitly disabled
+            return {'optimizer': optimizer}
+        else:
+            scheduler_type = scheduler_config.get('type', 'cosine').lower()
+        
+        # Create scheduler
+        if scheduler_type == 'step':
             scheduler = torch.optim.lr_scheduler.StepLR(
                 optimizer,
-                step_size=optimizer_config.get('step_size', 30),
-                gamma=optimizer_config.get('gamma', 0.1),
+                step_size=scheduler_config.get('step_size', 30),
+                gamma=scheduler_config.get('gamma', 0.1),
             )
-        elif scheduler_type.lower() == 'cosine':
+        
+        elif scheduler_type == 'cosine':
+            T_max = scheduler_config.get('T_max', optimizer_config.get('T_max', 100))
+            eta_min_factor = scheduler_config.get('eta_min_factor', 20)
+            eta_min = lr / eta_min_factor if eta_min_factor else 0
+            
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer,
-                T_max=optimizer_config.get('T_max', 100),
+                optimizer, T_max=T_max, eta_min=eta_min
             )
+        
+        elif scheduler_type in ['cosine_warm_restarts', 'cosineannealingwarmrestarts']:
+            T_0 = scheduler_config.get('T_0', 34)
+            T_mult = scheduler_config.get('T_mult', 2)
+            eta_min_factor = scheduler_config.get('eta_min_factor', 20)
+            eta_min = lr / eta_min_factor if eta_min_factor else 0
+            
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+                optimizer, T_0=T_0, T_mult=T_mult, eta_min=eta_min
+            )
+        
+        elif scheduler_type in ['reduce_on_plateau', 'reducelronplateau']:
+            factor = scheduler_config.get('factor', 0.5)
+            patience = scheduler_config.get('patience', 10)
+            
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer, mode='min', factor=factor, patience=patience, verbose=True
+            )
+            
+            return {
+                'optimizer': optimizer,
+                'lr_scheduler': {
+                    'scheduler': scheduler,
+                    'monitor': 'val_loss',
+                    'interval': 'epoch',
+                    'frequency': 1,
+                }
+            }
+        
         else:
             raise ValueError(f'Unsupported scheduler type: {scheduler_type}')
         
@@ -341,9 +422,21 @@ class BaseModel(pl.LightningModule):
             'lr_scheduler': {
                 'scheduler': scheduler,
                 'monitor': 'val_loss',
+                'interval': 'epoch',
                 'frequency': 1,
             },
         }
+
+    def _get_optimizer_params(self):
+        """Get parameters to optimize.
+        
+        Override in subclasses for custom parameter groups.
+        Default returns self.parameters().
+        
+        Returns:
+            Parameters or list of parameter group dicts.
+        """
+        return self.parameters()
 
 
 class Segmenter(BaseModel):
