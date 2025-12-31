@@ -723,34 +723,16 @@ class VideoSegmenter(VideoBaseModel):
         self.num_lags = config.get('model', {}).get('num_lags', 0)
         super().__init__(config)
         
-        # Load encoder configuration
-        encoder_config_path = self.model_config.get('encoder_config_path')
+        # Initialize encoder (config comes from pretrained model)
+        self.encoder = ImageEncoderViTMAE()
         
-        if encoder_config_path and os.path.exists(encoder_config_path):
-            with open(encoder_config_path, "r") as f:
-                encoder_config = yaml.safe_load(f)
-        else:
-            # Default encoder-Base configuration
-            encoder_config = {
-                'hidden_size': 768,
-                'num_channels': 3,
-                'mask_ratio': 0,
-                'image_size': 224,
-                'patch_size': 16,
-                'num_attention_heads': 12,
-            }
-        
-        self.embed_dim = encoder_config.get('hidden_size', 768)
-        encoder_config["mask_ratio"] = 0  # Disable masking for inference
-        self.encoder_config = encoder_config
-        
-        # Initialize encoder
+        # Load custom pretrained weights if available
         encoder_ckpt = self.model_config.get('encoder_checkpoint')
-        self.encoder = ImageEncoderViTMAE(encoder_config)
-        
-        # Load pretrained weights if available
         if encoder_ckpt and os.path.exists(encoder_ckpt):
             self.encoder.load_pretrained_weights(encoder_ckpt)
+        
+        # Get embed_dim from the encoder's config
+        self.embed_dim = self.encoder.hidden_size
         
         # Configure encoder freezing
         self.freeze_encoder = self.model_config.get('freeze_encoder', True)
