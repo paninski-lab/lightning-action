@@ -396,13 +396,6 @@ class VideoBaseModel(pl.LightningModule):
             result.append(valid_probs)
         
         return result
-
-    def on_train_epoch_start(self) -> None:
-        """Called at the start of each training epoch. Clears GPU cache."""
-        import gc
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
             
     def on_train_epoch_end(self) -> None:
         """Called at the end of each training epoch. Clears GPU cache."""
