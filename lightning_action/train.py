@@ -20,7 +20,7 @@ from typeguard import typechecked
 from lightning_action import __version__
 from lightning_action.data import DataModule
 from lightning_action.data import transforms as transform_module
-from lightning_action.utils.class_weights import (
+from lightning_action.data.utils import (
     compute_class_weights as _compute_class_weights,
     collect_labels_from_datamodule,
 )
