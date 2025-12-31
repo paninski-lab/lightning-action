@@ -58,7 +58,7 @@ from jaxtyping import Float, Int
 from torchmetrics import Accuracy, F1Score
 from typeguard import typechecked
 
-from lightning_action.models.backbones.image_encoder_vitmae import ImageEncoderViTMAE
+from lightning_action.models.encoders.vitmae import ImageEncoderViTMAE
 from lightning_action.models.backbones import DilatedTCN, TemporalMLP, RNN
 from lightning_action.data.utils import compute_sequence_pad
 
