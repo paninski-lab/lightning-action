@@ -16,6 +16,9 @@ from jaxtyping import Float, Int
 from torchmetrics import Accuracy, F1Score
 from typeguard import typechecked
 
+from lightning_action.data.utils import compute_sequence_pad
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -57,6 +60,9 @@ class BaseModel(pl.LightningModule):
         # build model architecture (implemented by subclasses)
         self._build_model()
 
+        # compute sequence padding (after _build_model to make it easier to test unsupported backbones)
+        self.sequence_pad = compute_sequence_pad(config['model']['backbone'], **config['model'])
+
     def _setup_metrics(self):
         """Set up torchmetrics for evaluation."""
         num_classes = self.output_size
@@ -97,6 +103,22 @@ class BaseModel(pl.LightningModule):
         """
         raise NotImplementedError
 
+    def _remove_padding(
+        self,
+        data: dict[str, torch.Tensor] | torch.Tensor,
+    ) -> dict[str, torch.Tensor] | torch.Tensor:
+        """Remove padding from each sequence for convolution/rnn models"""
+        if self.sequence_pad is None or self.sequence_pad == 0:
+            return data
+
+        if isinstance(data, dict):
+            for key, val in data.items():
+                data[key] = data[key][:, self.sequence_pad:-self.sequence_pad]
+        else:
+            data = data[:, self.sequence_pad:-self.sequence_pad]
+
+        return data
+
     def compute_loss(
         self,
         outputs: dict[str, torch.Tensor],
@@ -116,8 +138,8 @@ class BaseModel(pl.LightningModule):
         logits = outputs['logits']
 
         # flatten for loss computation
-        logits_flat = logits.view(-1, self.output_size)
-        targets_flat = targets.view(-1, self.output_size)
+        logits_flat = logits.reshape(-1, self.output_size)
+        targets_flat = targets.reshape(-1, self.output_size)
 
         # Get class weights from config and move to the correct device
         class_weights = self.model_config.get('class_weights', None)
@@ -135,7 +157,7 @@ class BaseModel(pl.LightningModule):
         # compute metrics
         with torch.no_grad():
             probabilities = outputs['probabilities']
-            probs_flat = probabilities.view(-1, self.output_size)
+            probs_flat = probabilities.reshape(-1, self.output_size)
 
             pred_classes = torch.argmax(probs_flat.clone(), axis=-1)
             targ_classes = torch.argmax(targets_flat.clone(), axis=-1)
@@ -183,9 +205,13 @@ class BaseModel(pl.LightningModule):
         
         # forward pass
         outputs = self.forward(x)
-        
+
+        # remove padding
+        outputs_no_pad = self._remove_padding(outputs)
+        targets_no_pad = self._remove_padding(targets)
+
         # compute loss and metrics
-        loss, metrics = self.compute_loss(outputs, targets, stage='train')
+        loss, metrics = self.compute_loss(outputs_no_pad, targets_no_pad, stage='train')
         
         # log metrics (only if we have valid metrics to log)
         if metrics:  # will be empty if all metrics were NaN
@@ -215,9 +241,13 @@ class BaseModel(pl.LightningModule):
         # forward pass
         outputs = self.forward(x)
 
+        # remove padding
+        outputs_no_pad = self._remove_padding(outputs)
+        targets_no_pad = self._remove_padding(targets)
+
         # compute loss and metrics
-        loss, metrics = self.compute_loss(outputs, targets, stage='val')
-        
+        loss, metrics = self.compute_loss(outputs_no_pad, targets_no_pad, stage='val')
+
         # log metrics (only if we have valid metrics to log)
         if metrics:  # will be empty if all metrics were NaN
             self.log_dict(
@@ -247,12 +277,15 @@ class BaseModel(pl.LightningModule):
         
         # forward pass
         outputs = self.forward(x)
-        
+
+        # remove padding
+        outputs_no_pad = self._remove_padding(outputs)
+
         # return predictions
         return {
-            'logits': outputs['logits'],
-            'probabilities': outputs['probabilities'],
-            'predictions': torch.argmax(outputs['probabilities'], dim=-1),
+            'logits': outputs_no_pad['logits'],
+            'probabilities': outputs_no_pad['probabilities'],
+            'predictions': torch.argmax(outputs_no_pad['probabilities'], dim=-1),
         }
 
     def configure_optimizers(self) -> dict[str, Any]:
