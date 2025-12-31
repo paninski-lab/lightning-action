@@ -29,7 +29,10 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 from typeguard import typechecked
-
+from lightning_action.data.utils import (
+            compute_class_weights,
+            collect_labels_from_files,
+        )
 
 class VideoDataset:
     """Dataset for video action segmentation - manages video metadata.
@@ -218,10 +221,6 @@ class VideoDataset:
         Returns:
             List of class weights, one per class.
         """
-        from lightning_action.utils.class_weights import (
-            compute_class_weights,
-            collect_labels_from_files,
-        )
         
         if not self.label_paths:
             return [1.0] * self.num_classes
