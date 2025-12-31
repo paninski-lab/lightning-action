@@ -203,28 +203,3 @@ class ImageEncoderViTMAE(nn.Module):
         
         # Load filtered weights
         self.vit_mae.load_state_dict(encoder_state_dict, strict=strict)
-    
-    def eval(self) -> 'ImageEncoderViTMAE':
-        """Set encoder to evaluation mode.
-        
-        Disables dropout and other training-specific behaviors.
-        
-        Returns:
-            Self for method chaining.
-        """
-        super().eval()
-        self.vit_mae.eval()
-        return self
-    
-    def train(self, mode: bool = True) -> 'ImageEncoderViTMAE':
-        """Set encoder to training or evaluation mode.
-        
-        Args:
-            mode: If True, set to training mode. If False, evaluation mode.
-        
-        Returns:
-            Self for method chaining.
-        """
-        super().train(mode)
-        self.vit_mae.train(mode)
-        return self
