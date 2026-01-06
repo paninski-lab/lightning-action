@@ -11,7 +11,7 @@ only the methods that need video-specific behavior.
 """
 
 import os
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -21,6 +21,7 @@ from typeguard import typechecked
 
 from lightning_action.models.segmenter import BaseModel
 from lightning_action.models.encoders.vitmae import ImageEncoderViTMAE
+from lightning_action.models.encoders.resnet import ImageEncoderResNet
 from lightning_action.models.necks.mha_pooling import MultiheadAttentionPooling
 from lightning_action.models.backbones import DilatedTCN, TemporalMLP, RNN
 
@@ -54,10 +55,8 @@ class VideoBaseModel(BaseModel):
             Tuple of (inputs, targets, metadata).
         """
         if isinstance(batch, dict):
-            # Standard dataloader format
             return batch['input'], batch.get('labels'), None
         
-        # DALI tuple format: (frames, labels, metadata) or (frames, labels)
         if len(batch) == 3:
             frames, labels, metadata = batch
         elif len(batch) == 2:
@@ -91,7 +90,6 @@ class VideoBaseModel(BaseModel):
         """
         frames, labels, _ = self._get_inputs_and_targets(batch)
         
-        # Check if all labels are ignored (after trimming padding)
         if self.sequence_pad and self.sequence_pad > 0:
             trimmed_labels = labels[:, self.sequence_pad:-self.sequence_pad]
         else:
@@ -99,7 +97,6 @@ class VideoBaseModel(BaseModel):
         
         all_ignored = torch.all(trimmed_labels == self.ignore_index)
         
-        # For DDP: coordinate skip decision across all GPUs
         if torch.distributed.is_available() and torch.distributed.is_initialized():
             world_size = torch.distributed.get_world_size()
             all_ignored_tensor = all_ignored.float().unsqueeze(0)
@@ -107,23 +104,17 @@ class VideoBaseModel(BaseModel):
             torch.distributed.all_gather(all_ignored_list, all_ignored_tensor)
             all_ignored_gathered = torch.cat(all_ignored_list)
             
-            # Skip only if ALL GPUs have all-ignore batches
             if torch.all(all_ignored_gathered > 0.5):
                 return None
         elif all_ignored:
             return None
         
-        # Forward pass
         outputs = self.forward(frames)
-        
-        # Remove padding
         outputs_no_pad = self._remove_padding(outputs)
         labels_no_pad = self._remove_padding(labels)
         
-        # Compute loss and metrics
         loss, metrics = self.compute_loss(outputs_no_pad, labels_no_pad, stage='train')
         
-        # Log metrics
         if metrics:
             self.log_dict(
                 metrics,
@@ -147,17 +138,12 @@ class VideoBaseModel(BaseModel):
         """
         frames, labels, _ = self._get_inputs_and_targets(batch)
         
-        # Forward pass
         outputs = self.forward(frames)
-        
-        # Remove padding
         outputs_no_pad = self._remove_padding(outputs)
         labels_no_pad = self._remove_padding(labels)
         
-        # Compute loss and metrics
         loss, metrics = self.compute_loss(outputs_no_pad, labels_no_pad, stage='val')
         
-        # Log metrics
         if metrics:
             self.log_dict(
                 metrics,
@@ -176,11 +162,7 @@ class VideoBaseModel(BaseModel):
         
         The extended sequence from DALI provides context on both sides.
         For boundary chunks (first/last in a video), we adjust slicing to
-        include predictions for frames that would normally be cut off:
-        
-        - Start chunk: include predictions from frame 0 (use [0:-pad] slice)
-        - Middle chunk: standard [pad:-pad] slice  
-        - End chunk: include predictions to video end (use [pad:] slice)
+        include predictions for frames that would normally be cut off.
         
         Args:
             batch: Tuple of (frames, actual_lengths, metadata) or dict.
@@ -192,41 +174,33 @@ class VideoBaseModel(BaseModel):
         """
         frames, _, metadata = self._get_inputs_and_targets(batch)
         
-        # Extract boundary flags from metadata
         is_start = None
         is_end = None
         if metadata is not None:
             is_start = [m.get('is_start', False) for m in metadata]
             is_end = [m.get('is_end', False) for m in metadata]
         
-        # Forward pass
         outputs = self.forward(frames)
-        probabilities = outputs['probabilities']  # (B, extended_seq, num_classes)
+        probabilities = outputs['probabilities']
         
         result = []
         pad = self.sequence_pad or 0
         
         for i in range(probabilities.shape[0]):
-            sample_probs = probabilities[i]  # (extended_seq, num_classes)
+            sample_probs = probabilities[i]
             sample_is_start = is_start[i] if is_start else False
             sample_is_end = is_end[i] if is_end else False
             
-            # Adjust slicing based on chunk position in video
             if pad > 0:
                 if sample_is_start and sample_is_end:
-                    # Single chunk covers entire video - use standard slice
                     valid_probs = sample_probs[pad:-pad]
                 elif sample_is_start:
-                    # First chunk - include predictions from frame 0
                     valid_probs = sample_probs[:-pad]
                 elif sample_is_end:
-                    # Last chunk - include predictions to end
                     valid_probs = sample_probs[pad:]
                 else:
-                    # Middle chunk - standard trimming
                     valid_probs = sample_probs[pad:-pad]
             else:
-                # No padding - use all predictions
                 valid_probs = sample_probs
             
             result.append(valid_probs)
@@ -253,56 +227,128 @@ class VideoBaseModel(BaseModel):
 
 
 class VideoSegmenter(VideoBaseModel):
-    """Video action segmentation model with ViT-MAE backbone.
+    """Video action segmentation model with swappable encoder.
     
     This model processes video frames through:
-    1. ViT-MAE encoder: Extract patch-level features from each frame
-    2. Attention pooling: Aggregate patches into frame-level features
+    1. Configurable encoder: Extract spatial features from each frame
+       - ViT-MAE: Patch-level transformer features (hidden_size=768)
+       - ResNet: Convolutional feature maps (hidden_size=512-2048)
+    2. Attention pooling: Aggregate spatial features per frame
     3. Feature augmentation: Concatenate positions with velocities
-    4. Temporal backbone: Model temporal dynamics
-    5. Classifier: Predict action class per frame
+    4. Temporal backbone: Model dynamics (TCN, MLP, or RNN)
+    5. Classifier: Per-frame action prediction
     
-    The model supports optional encoder freezing for transfer learning
-    and can fine-tune just the last encoder layer if desired.
+    The encoder is selected via encoder_type in the model config section.
     
     Attributes:
-        encoder: ViT-MAE image encoder.
+        encoder: Image encoder (ViT-MAE or ResNet).
+        encoder_type: String identifying the encoder type.
         pooling: MultiheadAttentionPooling for spatial pooling.
         backbone: Temporal sequence model.
         classifier: Linear classification head.
     """
+    
+    # Hidden sizes for each encoder type (used for input_size auto-computation)
+    ENCODER_HIDDEN_SIZES = {
+        'vitmae': 768,
+        'vit-mae': 768,
+        'vit': 768,
+        'resnet18': 512,
+        'resnet34': 512,
+        'resnet50': 2048,
+        'resnet101': 2048,
+        'resnet152': 2048,
+    }
+
+    def __init__(self, config: Dict[str, Any]):
+        """Initialize VideoSegmenter with auto-computed input_size.
+        
+        Args:
+            config: Configuration dictionary.
+        """
+        # Auto-compute input_size if not provided, before BaseModel.__init__ runs
+        model_config = config.get('model', {})
+        if model_config.get('input_size') is None:
+            encoder_name = model_config.get('encoder', 'vitmae').lower()
+            hidden_size = self.ENCODER_HIDDEN_SIZES.get(encoder_name, 768)
+            # input_size = 2 * hidden_size (position + velocity features)
+            config['model']['input_size'] = hidden_size * 2
+        
+        super().__init__(config)
 
     def _build_model(self) -> None:
         """Build the complete video segmentation model."""
-        # Initialize encoder
-        self.encoder = ImageEncoderViTMAE()
+        # Load encoder config from file if provided
+        encoder_file_config = {}
+        encoder_config_path = self.model_config.get('encoder_config_path')
+        if encoder_config_path and os.path.exists(encoder_config_path):
+            import yaml
+            with open(encoder_config_path, 'r') as f:
+                encoder_file_config = yaml.safe_load(f)
         
+        # Extract model_params from encoder config (mirrors vit.yaml / resnet_ae.yaml structure)
+        encoder_model_params = encoder_file_config.get('model', {}).get('model_params', {})
+        
+        # Get encoder name: main config 'encoder' overrides encoder_config_path
+        encoder_name = self.model_config.get('encoder')
+        if encoder_name is None:
+            # Fall back to model_class or model_params.backbone from encoder config
+            encoder_name = encoder_file_config.get('model', {}).get('model_class')
+            if encoder_name == 'resnet':
+                encoder_name = encoder_model_params.get('backbone', 'resnet50')
+            elif encoder_name is None:
+                encoder_name = 'vitmae'
+        encoder_name = encoder_name.lower()
+        
+        # Build encoder based on name
+        if encoder_name in ['vitmae', 'vit-mae', 'vit']:
+            self.encoder_type = 'vitmae'
+            vitmae_config = {
+                # model_name at top level of encoder config
+                'model_name': encoder_file_config.get('model_name',
+                    self.model_config.get('encoder_model_name', 'facebook/vit-mae-base')),
+                # mask_ratio in model.model_params
+                'mask_ratio': encoder_model_params.get('mask_ratio',
+                    self.model_config.get('encoder_mask_ratio', 0.0)),
+            }
+            self.encoder = ImageEncoderViTMAE(vitmae_config)
+            
+        elif encoder_name.startswith('resnet'):
+            self.encoder_type = 'resnet'
+            resnet_config = {
+                'backbone': encoder_name,
+                'image_size': encoder_model_params.get('image_size', 
+                    self.model_config.get('encoder_image_size', 224)),
+            }
+            self.encoder = ImageEncoderResNet(resnet_config)
+            
+        else:
+            raise ValueError(
+                f"Unknown encoder: {encoder_name}. "
+                f"Supported: 'vitmae', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152'"
+            )
+        
+        # Load encoder checkpoint if specified
         encoder_ckpt = self.model_config.get('encoder_checkpoint')
         if encoder_ckpt and os.path.exists(encoder_ckpt):
             self.encoder.load_pretrained_weights(encoder_ckpt)
         
+        # Get encoder hidden size
         self.embed_dim = self.encoder.hidden_size
+        
+        # Validate input_size matches encoder (it was auto-computed in __init__ if not set)
+        expected_input_size = self.embed_dim * 2
+        if self.input_size != expected_input_size:
+            import warnings
+            warnings.warn(
+                f"Config input_size ({self.input_size}) differs from expected "
+                f"({expected_input_size} = 2 × {self.embed_dim}). "
+                f"Using config value."
+            )
         
         # Configure encoder freezing
         self.freeze_encoder = self.model_config.get('freeze_encoder', True)
-        
-        if not self.freeze_encoder:
-            # Partial fine-tuning: freeze all except last layer and layernorm
-            for param in self.encoder.parameters():
-                param.requires_grad = False
-            
-            # Unfreeze last transformer layer
-            for param in self.encoder.vit_mae.encoder.layer[-1].parameters():
-                param.requires_grad = True
-            
-            # Unfreeze final layer norm
-            for param in self.encoder.vit_mae.layernorm.parameters():
-                param.requires_grad = True
-        else:
-            # Full freeze: no encoder gradients
-            self.encoder.eval()
-            for param in self.encoder.parameters():
-                param.requires_grad = False
+        self._configure_encoder_freezing()
         
         # Spatial pooling using learned queries
         self.pooling = MultiheadAttentionPooling(
@@ -323,6 +369,22 @@ class VideoSegmenter(VideoBaseModel):
         
         # Initialize weights (excluding encoder)
         self._initialize_weights()
+
+    def _configure_encoder_freezing(self) -> None:
+        """Configure encoder parameter freezing based on settings."""
+        if self.freeze_encoder:
+            # Full freeze: no encoder gradients
+            self.encoder.eval()
+            for param in self.encoder.parameters():
+                param.requires_grad = False
+        else:
+            # Partial fine-tuning: freeze all except last layer
+            for param in self.encoder.parameters():
+                param.requires_grad = False
+            
+            # Unfreeze last layer using encoder's helper method
+            for param in self.encoder.get_last_layer_params():
+                param.requires_grad = True
 
     def _build_backbone(self) -> nn.Module:
         """Construct temporal backbone for sequence modeling.
@@ -385,28 +447,45 @@ class VideoSegmenter(VideoBaseModel):
         """Get parameters to optimize with specific groups.
         
         Returns parameters from pooling, backbone, and classifier.
-        Encoder parameters are handled separately (frozen or partially frozen).
+        Encoder parameters are handled separately based on freeze settings.
         
         Returns:
             List of parameter group dicts.
         """
-        return [
+        param_groups = [
             {'params': self.pooling.parameters()},
             {'params': self.backbone.parameters()},
             {'params': self.classifier.parameters()},
         ]
+        
+        # Add encoder parameters if not fully frozen
+        if not self.freeze_encoder:
+            encoder_params = [p for p in self.encoder.parameters() if p.requires_grad]
+            if encoder_params:
+                # Use lower learning rate for encoder fine-tuning
+                encoder_lr = self.config.get('optimizer', {}).get('encoder_lr')
+                if encoder_lr is None:
+                    base_lr = self.config.get('optimizer', {}).get('lr', 1e-3)
+                    encoder_lr = base_lr * 0.1
+                
+                param_groups.append({
+                    'params': encoder_params,
+                    'lr': encoder_lr,
+                })
+        
+        return param_groups
 
     @typechecked
     def forward(
         self,
         x: Float[torch.Tensor, 'batch sequence channels height width'],
-    ) -> dict[str, torch.Tensor]:
+    ) -> Dict[str, torch.Tensor]:
         """Forward pass through video segmentation model.
         
         Processing steps:
         1. Reshape for batch encoding: (B, T, C, H, W) -> (B*T, C, H, W)
-        2. ViT-MAE encoding: Extract patch features
-        3. Spatial pooling: Aggregate patches per frame
+        2. Encoder: Extract spatial features (works for both ViT and ResNet)
+        3. Spatial pooling: Aggregate to frame-level features
         4. Feature augmentation: Add temporal differences (velocity)
         5. Temporal backbone: Model dynamics
         6. Classification: Per-frame action prediction
@@ -425,17 +504,17 @@ class VideoSegmenter(VideoBaseModel):
         # Flatten batch and time for frame-wise encoding
         x = x.view(b * s, c, h, w)
         
-        # Encode frames with ViT-MAE
+        # Encode frames with selected encoder
         with torch.set_grad_enabled(not self.freeze_encoder):
             if self.freeze_encoder:
                 self.encoder.eval()
-            patch_features = self.encoder(x)  # (B*T, hidden_dim, H', W')
+            spatial_features = self.encoder(x)  # (B*T, hidden_dim, H', W')
         
         # Reshape for attention pooling: (B*T, H'*W', hidden_dim)
-        bs, feat_d, feat_h, feat_w = patch_features.shape
+        bs, feat_d, feat_h, feat_w = spatial_features.shape
         num_patches = feat_h * feat_w
-        patch_features = patch_features.reshape(bs, feat_d, num_patches)
-        patch_features = patch_features.transpose(1, 2)
+        patch_features = spatial_features.reshape(bs, feat_d, num_patches)
+        patch_features = patch_features.transpose(1, 2)  # (B*T, num_patches, hidden_dim)
         
         # Pool patches to single frame representation
         pooled = self.pooling(patch_features)  # (B*T, 1, hidden_dim)
@@ -443,9 +522,8 @@ class VideoSegmenter(VideoBaseModel):
         pooled = pooled.view(b, s, -1)  # (B, T, hidden_dim)
 
         # Compute temporal differences (frame velocity features)
-        # This helps the model understand motion/change
         diffs = torch.diff(pooled, dim=1)
-        diffs = torch.cat([pooled[:, 0:1, :], diffs], dim=1)  # Pad first frame
+        diffs = torch.cat([pooled[:, 0:1, :], diffs], dim=1)
         
         # Concatenate position and velocity features
         features = torch.cat([pooled, diffs], dim=-1)  # (B, T, 2*hidden_dim)
@@ -461,4 +539,17 @@ class VideoSegmenter(VideoBaseModel):
             'logits': logits,
             'probabilities': probabilities,
             'features': features,
+        }
+    
+    def get_encoder_info(self) -> Dict[str, Any]:
+        """Get information about the current encoder configuration.
+        
+        Returns:
+            Dict with encoder type, hidden size, and other metadata.
+        """
+        return {
+            'encoder_type': self.encoder_type,
+            'hidden_size': self.embed_dim,
+            'patch_size': self.encoder.patch_size,
+            'frozen': self.freeze_encoder,
         }
