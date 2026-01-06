@@ -1,10 +1,13 @@
 """ResNet image encoder for video action segmentation.
 
-This module provides the ImageEncoderResNet class, which wraps pretrained
+This module provides the ImageEncoderResNet class, which wraps
 ResNet models for use as a frame encoder in video action segmentation.
 
 The encoder outputs spatial feature maps that can be pooled or processed
 by downstream modules, matching the interface of ImageEncoderViTMAE.
+
+Note: This encoder initializes with random weights. Use load_pretrained_weights()
+to load a checkpoint file (e.g., from a pretrained autoencoder or classifier).
 
 Architecture:
     Input: Image tensor (B, C, H, W)
@@ -51,10 +54,13 @@ RESNET_MODELS = {
 
 
 class ImageEncoderResNet(nn.Module):
-    """Image encoder using ResNet backbone with optional pretrained weights.
+    """Image encoder using ResNet backbone.
     
     This encoder processes individual frames to extract spatial features.
-    It uses torchvision's ResNet implementation with ImageNet-pretrained weights.
+    It uses torchvision's ResNet implementation.
+    
+    Note: Initializes with random weights. Call load_pretrained_weights()
+    with your checkpoint file to load pretrained weights.
     
     The encoder outputs spatial feature maps that preserve spatial structure,
     matching the interface of ImageEncoderViTMAE for interchangeable use.
@@ -69,11 +75,10 @@ class ImageEncoderResNet(nn.Module):
         patch_size: Effective "patch size" (stride, 32 for ResNet).
     
     Example:
-        # With config
-        config = {'backbone': 'resnet50', 'pretrained': True}
+        config = {'backbone': 'resnet50'}
         encoder = ImageEncoderResNet(config)
         
-        # Load custom pretrained weights
+        # Load pretrained weights (required for useful features)
         encoder.load_pretrained_weights('path/to/checkpoint.ckpt')
         
         # Encode images
@@ -118,11 +123,16 @@ class ImageEncoderResNet(nn.Module):
         self._build_backbone()
     
     def _build_backbone(self) -> None:
-        """Build the ResNet backbone, removing the final pooling and FC layers."""
-        model_fn, weights = RESNET_MODELS[self._backbone_name]
+        """Build the ResNet backbone, removing the final pooling and FC layers.
         
-        # Always use pretrained ImageNet weights
-        full_model = model_fn(weights=weights)
+        Initializes with random weights. Call load_pretrained_weights() to
+        load a checkpoint.
+        """
+        model_fn, _ = RESNET_MODELS[self._backbone_name]
+        
+        # Initialize with random weights (no pretrained)
+        # Use load_pretrained_weights() to load checkpoint
+        full_model = model_fn(weights=None)
         
         # Remove average pooling and FC layers to get spatial features
         # ResNet structure: conv1, bn1, relu, maxpool, layer1-4, avgpool, fc
