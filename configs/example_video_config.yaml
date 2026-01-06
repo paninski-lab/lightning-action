@@ -16,7 +16,7 @@ data:
 
 model:
   # Encoder configuration
-  encoder: vitmae                                # Options: vitmae, resnet18, resnet34, resnet50, resnet101, resnet152
+  encoder: vitmae                                # Options: vitmae, resnet18, resnet34, resnet50, resnet101, resnet152, Use '-beast' suffix for beast-trained checkpoints
   encoder_checkpoint: /teamspace/studios/this_studio/lightning-action/data/checkpoints/encoder/vitm.ckpt
   encoder_config_path: /teamspace/studios/this_studio/lightning-action/configs/encoders/vit.yaml
   freeze_encoder: true
