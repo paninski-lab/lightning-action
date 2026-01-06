@@ -4,10 +4,6 @@ This module provides the ImageEncoderViTMAE class, which wraps a Vision
 Transformer with Masked Autoencoding (ViT-MAE) for use as a frame encoder
 in video action segmentation.
 
-ViT-MAE was pretrained on large image datasets using a masked autoencoding
-objective, learning rich visual representations. We use only the encoder
-portion (discarding the decoder) to extract features from video frames.
-
 Architecture:
     Input: Image tensor (B, C, H, W)
     1. Patch embedding: (B, C, H, W) -> (B, num_patches, hidden_dim)
@@ -16,9 +12,6 @@ Architecture:
     
     Where H' = W' = image_size / patch_size (typically 14 for 224/16)
 
-The output is a spatial feature map that can be pooled or processed
-further by downstream modules.
-
 Reference:
     He et al., "Masked Autoencoders Are Scalable Vision Learners", CVPR 2022
     https://arxiv.org/abs/2111.06377
@@ -26,6 +19,7 @@ Reference:
 
 import math
 from pathlib import Path
+from typing import Optional, Dict, Any
 
 import torch
 import torch.nn as nn
@@ -51,7 +45,9 @@ class ImageEncoderViTMAE(nn.Module):
         patch_size: Size of image patches for the transformer.
     
     Example:
-        encoder = ImageEncoderViTMAE()
+        # With config
+        config = {'model_name': 'facebook/vit-mae-base'}
+        encoder = ImageEncoderViTMAE(config)
         
         # Load pretrained weights
         encoder.load_pretrained_weights('path/to/checkpoint.ckpt')
@@ -61,22 +57,32 @@ class ImageEncoderViTMAE(nn.Module):
         features = encoder(images)  # (4, 768, 14, 14)
     """
     
-    def __init__(self, config: dict = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize the ViT-MAE image encoder.
         
         Args:
-            config: Optional configuration dictionary. Currently unused as
-                model configuration is determined by the pretrained weights.
-                Kept for API compatibility.
+            config: Configuration dictionary with optional keys:
+                - model_name: HuggingFace model identifier 
+                    (default: 'facebook/vit-mae-base')
+                - mask_ratio: Masking ratio, should be 0.0 for inference
+                    (default: 0.0)
         """
         super().__init__()
         
-        # Initialize ViT-MAE from HuggingFace with Facebook's pretrained weights
-        # We use mask_ratio=0 since we want full image encoding (no masking)
+        config = config or {}
+        
+        # Get model configuration
+        model_name = config.get('model_name', 'facebook/vit-mae-base')
+        mask_ratio = config.get('mask_ratio', 0.0)
+        
+        # Initialize ViT-MAE from HuggingFace
         self.vit_mae = ViTMAEModel.from_pretrained(
-            "facebook/vit-mae-base",
-            mask_ratio=0.0,  # No masking during feature extraction
+            model_name,
+            mask_ratio=mask_ratio,
         )
+        
+        # Store config for reference
+        self._config = config
     
     @property
     def hidden_size(self) -> int:
@@ -97,6 +103,11 @@ class ImageEncoderViTMAE(nn.Module):
     def patch_size(self) -> int:
         """Size of image patches for the transformer."""
         return self.vit_mae.config.patch_size
+    
+    @property
+    def encoder_type(self) -> str:
+        """Return encoder type identifier."""
+        return 'vitmae'
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through ViT-MAE encoder.
@@ -180,26 +191,60 @@ class ImageEncoderViTMAE(nn.Module):
         checkpoint = torch.load(checkpoint_path, map_location='cpu')
         
         # Handle different checkpoint formats
-        state_dict = checkpoint.get('state_dict', checkpoint)
+        if 'state_dict' in checkpoint:
+            state_dict = checkpoint['state_dict']
+        elif 'model_state_dict' in checkpoint:
+            state_dict = checkpoint['model_state_dict']
+        else:
+            state_dict = checkpoint
+            
         current_state_dict = self.vit_mae.state_dict()
         
         # Filter and rename keys for compatibility
         encoder_state_dict = {}
-        PREFIX_TO_STRIP = 'vit_mae.vit.'
+        
+        # Try multiple prefix patterns
+        prefixes_to_try = [
+            'vit_mae.vit.',      # From Lightning checkpoint with this encoder
+            'encoder.vit_mae.',  # From VideoSegmenter checkpoint
+            'vit.',              # Direct ViT save
+            '',                  # No prefix
+        ]
         
         for ckpt_key, value in state_dict.items():
             # Skip decoder weights and mask tokens
-            if ckpt_key.startswith('vit_mae.decoder.') or 'mask_token' in ckpt_key:
+            if 'decoder' in ckpt_key.lower() or 'mask_token' in ckpt_key:
                 continue
             
-            # Strip prefix if present
-            if ckpt_key.startswith(PREFIX_TO_STRIP):
-                model_key = ckpt_key[len(PREFIX_TO_STRIP):]
+            # Try each prefix
+            for prefix in prefixes_to_try:
+                if prefix and ckpt_key.startswith(prefix):
+                    model_key = ckpt_key[len(prefix):]
+                elif not prefix:
+                    model_key = ckpt_key
+                else:
+                    continue
                 
                 # Only load if key exists and shape matches
                 if model_key in current_state_dict:
                     if current_state_dict[model_key].shape == value.shape:
                         encoder_state_dict[model_key] = value
+                        break
         
         # Load filtered weights
-        self.vit_mae.load_state_dict(encoder_state_dict, strict=strict)
+        if encoder_state_dict:
+            self.vit_mae.load_state_dict(encoder_state_dict, strict=strict)
+            print(f"Loaded {len(encoder_state_dict)} weights from checkpoint")
+        else:
+            print("Warning: No matching weights found in checkpoint")
+    
+    def get_last_layer_params(self):
+        """Get parameters of the last transformer layer for fine-tuning.
+        
+        Returns:
+            Iterator over parameters of the last encoder layer and layernorm.
+        """
+        for param in self.vit_mae.encoder.layer[-1].parameters():
+            yield param
+        for param in self.vit_mae.layernorm.parameters():
+            yield param
