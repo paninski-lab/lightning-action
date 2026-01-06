@@ -1,0 +1,31 @@
+model:
+  model_class: vit
+  model_params:
+    # Architecture
+    hidden_size: 768
+    num_hidden_layers: 12
+    num_attention_heads: 12
+    intermediate_size: 3072
+    hidden_act: gelu
+    
+    # Regularization (used if fine-tuning)
+    hidden_dropout_prob: 0.0
+    attention_probs_dropout_prob: 0.0
+    
+    # Initialization
+    initializer_range: 0.02
+    layer_norm_eps: 1.e-12
+    
+    # Input
+    image_size: 224
+    patch_size: 16
+    num_channels: 3
+    
+    # Attention
+    qkv_bias: true
+    
+    # MAE-specific (0.0 for feature extraction, 0.75 for MAE training)
+    mask_ratio: 0.0
+
+# HuggingFace model to load (if using pretrained)
+model_name: facebook/vit-mae-base
