@@ -22,6 +22,7 @@ from typeguard import typechecked
 from lightning_action.models.segmenter import BaseModel
 from lightning_action.models.encoders.vitmae import ImageEncoderViTMAE
 from lightning_action.models.encoders.resnet import ImageEncoderResNet
+from lightning_action.models.encoders.resnet_beast import ImageEncoderResNetBeast
 from lightning_action.models.necks.mha_pooling import MultiheadAttentionPooling
 from lightning_action.models.backbones import DilatedTCN, TemporalMLP, RNN
 
@@ -258,6 +259,12 @@ class VideoSegmenter(VideoBaseModel):
         'resnet50': 2048,
         'resnet101': 2048,
         'resnet152': 2048,
+        # Beast variants (same hidden sizes, different architecture)
+        'resnet18-beast': 512,
+        'resnet34-beast': 512,
+        'resnet50-beast': 2048,
+        'resnet101-beast': 2048,
+        'resnet152-beast': 2048,
     }
 
     def __init__(self, config: Dict[str, Any]):
@@ -312,8 +319,20 @@ class VideoSegmenter(VideoBaseModel):
                     self.model_config.get('encoder_mask_ratio', 0.0)),
             }
             self.encoder = ImageEncoderViTMAE(vitmae_config)
+        
+        elif encoder_name.endswith('-beast'):
+            # Beast ResNet variant (custom implementation from beast package)
+            self.encoder_type = 'resnet-beast'
+            backbone_name = encoder_name.replace('-beast', '')  # e.g., 'resnet50-beast' -> 'resnet50'
+            resnet_config = {
+                'backbone': backbone_name,
+                'image_size': encoder_model_params.get('image_size', 
+                    self.model_config.get('encoder_image_size', 224)),
+            }
+            self.encoder = ImageEncoderResNetBeast(resnet_config)
             
         elif encoder_name.startswith('resnet'):
+            # Standard torchvision ResNet
             self.encoder_type = 'resnet'
             resnet_config = {
                 'backbone': encoder_name,
@@ -325,7 +344,8 @@ class VideoSegmenter(VideoBaseModel):
         else:
             raise ValueError(
                 f"Unknown encoder: {encoder_name}. "
-                f"Supported: 'vitmae', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152'"
+                f"Supported: 'vitmae', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', "
+                f"'resnet18-beast', 'resnet34-beast', 'resnet50-beast', 'resnet101-beast', 'resnet152-beast'"
             )
         
         # Load encoder checkpoint if specified
