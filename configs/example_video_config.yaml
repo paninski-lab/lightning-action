@@ -1,6 +1,6 @@
 data:
-  videos_dir: /teamspace/studios/this_studio/lightning-action/data/videos  # MP4 directory
-  labels_dir: /teamspace/studios/this_studio/lightning-action/data/labels_numpy  # Numpy directory
+  videos_dir: /teamspace/studios/this_studio/lightning-action/data/videos
+  labels_dir: /teamspace/studios/this_studio/lightning-action/data/labels_numpy
   expt_ids:
   - 1.1.28R
   - 1.1.28L
@@ -13,18 +13,24 @@ data:
   - 3.2.28L
   ignore_index: -100
   seed: 42
+
 model:
+  # Encoder configuration
+  encoder: vitmae                                # Options: vitmae, resnet18, resnet34, resnet50, resnet101, resnet152
+  encoder_checkpoint: /teamspace/studios/this_studio/lightning-action/data/checkpoints/encoder/vitm.ckpt
+  encoder_config_path: /teamspace/studios/this_studio/lightning-action/configs/encoders/vit.yaml
+  freeze_encoder: true
+  
+  # Temporal backbone
   backbone: dtcn
   dropout_rate: 0.1
-  input_size: 1536
+  # input_size: 1536                             # Optional - auto-computed as 2 x 768
   num_hid_units: 32
   num_lags: 2
   num_layers: 4
   output_size: 3
   seed: 42
-  encoder_checkpoint: /teamspace/studios/this_studio/lightning-action/data/checkpoints/encoder/vitm.ckpt
-  encoder_config_path: /teamspace/studios/this_studio/lightning-action/configs/vit_mae/vit_m-betta.yaml
-  freeze_encoder: true
+
 optimizer:
   T_max: 200
   lr: .001
@@ -35,13 +41,14 @@ optimizer:
     T_0: 34
     T_mult: 2
     eta_min_factor: 20
+
 training:
   checkpointing: true
   batch_size: 2  
   device: gpu
   early_stopping: false
   early_stopping_patience: 20
-  num_epochs: 160
+  num_epochs: 100
   num_workers: 4
   sequence_length: 500
   train_probability: 1.0
