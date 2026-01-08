@@ -153,10 +153,11 @@ class BaseModel(pl.LightningModule):
         # Handle edge case where all targets are ignore_index
         if torch.all(targets_flat == self.ignore_index):
             # Loss is 0, metrics are meaningless so set to 1.0
-            return torch.tensor(0.0, device=self.device), {
+            loss = logits_flat.sum() * 0.0
+            return loss, {
                 f'{stage}_loss': 0.0,
-                f'{stage}_accuracy': 1.0,
-                f'{stage}_f1': 1.0,
+                f'{stage}_accuracy': float('nan'),
+                f'{stage}_f1': float('nan'),
             }
 
         # Get class weights from config and move to the correct device
@@ -316,7 +317,7 @@ class BaseModel(pl.LightningModule):
                     # Scheduler-specific params (T_max, step_size, etc.)
         
         Returns:
-            optimizer configuration dictionary
+            optimizer 
         """
         optimizer_config = self.config.get('optimizer', {})
         
@@ -350,10 +351,10 @@ class BaseModel(pl.LightningModule):
             scheduler_config = {}
         elif scheduler_config is None:
             # No scheduler
-            return {'optimizer': optimizer}
+            return optimizer
         elif not scheduler_config.get('use_scheduler', True):
             # Scheduler explicitly disabled
-            return {'optimizer': optimizer}
+            return optimizer
         else:
             scheduler_type = scheduler_config.get('type', 'cosine').lower()
         
@@ -392,28 +393,12 @@ class BaseModel(pl.LightningModule):
                 optimizer, mode='min', factor=factor, patience=patience, verbose=True
             )
             
-            return {
-                'optimizer': optimizer,
-                'lr_scheduler': {
-                    'scheduler': scheduler,
-                    'monitor': 'val_loss',
-                    'interval': 'epoch',
-                    'frequency': 1,
-                }
-            }
+            return [optimizer], [scheduler]
         
         else:
             raise ValueError(f'Unsupported scheduler type: {scheduler_type}')
         
-        return {
-            'optimizer': optimizer,
-            'lr_scheduler': {
-                'scheduler': scheduler,
-                'monitor': 'val_loss',
-                'interval': 'epoch',
-                'frequency': 1,
-            },
-        }
+        return [optimizer], [scheduler]
 
     def _get_optimizer_params(self):
         """Get parameters to optimize.
