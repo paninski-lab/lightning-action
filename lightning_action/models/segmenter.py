@@ -351,10 +351,10 @@ class BaseModel(pl.LightningModule):
             scheduler_config = {}
         elif scheduler_config is None:
             # No scheduler
-            return optimizer
+            return {'optimizer': optimizer}
         elif not scheduler_config.get('use_scheduler', True):
             # Scheduler explicitly disabled
-            return optimizer
+            return {'optimizer': optimizer}
         else:
             scheduler_type = scheduler_config.get('type', 'cosine').lower()
         
@@ -393,12 +393,28 @@ class BaseModel(pl.LightningModule):
                 optimizer, mode='min', factor=factor, patience=patience, verbose=True
             )
             
-            return [optimizer], [scheduler]
+            return {
+                'optimizer': optimizer,
+                'lr_scheduler': {
+                    'scheduler': scheduler,
+                    'monitor': 'val_loss',  # Pointless for most schedulers
+                    'interval': 'epoch',
+                    'frequency': 1,
+                }
+            }
         
         else:
             raise ValueError(f'Unsupported scheduler type: {scheduler_type}')
         
-        return [optimizer], [scheduler]
+        return {
+                'optimizer': optimizer,
+                'lr_scheduler': {
+                    'scheduler': scheduler,
+                    'monitor': 'val_loss',  # Pointless for most schedulers
+                    'interval': 'epoch',
+                    'frequency': 1,
+                }
+            }
 
     def _get_optimizer_params(self):
         """Get parameters to optimize.
