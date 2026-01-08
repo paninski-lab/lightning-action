@@ -1,5 +1,0 @@
-hidden_size: 768
-image_size: 224 
-patch_size: 16 
-num_channels: 3 
-mask_ratio: 0 
