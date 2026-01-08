@@ -1,5 +1,7 @@
 """Tests for Segmenter model with backbone integration."""
 
+import copy
+from unittest.mock import patch
 import pytest
 import torch
 
@@ -23,7 +25,7 @@ class TestSegmenter:
                         'backbone': 'temporalmlp',
                         'num_hid_units': 32,
                         'num_layers': 2,
-                        'n_lags': 3,
+                        'num_lags': 3,
                         'activation': 'lrelu',
                         'dropout_rate': 0.1,
                         'seed': 42,
@@ -89,7 +91,7 @@ class TestSegmenter:
                         'backbone': 'dilatedtcn',
                         'num_hid_units': 32,
                         'num_layers': 3,
-                        'n_lags': 2,
+                        'num_lags': 2,
                         'activation': 'relu',
                         'dropout_rate': 0.2,
                         'seed': 42,
@@ -137,6 +139,24 @@ class TestSegmenter:
             assert hasattr(model, 'train_f1')
             assert hasattr(model, 'val_accuracy')
             assert hasattr(model, 'val_f1')
+
+    def test_remove_padding(self, backbone_configs, sample_batch):
+        """Test the removal of padding from batch"""
+        # remove non-data arrays
+        del sample_batch['dataset_id']
+        del sample_batch['batch_idx']
+
+        for backbone_config in backbone_configs:
+            config = backbone_config['config']
+            model = Segmenter(config)
+            unpadded_len = 100 - 2 * model.sequence_pad
+            # test dict operation
+            batch_no_pad = model._remove_padding(copy.copy(sample_batch))
+            for _, val in batch_no_pad.items():
+                assert val.shape[1] == unpadded_len
+            # test array operation
+            array_no_pad = model._remove_padding(torch.randn(2, 100, 6))
+            assert array_no_pad.shape[1] == unpadded_len
 
     def test_forward_pass(self, backbone_configs, sample_batch):
         """Test forward pass with different backbones."""
@@ -233,6 +253,135 @@ class TestSegmenter:
             # validation step returns None
             assert result is None
 
+    def test_padding_removal_in_training_step(self, backbone_configs):
+        """Test that padding is correctly removed before computing loss in training_step.
+
+        This test verifies the bug fix where _remove_padding() is called before
+        compute_loss() in both training_step() and validation_step(). We use
+        Python's unittest.mock.patch to "spy" on the compute_loss method and
+        capture the tensor shapes it receives.
+        """
+        for backbone_config in backbone_configs:
+            config = backbone_config['config']
+            model = Segmenter(config)
+
+            # Create a batch with known dimensions
+            sequence_length = 100
+            batch_size = 2
+            batch = {
+                'input': torch.randn(batch_size, sequence_length, config['model']['input_size']),
+                'labels': torch.randint(
+                    0, 4, (batch_size, sequence_length, config['model']['output_size'])
+                ).double(),
+            }
+
+            # --- PATCHING EXPLANATION ---
+            # We want to verify that compute_loss receives tensors with padding removed.
+            # To do this without modifying the actual method, we use Python's "patch" mechanism.
+            #
+            # Step 1: Save a reference to the original compute_loss method
+            original_compute_loss = model.compute_loss
+
+            # Step 2: Create a dictionary to store captured information
+            # This will be populated by our "spy" function below
+            captured_shapes = {}
+
+            # Step 3: Create a "spy" function that wraps the original method
+            # This function will be called INSTEAD of compute_loss during the test
+            def spy_compute_loss(outputs, targets, stage='train'):
+                """A wrapper function that captures tensor shapes then calls the original method.
+
+                This is called a "spy" because it observes what's happening without
+                changing the behavior - it records information and then delegates to
+                the real implementation.
+                """
+                # Capture the shapes of the tensors passed to compute_loss
+                # The key thing we're checking: do these shapes reflect padding removal?
+                captured_shapes['outputs_shape'] = outputs['logits'].shape
+                captured_shapes['targets_shape'] = targets.shape
+
+                # Call the original compute_loss method to maintain normal behavior
+                # This ensures training_step still returns a valid loss
+                return original_compute_loss(outputs, targets, stage)
+
+            # Step 4: Use patch.object as a context manager
+            # - patch.object(model, 'compute_loss', ...): temporarily replace model.compute_loss
+            # - side_effect=spy_compute_loss: when compute_loss is called, run spy function instead
+            # - The 'with' block ensures the patch is only active during this scope
+            #   and automatically restores the original method when the block exits
+            with patch.object(model, 'compute_loss', side_effect=spy_compute_loss):
+                # Inside this block, any call to model.compute_loss will trigger spy_compute_loss
+                # Our spy will capture the shapes at the compute_loss call
+                model.training_step(batch, batch_idx=0)
+
+            # Now the patch is deactivated and captured_shapes contains the recorded information
+
+            # --- VERIFICATION ---
+            # If _remove_padding() was called correctly, the sequence dimension should be reduced
+            # Original sequence_length: 100
+            # After padding removal: 100 - 2*sequence_pad (remove from both start and end)
+            expected_seq_len = sequence_length - 2 * model.sequence_pad
+
+            # Check that both outputs and targets had padding removed
+            assert captured_shapes['outputs_shape'][1] == expected_seq_len, \
+                f"Expected sequence length {expected_seq_len} after padding removal, " \
+                f"but got {captured_shapes['outputs_shape'][1]}"
+
+            assert captured_shapes['targets_shape'][1] == expected_seq_len, \
+                f"Expected sequence length {expected_seq_len} after padding removal, " \
+                f"but got {captured_shapes['targets_shape'][1]}"
+
+    def test_padding_removal_in_validation_step(self, backbone_configs):
+        """Test that padding is correctly removed before computing loss in validation_step.
+
+        This is the same test as above but for validation_step. We separate them
+        because they are different code paths that both need to handle padding correctly.
+        """
+        for backbone_config in backbone_configs:
+            config = backbone_config['config']
+            model = Segmenter(config)
+
+            # Skip backbones without padding
+            if model.sequence_pad == 0:
+                continue
+
+            # Create test batch
+            sequence_length = 100
+            batch_size = 2
+            batch = {
+                'input': torch.randn(batch_size, sequence_length, config['model']['input_size']),
+                'labels': torch.randint(
+                    0, 4, (batch_size, sequence_length, config['model']['output_size'])
+                ).double(),
+            }
+
+            # Save original method
+            original_compute_loss = model.compute_loss
+
+            # Dictionary to capture information
+            captured_shapes = {}
+
+            # Spy function to capture shapes
+            def spy_compute_loss(outputs, targets, stage='val'):
+                captured_shapes['outputs_shape'] = outputs['logits'].shape
+                captured_shapes['targets_shape'] = targets.shape
+                return original_compute_loss(outputs, targets, stage)
+
+            # Temporarily replace compute_loss with our spy
+            with patch.object(model, 'compute_loss', side_effect=spy_compute_loss):
+                model.validation_step(batch, batch_idx=0)
+
+            # Verify padding was removed
+            expected_seq_len = sequence_length - 2 * model.sequence_pad
+
+            assert captured_shapes['outputs_shape'][1] == expected_seq_len, \
+                f"Expected sequence length {expected_seq_len} after padding removal, " \
+                f"but got {captured_shapes['outputs_shape'][1]}"
+
+            assert captured_shapes['targets_shape'][1] == expected_seq_len, \
+                f"Expected sequence length {expected_seq_len} after padding removal, " \
+                f"but got {captured_shapes['targets_shape'][1]}"
+
     def test_predict_step(self, backbone_configs, sample_batch):
         """Test prediction step with different backbones."""
         for backbone_config in backbone_configs:
@@ -253,10 +402,11 @@ class TestSegmenter:
             output_size = config['model']['output_size']
             
             # check prediction shapes
-            assert predictions['logits'].shape == (batch_size, sequence_length, output_size)
-            assert predictions['probabilities'].shape == (batch_size, sequence_length, output_size)
-            assert predictions['predictions'].shape == (batch_size, sequence_length)
-            
+            seq_len_no_pad = sequence_length - 2 * model.sequence_pad
+            assert predictions['logits'].shape == (batch_size, seq_len_no_pad, output_size)
+            assert predictions['probabilities'].shape == (batch_size, seq_len_no_pad, output_size)
+            assert predictions['predictions'].shape == (batch_size, seq_len_no_pad)
+
             # check prediction values are valid class indices
             assert predictions['predictions'].min() >= 0
             assert predictions['predictions'].max() < output_size
