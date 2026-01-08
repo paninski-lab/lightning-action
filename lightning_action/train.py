@@ -20,7 +20,10 @@ from typeguard import typechecked
 from lightning_action import __version__
 from lightning_action.data import DataModule
 from lightning_action.data import transforms as transform_module
-
+from lightning_action.data.utils import (
+    compute_class_weights as _compute_class_weights,
+    collect_labels_from_datamodule,
+)
 logger = logging.getLogger(__name__)
 
 
@@ -430,75 +433,32 @@ def compute_class_weights(datamodule: DataModule, ignore_index: int = -100) -> l
     """
     logger.info("Computing class weights from training data...")
     
-    # ensure datamodule is set up
+    # Ensure datamodule is set up
     if not hasattr(datamodule, 'dataset_train') or datamodule.dataset_train is None:
         datamodule.setup('fit')
     
-    # count examples per class in training set
-    dataset_train = datamodule.dataset_train
+    # Collect labels from training dataset
+    all_labels, num_classes = collect_labels_from_datamodule(
+        datamodule.dataset_train,
+        ignore_index=ignore_index,
+    )
     
-    # get all labels from training dataset
-    all_labels = []
-    num_classes = None
-    
-    for i in range(len(dataset_train)):
-        batch = dataset_train[i]
-        if 'labels' in batch:
-            labels = batch['labels']
-            if isinstance(labels, torch.Tensor):
-                labels = labels.numpy()
-            # handle both one-hot and class index formats
-            if labels.ndim > 1 and labels.shape[-1] > 1:
-                # one-hot encoded - convert to class indices
-                labels = np.argmax(labels, axis=-1)
-                if num_classes is None:
-                    num_classes = batch['labels'].shape[-1]
-            all_labels.append(labels.flatten())
-    
-    if not all_labels:
+    if len(all_labels) == 0:
         logger.warning("No labels found in training dataset, using uniform weights")
-        # try to get num_classes from dataset
-        if hasattr(dataset_train, 'label_names'):
-            num_classes = len(dataset_train.label_names)
+        # Try to get num_classes from dataset
+        if hasattr(datamodule.dataset_train, 'label_names'):
+            num_classes = len(datamodule.dataset_train.label_names)
         else:
             num_classes = 4  # default fallback
         return [1.0] * num_classes
     
-    # concatenate all labels
-    all_labels = np.concatenate(all_labels)
-    
-    # count occurrences of each class
-    unique_classes, counts = np.unique(all_labels, return_counts=True)
-    
-    # determine total number of classes
-    if num_classes is None:
-        max_class = int(max(unique_classes))
-        num_classes = max_class + 1
-    
-    # create totals array with counts for each class
-    totals = np.zeros(num_classes)
-    for cls, count in zip(unique_classes, counts):
-        if int(cls) < num_classes:  # ensure class index is valid
-            totals[int(cls)] = count
-    
-    # ignore background class if specified
-    if 0 <= ignore_index < len(totals):
-        totals[ignore_index] = 0
-    
-    # compute class weights: most frequent class gets weight 1.0,
-    # others get weights inversely proportional to frequency
-    max_count = np.max(totals)
-    if max_count == 0:
-        logger.warning("No labeled examples found, using uniform weights")
-        class_weights = np.ones(num_classes)
-    else:
-        class_weights = max_count / (totals + 1e-10)
-        class_weights[totals == 0] = 0.0
-    
-    logger.info(f"Class counts: {totals}")
-    logger.info(f"Class weights: {class_weights}")
-    
-    return class_weights.tolist()
+    # Compute weights (no sqrt dampening for CSV pipeline to match original behavior)
+    return _compute_class_weights(
+        labels=all_labels,
+        num_classes=num_classes,
+        ignore_index=ignore_index,
+        sqrt_dampening=False,
+    )
 
 
 @typechecked

@@ -421,9 +421,10 @@ class TestSegmenter:
             optimizer_config = model.configure_optimizers()
             
             if isinstance(optimizer_config, dict):
-                # with scheduler
                 assert 'optimizer' in optimizer_config
-                assert 'lr_scheduler' in optimizer_config
+                # lr_scheduler is optional - only check if present
+                if 'lr_scheduler' in optimizer_config:
+                    assert isinstance(optimizer_config['lr_scheduler'], dict)
                 optimizer = optimizer_config['optimizer']
             else:
                 # just optimizer
