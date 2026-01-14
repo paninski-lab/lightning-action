@@ -32,6 +32,7 @@ from typing import Optional, Dict, Any
 import torch
 import torch.nn as nn
 import torchvision.models as models
+from typeguard import typechecked
 
 
 # Mapping of backbone names to output dimensions
@@ -86,6 +87,7 @@ class ImageEncoderResNet(nn.Module):
         features = encoder(images)  # (4, 2048, 7, 7)
     """
     
+    @typechecked
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize the ResNet image encoder.
         
@@ -182,6 +184,7 @@ class ImageEncoderResNet(nn.Module):
         """Return encoder type identifier."""
         return 'resnet'
     
+    @typechecked
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through ResNet encoder.
         
@@ -214,6 +217,7 @@ class ImageEncoderResNet(nn.Module):
         
         return spatial_features
     
+    @typechecked
     def load_pretrained_weights(
         self, 
         checkpoint_path: str, 
