@@ -13,8 +13,9 @@ These tests require OpenCV for video creation and reading.
 GPU tests require NVIDIA DALI and a CUDA-capable GPU.
 
 Test Categories:
-- CPU tests: Run everywhere, including GitHub Actions
-- GPU tests: Require NVIDIA GPU, skipped if not available
+- CPU tests: Run everywhere, including GitHub Actions (no DALI needed)
+- DALI tests: Require DALI installed (may not need GPU)
+- GPU tests: Require NVIDIA GPU + DALI
 """
 
 import os
@@ -29,24 +30,43 @@ import pytest
 import torch
 
 # =============================================================================
-# GPU availability check
+# DALI and GPU availability checks
 # =============================================================================
 
-def gpu_available() -> bool:
-    """Check if CUDA GPU is available for DALI."""
-    if not torch.cuda.is_available():
-        return False
+def dali_available() -> bool:
+    """Check if NVIDIA DALI is installed."""
     try:
-        # Try to import DALI
         from nvidia.dali.pipeline import Pipeline
         from nvidia.dali import fn, types
         return True
     except ImportError:
         return False
 
-# Markers for GPU-required tests
+
+def gpu_available() -> bool:
+    """Check if CUDA GPU is available AND DALI is installed."""
+    if not torch.cuda.is_available():
+        return False
+    return dali_available()
+
+
+# Store availability at module load time
+DALI_INSTALLED = dali_available()
+GPU_AVAILABLE = gpu_available()
+
+# =============================================================================
+# Skip markers for different test categories
+# =============================================================================
+
+# For tests that need DALI installed (but not necessarily GPU)
+requires_dali = pytest.mark.skipif(
+    not DALI_INSTALLED,
+    reason="NVIDIA DALI not installed"
+)
+
+# For tests that need both DALI and GPU
 requires_gpu = pytest.mark.skipif(
-    not gpu_available(),
+    not GPU_AVAILABLE,
     reason="NVIDIA GPU and DALI required for this test"
 )
 
@@ -243,6 +263,8 @@ def create_test_labels():
 # =============================================================================
 # Tests for _get_video_frame_count_cv2
 # =============================================================================
+# Tests for _get_video_frame_count_cv2 (CPU-only, no DALI needed)
+# =============================================================================
 
 class TestGetVideoFrameCountCV2:
     """Test the _get_video_frame_count_cv2 utility function."""
@@ -296,6 +318,7 @@ class TestGetVideoFrameCountCV2:
         assert result == 0
 
 
+# =============================================================================
 # =============================================================================
 # Tests for load_labels_for_videos (CPU-only, no DALI needed)
 # =============================================================================
@@ -502,7 +525,7 @@ class TestLoadLabelsForVideos:
 
 
 # =============================================================================
-# Tests for get_video_lengths
+# Tests for get_video_lengths (CPU-only, no DALI needed)
 # =============================================================================
 
 class TestGetVideoLengths:
@@ -705,7 +728,7 @@ class TestGetVideoLengths:
 
 
 # =============================================================================
-# Tests for get_max_frames
+# Tests for get_max_frames (CPU-only, no DALI needed)
 # =============================================================================
 
 class TestGetMaxFrames:
@@ -1416,7 +1439,8 @@ class TestVideoDatasetLabelNames:
 
 
 # =============================================================================
-# Tests for VideoDataModule setup and configuration
+# Tests for VideoDataModule setup and configuration (CPU-only after source fix)
+# Note: These tests don't call train_dataloader/val_dataloader, so they work without DALI
 # =============================================================================
 
 class TestVideoDataModuleSetup:
