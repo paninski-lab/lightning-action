@@ -52,7 +52,9 @@ try:
     from nvidia.dali.plugin.pytorch import DALIGenericIterator, LastBatchPolicy
     DALI_AVAILABLE = True
 except ImportError:
-    fn = types = Pipeline = DALIGenericIterator = LastBatchPolicy = None
+    fn = types = LastBatchPolicy = None
+    Pipeline = object
+    DALIGenericIterator = object
 
 def _check_dali_available():
     """Raise informative error if DALI is not available."""
