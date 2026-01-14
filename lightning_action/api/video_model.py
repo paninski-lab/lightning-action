@@ -69,7 +69,7 @@ def chdir(path: Path):
     finally:
         os.chdir(old_cwd)
 
-
+@typechecked
 def _get_video_frame_count(video_path: str | Path) -> int:
     """Get the total frame count of a video using OpenCV.
     
@@ -121,6 +121,7 @@ class VideoModel:
         )
     """
 
+    @typechecked
     def __init__(
         self,
         model: VideoSegmenter,
@@ -143,6 +144,7 @@ class VideoModel:
         self._trainer: Optional[pl.Trainer] = None
 
     @classmethod
+    @typechecked
     def from_dir(cls, model_dir: str | Path) -> 'VideoModel':
         """Load a trained model from a directory.
         
@@ -209,6 +211,7 @@ class VideoModel:
         return cls(model, config, model_dir)
 
     @classmethod
+    @typechecked
     def from_config(cls, config_path: str | Path | dict) -> 'VideoModel':
         """Create a new untrained model from configuration.
         
@@ -233,6 +236,7 @@ class VideoModel:
         model = VideoSegmenter(config)
         return cls(model, config, model_dir=None)
 
+    @typechecked
     def train(
         self, 
         output_dir: str | Path = 'runs/default', 
@@ -282,6 +286,7 @@ class VideoModel:
         except Exception as e:
             print(f'Warning: Post-training inference failed: {e}')
     
+    @typechecked
     def _setup_trainer(self) -> pl.Trainer:
         """Set up a Lightning Trainer for prediction.
         
@@ -311,6 +316,7 @@ class VideoModel:
         
         return pl.Trainer(**trainer_config)
     
+    @typechecked
     def _predict_single_video(
         self,
         video_path: Path,
@@ -420,6 +426,7 @@ class VideoModel:
         output_path.parent.mkdir(exist_ok=True, parents=True)
         df.to_csv(output_path, index=False)
     
+    @typechecked
     def predict(
         self,
         videos_dir: str | Path,
