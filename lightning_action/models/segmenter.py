@@ -390,7 +390,7 @@ class BaseModel(pl.LightningModule):
             patience = scheduler_config.get('patience', 10)
             
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer, mode='min', factor=factor, patience=patience, verbose=True
+                optimizer, mode='min', factor=factor, patience=patience
             )
             
             return {
