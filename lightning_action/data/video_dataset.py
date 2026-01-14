@@ -257,6 +257,7 @@ class VideoDataset:
         """Return a copy of the class label names."""
         return self.label_names.copy()
     
+    @typechecked
     def get_video_length(self, video_idx: int) -> int:
         """Get the frame count for a specific video.
         
