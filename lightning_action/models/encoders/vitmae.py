@@ -24,6 +24,7 @@ from typing import Optional, Dict, Any
 import torch
 import torch.nn as nn
 from transformers import ViTMAEModel
+from typeguard import typechecked
 
 
 class ImageEncoderViTMAE(nn.Module):
@@ -57,6 +58,7 @@ class ImageEncoderViTMAE(nn.Module):
         features = encoder(images)  # (4, 768, 14, 14)
     """
     
+    @typechecked
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize the ViT-MAE image encoder.
         
@@ -109,6 +111,7 @@ class ImageEncoderViTMAE(nn.Module):
         """Return encoder type identifier."""
         return 'vitmae'
     
+    @typechecked
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through ViT-MAE encoder.
         
@@ -159,6 +162,7 @@ class ImageEncoderViTMAE(nn.Module):
         
         return spatial_features
     
+    @typechecked
     def load_pretrained_weights(
         self, 
         checkpoint_path: str, 
