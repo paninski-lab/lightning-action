@@ -227,6 +227,224 @@ class TestSegmenter:
             assert 0.0 <= metrics['train_accuracy'] <= 1.0
             assert 0.0 <= metrics['train_f1'] <= 1.0
 
+    def test_compute_loss_with_one_hot_targets(self, backbone_configs):
+        """Test compute_loss accepts one-hot encoded targets."""
+        config = backbone_configs[0]['config']
+        model = Segmenter(config)
+        
+        batch_size = 2
+        sequence_length = 100
+        output_size = config['model']['output_size']
+        
+        # Create input and run forward pass
+        x = torch.randn(batch_size, sequence_length, config['model']['input_size'])
+        outputs = model(x)
+        
+        # Create one-hot encoded targets: shape (batch, sequence, num_classes)
+        class_indices = torch.randint(0, output_size, (batch_size, sequence_length))
+        one_hot_targets = torch.zeros(batch_size, sequence_length, output_size)
+        one_hot_targets.scatter_(2, class_indices.unsqueeze(-1), 1.0)
+        
+        # Compute loss with one-hot targets
+        loss, metrics = model.compute_loss(outputs, one_hot_targets, stage='train')
+        
+        # Verify loss is valid
+        assert isinstance(loss, torch.Tensor)
+        assert loss.ndim == 0
+        assert loss.item() >= 0
+        assert not torch.isnan(loss)
+        
+        # Verify metrics
+        assert 'train_loss' in metrics
+        assert 'train_accuracy' in metrics
+        assert 'train_f1' in metrics
+
+    def test_compute_loss_with_class_index_targets(self, backbone_configs):
+        """Test compute_loss accepts class index targets."""
+        config = backbone_configs[0]['config']
+        model = Segmenter(config)
+        
+        batch_size = 2
+        sequence_length = 100
+        output_size = config['model']['output_size']
+        
+        # Create input and run forward pass
+        x = torch.randn(batch_size, sequence_length, config['model']['input_size'])
+        outputs = model(x)
+        
+        # Create class index targets: shape (batch, sequence)
+        class_index_targets = torch.randint(0, output_size, (batch_size, sequence_length))
+        
+        # Compute loss with class index targets
+        loss, metrics = model.compute_loss(outputs, class_index_targets, stage='train')
+        
+        # Verify loss is valid
+        assert isinstance(loss, torch.Tensor)
+        assert loss.ndim == 0
+        assert loss.item() >= 0
+        assert not torch.isnan(loss)
+        
+        # Verify metrics
+        assert 'train_loss' in metrics
+        assert 'train_accuracy' in metrics
+        assert 'train_f1' in metrics
+
+    def test_compute_loss_one_hot_vs_class_index_equivalence(self, backbone_configs):
+        """Test that one-hot and class index targets produce the same loss."""
+        config = backbone_configs[0]['config']
+        model = Segmenter(config)
+        model.eval()  # Ensure deterministic behavior
+        
+        batch_size = 2
+        sequence_length = 100
+        output_size = config['model']['output_size']
+        
+        # Create input and run forward pass
+        torch.manual_seed(42)
+        x = torch.randn(batch_size, sequence_length, config['model']['input_size'])
+        outputs = model(x)
+        
+        # Create class index targets
+        class_indices = torch.randint(0, output_size, (batch_size, sequence_length))
+        
+        # Create equivalent one-hot targets
+        one_hot_targets = torch.zeros(batch_size, sequence_length, output_size)
+        one_hot_targets.scatter_(2, class_indices.unsqueeze(-1), 1.0)
+        
+        # Compute loss with both target formats
+        loss_class_idx, _ = model.compute_loss(outputs, class_indices, stage='train')
+        
+        # Reset metrics to avoid accumulation effects
+        model.train_accuracy.reset()
+        model.train_f1.reset()
+        
+        loss_one_hot, _ = model.compute_loss(outputs, one_hot_targets, stage='train')
+        
+        # Losses should be identical
+        assert torch.allclose(loss_class_idx, loss_one_hot, atol=1e-6)
+
+    def test_compute_loss_all_targets_ignore_index(self, backbone_configs):
+        """Test compute_loss when all targets are ignore_index."""
+        config = backbone_configs[0]['config']
+        config['data'] = {'ignore_index': -100}
+        model = Segmenter(config)
+        
+        batch_size = 2
+        sequence_length = 100
+        
+        # Create input and run forward pass
+        x = torch.randn(batch_size, sequence_length, config['model']['input_size'])
+        outputs = model(x)
+        
+        # Create targets where ALL values are ignore_index
+        ignore_index = model.ignore_index
+        all_ignored_targets = torch.full(
+            (batch_size, sequence_length), 
+            ignore_index, 
+            dtype=torch.long
+        )
+        
+        # Compute loss
+        loss, metrics = model.compute_loss(outputs, all_ignored_targets, stage='train')
+        
+        # Loss should be 0 (no valid targets to compute loss on)
+        assert loss.item() == 0.0
+        
+        # Metrics should indicate the special case
+        assert metrics['train_loss'] == 0.0
+        # Accuracy and F1 should be NaN when all ignored
+        assert 'train_accuracy' not in metrics or metrics['train_accuracy'] != metrics['train_accuracy']  # NaN check
+        assert 'train_f1' not in metrics or metrics['train_f1'] != metrics['train_f1']  # NaN check
+
+    def test_compute_loss_partial_ignore_index(self, backbone_configs):
+        """Test compute_loss with some targets as ignore_index."""
+        config = backbone_configs[0]['config']
+        config['data'] = {'ignore_index': -100}
+        model = Segmenter(config)
+        
+        batch_size = 2
+        sequence_length = 100
+        output_size = config['model']['output_size']
+        
+        # Create input and run forward pass
+        x = torch.randn(batch_size, sequence_length, config['model']['input_size'])
+        outputs = model(x)
+        
+        # Create targets with mix of valid and ignored values
+        targets = torch.randint(0, output_size, (batch_size, sequence_length))
+        # Set first 10 and last 10 positions to ignore_index
+        targets[:, :10] = model.ignore_index
+        targets[:, -10:] = model.ignore_index
+        
+        # Compute loss
+        loss, metrics = model.compute_loss(outputs, targets, stage='train')
+        
+        # Loss should be valid (computed on non-ignored targets)
+        assert isinstance(loss, torch.Tensor)
+        assert loss.item() >= 0
+        assert not torch.isnan(loss)
+        
+        # Metrics should be present
+        assert 'train_loss' in metrics
+        assert 'train_accuracy' in metrics
+        assert 'train_f1' in metrics
+
+    def test_compute_loss_with_class_weights(self, backbone_configs):
+        """Test compute_loss with class weights."""
+        config = backbone_configs[0]['config']
+        output_size = config['model']['output_size']
+        
+        # Add class weights to config
+        class_weights = [1.0, 2.0, 0.5, 1.5]  # 4 classes
+        config['model']['class_weights'] = class_weights
+        
+        model = Segmenter(config)
+        
+        batch_size = 2
+        sequence_length = 100
+        
+        # Create input and run forward pass
+        x = torch.randn(batch_size, sequence_length, config['model']['input_size'])
+        outputs = model(x)
+        
+        # Create targets
+        targets = torch.randint(0, output_size, (batch_size, sequence_length))
+        
+        # Compute loss with class weights
+        loss, metrics = model.compute_loss(outputs, targets, stage='train')
+        
+        # Loss should be valid
+        assert isinstance(loss, torch.Tensor)
+        assert loss.item() >= 0
+        assert not torch.isnan(loss)
+
+    def test_compute_loss_validation_stage(self, backbone_configs):
+        """Test compute_loss with validation stage."""
+        config = backbone_configs[0]['config']
+        model = Segmenter(config)
+        
+        batch_size = 2
+        sequence_length = 100
+        output_size = config['model']['output_size']
+        
+        # Create input and run forward pass
+        x = torch.randn(batch_size, sequence_length, config['model']['input_size'])
+        outputs = model(x)
+        targets = torch.randint(0, output_size, (batch_size, sequence_length))
+        
+        # Compute loss with val stage
+        loss, metrics = model.compute_loss(outputs, targets, stage='val')
+        
+        # Check metrics have val_ prefix
+        assert 'val_loss' in metrics
+        assert 'val_accuracy' in metrics
+        assert 'val_f1' in metrics
+        
+        # Ensure train_ metrics are not present
+        assert 'train_loss' not in metrics
+        assert 'train_accuracy' not in metrics
+        assert 'train_f1' not in metrics
+
     def test_training_step(self, backbone_configs, sample_batch):
         """Test training step with different backbones."""
         for backbone_config in backbone_configs:
@@ -443,13 +661,21 @@ class TestSegmenter:
 
     def test_different_optimizer_types(self, backbone_configs):
         """Test different optimizer configurations."""
-        base_config = backbone_configs[0]['config'].copy()
+        base_config = copy.deepcopy(backbone_configs[0]['config'])
         
-        optimizer_types = ['Adam', 'AdamW']
+        optimizer_types = [
+            ('Adam', torch.optim.Adam),
+            ('AdamW', torch.optim.AdamW),
+            ('SGD', torch.optim.SGD),
+        ]
         
-        for opt_type in optimizer_types:
-            config = base_config.copy()
+        for opt_type, expected_class in optimizer_types:
+            config = copy.deepcopy(base_config)
             config['optimizer']['type'] = opt_type
+            
+            # Add momentum for SGD
+            if opt_type == 'SGD':
+                config['optimizer']['momentum'] = 0.9
             
             model = Segmenter(config)
             optimizer_config = model.configure_optimizers()
@@ -459,20 +685,297 @@ class TestSegmenter:
             else:
                 optimizer = optimizer_config
             
-            if opt_type.lower() == 'adam':
-                assert isinstance(optimizer, torch.optim.Adam)
-            elif opt_type.lower() == 'adamw':
-                assert isinstance(optimizer, torch.optim.AdamW)
+            assert isinstance(optimizer, expected_class), \
+                f"Expected {expected_class.__name__} but got {type(optimizer).__name__}"
+
+    def test_sgd_optimizer_with_momentum(self, backbone_configs):
+        """Test SGD optimizer configuration with momentum."""
+        config = copy.deepcopy(backbone_configs[0]['config'])
+        config['optimizer']['type'] = 'SGD'
+        config['optimizer']['momentum'] = 0.95
+        config['optimizer']['lr'] = 0.01
+        
+        model = Segmenter(config)
+        optimizer_config = model.configure_optimizers()
+        optimizer = optimizer_config['optimizer']
+        
+        assert isinstance(optimizer, torch.optim.SGD)
+        # Check momentum is set correctly
+        assert optimizer.param_groups[0]['momentum'] == 0.95
+        assert optimizer.param_groups[0]['lr'] == 0.01
+
+    def test_sgd_default_momentum(self, backbone_configs):
+        """Test SGD optimizer uses default momentum when not specified."""
+        config = copy.deepcopy(backbone_configs[0]['config'])
+        config['optimizer']['type'] = 'SGD'
+        # Don't specify momentum - should use default of 0.9
+        
+        model = Segmenter(config)
+        optimizer_config = model.configure_optimizers()
+        optimizer = optimizer_config['optimizer']
+        
+        assert isinstance(optimizer, torch.optim.SGD)
+        assert optimizer.param_groups[0]['momentum'] == 0.9  # default value
 
     def test_invalid_optimizer_type(self, backbone_configs):
         """Test invalid optimizer type raises error."""
-        config = backbone_configs[0]['config'].copy()
+        config = copy.deepcopy(backbone_configs[0]['config'])
         config['optimizer']['type'] = 'invalid_optimizer'
         
         model = Segmenter(config)
         
         with pytest.raises(ValueError, match='Unsupported optimizer type'):
             model.configure_optimizers()
+
+    # =========================================================================
+    # Scheduler Tests
+    # =========================================================================
+    
+    def test_scheduler_step_lr(self, backbone_configs):
+        """Test StepLR scheduler configuration."""
+        config = copy.deepcopy(backbone_configs[0]['config'])
+        config['optimizer']['scheduler'] = {
+            'use_scheduler': True,
+            'type': 'step',
+            'step_size': 10,
+            'gamma': 0.5,
+        }
+        
+        model = Segmenter(config)
+        optimizer_config = model.configure_optimizers()
+        
+        assert 'lr_scheduler' in optimizer_config
+        scheduler_config = optimizer_config['lr_scheduler']
+        scheduler = scheduler_config['scheduler']
+        
+        assert isinstance(scheduler, torch.optim.lr_scheduler.StepLR)
+        assert scheduler.step_size == 10
+        assert scheduler.gamma == 0.5
+
+    def test_scheduler_cosine_annealing(self, backbone_configs):
+        """Test CosineAnnealingLR scheduler configuration."""
+        config = copy.deepcopy(backbone_configs[0]['config'])
+        config['optimizer']['scheduler'] = {
+            'use_scheduler': True,
+            'type': 'cosine',
+            'T_max': 50,
+            'eta_min_factor': 10,
+        }
+        
+        model = Segmenter(config)
+        optimizer_config = model.configure_optimizers()
+        
+        assert 'lr_scheduler' in optimizer_config
+        scheduler = optimizer_config['lr_scheduler']['scheduler']
+        
+        assert isinstance(scheduler, torch.optim.lr_scheduler.CosineAnnealingLR)
+        assert scheduler.T_max == 50
+        # eta_min should be lr / eta_min_factor
+        expected_eta_min = config['optimizer']['lr'] / 10
+        assert scheduler.eta_min == expected_eta_min
+
+    def test_scheduler_cosine_warm_restarts(self, backbone_configs):
+        """Test CosineAnnealingWarmRestarts scheduler configuration."""
+        config = copy.deepcopy(backbone_configs[0]['config'])
+        config['optimizer']['scheduler'] = {
+            'use_scheduler': True,
+            'type': 'cosine_warm_restarts',
+            'T_0': 20,
+            'T_mult': 2,
+            'eta_min_factor': 20,
+        }
+        
+        model = Segmenter(config)
+        optimizer_config = model.configure_optimizers()
+        
+        assert 'lr_scheduler' in optimizer_config
+        scheduler = optimizer_config['lr_scheduler']['scheduler']
+        
+        assert isinstance(scheduler, torch.optim.lr_scheduler.CosineAnnealingWarmRestarts)
+        assert scheduler.T_0 == 20
+        assert scheduler.T_mult == 2
+
+    def test_scheduler_cosine_warm_restarts_alternate_name(self, backbone_configs):
+        """Test CosineAnnealingWarmRestarts with alternate naming."""
+        config = copy.deepcopy(backbone_configs[0]['config'])
+        config['optimizer']['scheduler'] = {
+            'use_scheduler': True,
+            'type': 'cosineannealingwarmrestarts',  # alternate naming
+            'T_0': 15,
+            'T_mult': 3,
+        }
+        
+        model = Segmenter(config)
+        optimizer_config = model.configure_optimizers()
+        
+        scheduler = optimizer_config['lr_scheduler']['scheduler']
+        assert isinstance(scheduler, torch.optim.lr_scheduler.CosineAnnealingWarmRestarts)
+
+    def test_scheduler_reduce_on_plateau(self, backbone_configs):
+        """Test ReduceLROnPlateau scheduler configuration."""
+        config = copy.deepcopy(backbone_configs[0]['config'])
+        config['optimizer']['scheduler'] = {
+            'use_scheduler': True,
+            'type': 'reduce_on_plateau',
+            'factor': 0.25,
+            'patience': 5,
+        }
+        
+        model = Segmenter(config)
+        optimizer_config = model.configure_optimizers()
+        
+        assert 'lr_scheduler' in optimizer_config
+        scheduler_config = optimizer_config['lr_scheduler']
+        scheduler = scheduler_config['scheduler']
+        
+        assert isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
+        assert scheduler.factor == 0.25
+        assert scheduler.patience == 5
+        # ReduceLROnPlateau should have monitor set
+        assert scheduler_config['monitor'] == 'val_loss'
+
+    def test_scheduler_reduce_on_plateau_alternate_name(self, backbone_configs):
+        """Test ReduceLROnPlateau with alternate naming."""
+        config = copy.deepcopy(backbone_configs[0]['config'])
+        config['optimizer']['scheduler'] = {
+            'use_scheduler': True,
+            'type': 'reducelronplateau',  # alternate naming
+            'factor': 0.5,
+            'patience': 10,
+        }
+        
+        model = Segmenter(config)
+        optimizer_config = model.configure_optimizers()
+        
+        scheduler = optimizer_config['lr_scheduler']['scheduler']
+        assert isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
+
+    def test_scheduler_disabled(self, backbone_configs):
+        """Test scheduler is disabled when use_scheduler is False."""
+        config = copy.deepcopy(backbone_configs[0]['config'])
+        config['optimizer']['scheduler'] = {
+            'use_scheduler': False,
+            'type': 'cosine',
+        }
+        
+        model = Segmenter(config)
+        optimizer_config = model.configure_optimizers()
+        
+        # Should only have optimizer, no scheduler
+        assert 'optimizer' in optimizer_config
+        assert 'lr_scheduler' not in optimizer_config
+
+    def test_scheduler_none(self, backbone_configs):
+        """Test no scheduler when scheduler config is None."""
+        config = copy.deepcopy(backbone_configs[0]['config'])
+        # Ensure no scheduler key
+        if 'scheduler' in config['optimizer']:
+            del config['optimizer']['scheduler']
+        
+        model = Segmenter(config)
+        optimizer_config = model.configure_optimizers()
+        
+        assert 'optimizer' in optimizer_config
+        assert 'lr_scheduler' not in optimizer_config
+
+    def test_scheduler_flat_specification(self, backbone_configs):
+        """Test scheduler with flat string specification (scheduler: 'cosine')."""
+        config = copy.deepcopy(backbone_configs[0]['config'])
+        # Use flat specification instead of nested dict
+        config['optimizer']['scheduler'] = 'cosine'
+        
+        model = Segmenter(config)
+        optimizer_config = model.configure_optimizers()
+        
+        assert 'lr_scheduler' in optimizer_config
+        scheduler = optimizer_config['lr_scheduler']['scheduler']
+        assert isinstance(scheduler, torch.optim.lr_scheduler.CosineAnnealingLR)
+
+    def test_scheduler_flat_specification_step(self, backbone_configs):
+        """Test scheduler with flat string specification for StepLR."""
+        config = copy.deepcopy(backbone_configs[0]['config'])
+        config['optimizer']['scheduler'] = 'step'
+        
+        model = Segmenter(config)
+        optimizer_config = model.configure_optimizers()
+        
+        scheduler = optimizer_config['lr_scheduler']['scheduler']
+        assert isinstance(scheduler, torch.optim.lr_scheduler.StepLR)
+        # Should use default values
+        assert scheduler.step_size == 30  # default
+        assert scheduler.gamma == 0.1  # default
+
+    def test_scheduler_invalid_type(self, backbone_configs):
+        """Test invalid scheduler type raises error."""
+        config = copy.deepcopy(backbone_configs[0]['config'])
+        config['optimizer']['scheduler'] = {
+            'use_scheduler': True,
+            'type': 'invalid_scheduler',
+        }
+        
+        model = Segmenter(config)
+        
+        with pytest.raises(ValueError, match='Unsupported scheduler type'):
+            model.configure_optimizers()
+
+    def test_scheduler_T_max_from_optimizer_config(self, backbone_configs):
+        """Test T_max can be specified at optimizer level for cosine scheduler."""
+        config = copy.deepcopy(backbone_configs[0]['config'])
+        config['optimizer']['T_max'] = 200  # At optimizer level, not scheduler level
+        config['optimizer']['scheduler'] = {
+            'use_scheduler': True,
+            'type': 'cosine',
+            # T_max not specified here, should use from optimizer level
+        }
+        
+        model = Segmenter(config)
+        optimizer_config = model.configure_optimizers()
+        
+        scheduler = optimizer_config['lr_scheduler']['scheduler']
+        assert isinstance(scheduler, torch.optim.lr_scheduler.CosineAnnealingLR)
+        assert scheduler.T_max == 200
+
+    def test_scheduler_defaults(self, backbone_configs):
+        """Test scheduler uses sensible defaults when minimal config provided."""
+        config = copy.deepcopy(backbone_configs[0]['config'])
+        config['optimizer']['scheduler'] = {
+            'use_scheduler': True,
+            'type': 'step',
+            # No step_size or gamma specified
+        }
+        
+        model = Segmenter(config)
+        optimizer_config = model.configure_optimizers()
+        
+        scheduler = optimizer_config['lr_scheduler']['scheduler']
+        # Should use defaults
+        assert scheduler.step_size == 30
+        assert scheduler.gamma == 0.1
+
+    def test_scheduler_config_structure(self, backbone_configs):
+        """Test scheduler config returns proper Lightning structure."""
+        config = copy.deepcopy(backbone_configs[0]['config'])
+        config['optimizer']['scheduler'] = {
+            'use_scheduler': True,
+            'type': 'cosine',
+            'T_max': 100,
+        }
+        
+        model = Segmenter(config)
+        optimizer_config = model.configure_optimizers()
+        
+        # Check structure expected by Lightning
+        assert 'optimizer' in optimizer_config
+        assert 'lr_scheduler' in optimizer_config
+        
+        lr_scheduler_config = optimizer_config['lr_scheduler']
+        assert 'scheduler' in lr_scheduler_config
+        assert 'monitor' in lr_scheduler_config
+        assert 'interval' in lr_scheduler_config
+        assert 'frequency' in lr_scheduler_config
+        
+        assert lr_scheduler_config['interval'] == 'epoch'
+        assert lr_scheduler_config['frequency'] == 1
 
     def test_gradient_flow(self, backbone_configs, sample_batch):
         """Test gradient flow through model with different backbones."""
@@ -642,7 +1145,7 @@ class TestSegmenter:
 
     def test_train_accuracy_with_ignore_index(self, backbone_configs):
         """Test train_accuracy metric with ignore_index functionality."""
-        config = backbone_configs[0]['config']
+        config = copy.deepcopy(backbone_configs[0]['config'])
         # set ignore_index in data config
         config['data'] = {'ignore_index': 0}
         model = Segmenter(config)
@@ -671,7 +1174,7 @@ class TestSegmenter:
 
     def test_train_f1_with_ignore_index(self, backbone_configs):
         """Test train_f1 metric with ignore_index functionality."""
-        config = backbone_configs[0]['config']
+        config = copy.deepcopy(backbone_configs[0]['config'])
         # set ignore_index in data config
         config['data'] = {'ignore_index': 0}
         model = Segmenter(config)
