@@ -1080,17 +1080,25 @@ class TestVideoDatasetGetVideoLength:
             os.makedirs(videos_dir)
             os.makedirs(labels_dir)
             
-            frame_counts = [50, 75, 100]
-            for i, num_frames in enumerate(frame_counts):
+            # Create videos with different frame counts
+            # Use a dict to track expected lengths by filename
+            expected_lengths = {
+                'video_0.mp4': 50,
+                'video_1.mp4': 75,
+                'video_2.mp4': 100,
+            }
+            
+            for filename, num_frames in expected_lengths.items():
                 create_test_video(
                     num_frames=num_frames,
                     directory=videos_dir,
-                    filename=f'video_{i}.mp4'
+                    filename=filename
                 )
+                label_filename = filename.replace('.mp4', '.npy')
                 create_test_labels(
                     num_frames=num_frames,
                     directory=labels_dir,
-                    filename=f'video_{i}.npy'
+                    filename=label_filename
                 )
             
             dataset = VideoDataset(
@@ -1099,9 +1107,25 @@ class TestVideoDatasetGetVideoLength:
                 num_classes=3,
             )
             
-            for i, expected_length in enumerate(frame_counts):
+            # Verify we have all videos
+            assert len(dataset.video_paths) == 3
+            
+            # Check lengths match expected values (order-agnostic)
+            # Build mapping from dataset's actual video order to expected lengths
+            actual_lengths = []
+            for i in range(len(dataset.video_paths)):
                 length = dataset.get_video_length(i)
-                assert length == expected_length
+                actual_lengths.append(length)
+            
+            # The set of lengths should match, regardless of order
+            assert sorted(actual_lengths) == sorted(expected_lengths.values())
+            
+            # Also verify each video's length matches its label file
+            for i, video_path in enumerate(dataset.video_paths):
+                video_name = os.path.basename(video_path)
+                expected = expected_lengths[video_name]
+                actual = dataset.get_video_length(i)
+                assert actual == expected, f"Video {video_name}: expected {expected}, got {actual}"
 
 
 # =============================================================================
