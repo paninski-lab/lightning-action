@@ -83,11 +83,13 @@ def data_dir() -> Path:
 def config_path() -> Path:
     return ROOT.joinpath('data', 'fly.yaml')
 
-
 def pytest_configure(config):
     """Register custom markers."""
     config.addinivalue_line(
         "markers", "gpu: mark test as requiring GPU (deselect with '-m not gpu')"
+    )
+    config.addinivalue_line(
+        "markers", "dali: mark test as requiring NVIDIA DALI"
     )
     config.addinivalue_line(
         "markers", "slow: mark test as slow running"
