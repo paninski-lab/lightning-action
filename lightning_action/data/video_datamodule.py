@@ -186,7 +186,7 @@ class DALIIterator(DALIGenericIterator):
         include_labels: bool = False, 
         include_lengths: bool = False,
         video_lengths: Optional[dict[int, int]] = None,
-        last_batch_policy: LastBatchPolicy = LastBatchPolicy.DROP,
+        last_batch_policy: Optional[Any] = None,
     ):
         """Initialize the DALI iterator.
         
@@ -200,10 +200,15 @@ class DALIIterator(DALIGenericIterator):
             include_labels: Whether to return labels (True for train/val).
             include_lengths: Whether to return sequence lengths (True for predict).
             video_lengths: Dict mapping video_idx -> total frame count.
-            last_batch_policy: How to handle incomplete final batch.
+            last_batch_policy: How to handle incomplete final batch. Defaults to DROP.
         """
 
         _check_dali_available()
+        
+        # Set default last_batch_policy after DALI check (can't use as default param
+        # because LastBatchPolicy may be None when DALI isn't installed)
+        if last_batch_policy is None:
+            last_batch_policy = LastBatchPolicy.DROP
 
         super().__init__(
             pipe, 
