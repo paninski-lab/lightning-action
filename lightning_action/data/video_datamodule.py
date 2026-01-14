@@ -40,15 +40,28 @@ import cv2
 import lightning as pl
 import numpy as np
 import torch
-from nvidia.dali import fn, types
-from nvidia.dali.pipeline import Pipeline
-from nvidia.dali.plugin.pytorch import DALIGenericIterator, LastBatchPolicy
 from torch.utils.data import DataLoader, TensorDataset
 from typeguard import typechecked
-
 from lightning_action.data.video_dataset import VideoDataset
 from lightning_action.data.utils import split_sizes_from_probabilities
 
+DALI_AVAILABLE = False
+try:
+    from nvidia.dali import fn, types
+    from nvidia.dali.pipeline import Pipeline
+    from nvidia.dali.plugin.pytorch import DALIGenericIterator, LastBatchPolicy
+    DALI_AVAILABLE = True
+except ImportError:
+    fn = types = Pipeline = DALIGenericIterator = LastBatchPolicy = None
+
+def _check_dali_available():
+    """Raise informative error if DALI is not available."""
+    if not DALI_AVAILABLE:
+        raise ImportError(
+            "NVIDIA DALI is required for GPU video loading but is not installed. "
+            "Install with: pip install nvidia-dali-cuda120  # (or appropriate CUDA version)\n"
+            "See: https://docs.nvidia.com/deeplearning/dali/user-guide/docs/installation.html"
+        )
 
 class VideoPipeline(Pipeline):
     """DALI pipeline for GPU-accelerated video decoding and preprocessing.
@@ -96,6 +109,8 @@ class VideoPipeline(Pipeline):
             num_shards: Total number of shards for distributed training.
             pad_sequences: Whether to pad the last sequence of each video.
         """
+        _check_dali_available()
+
         super().__init__(
             batch_size=batch_size,
             num_threads=num_threads,
@@ -185,6 +200,9 @@ class DALIIterator(DALIGenericIterator):
             video_lengths: Dict mapping video_idx -> total frame count.
             last_batch_policy: How to handle incomplete final batch.
         """
+
+        _check_dali_available()
+
         super().__init__(
             pipe, 
             output_map, 
@@ -598,6 +616,9 @@ class VideoDataModule(pl.LightningDataModule):
         Returns:
             DALIIterator instance, or None if video_list is empty.
         """
+
+        _check_dali_available()
+
         if not video_list or len(video_list) == 0:
             return None
         
@@ -677,6 +698,9 @@ class VideoDataModule(pl.LightningDataModule):
 
     def train_dataloader(self) -> DALIIterator:
         """Create training dataloader."""
+
+        _check_dali_available()
+
         if hasattr(self, 'trainer') and self.trainer is not None:
             self.current_epoch = self.trainer.current_epoch
         
@@ -708,6 +732,9 @@ class VideoDataModule(pl.LightningDataModule):
 
     def val_dataloader(self) -> Union[DALIIterator, DataLoader]:
         """Create validation dataloader."""
+
+        _check_dali_available()
+
         if not self.validation_enabled or not self.val_video_paths:
             return DataLoader(TensorDataset(torch.empty(0)), batch_size=1)
         
@@ -738,6 +765,9 @@ class VideoDataModule(pl.LightningDataModule):
 
     def predict_dataloader(self) -> Union[DALIIterator, DataLoader]:
         """Create prediction dataloader."""
+
+        _check_dali_available()
+        
         if self._predict_video_paths is None:
             self._predict_video_paths = self.dataset.video_paths
         
