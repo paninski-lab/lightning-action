@@ -15,14 +15,14 @@ data:
   seed: 42
 
 model:
-  # Encoder configuration
-  encoder: vitmae                                # Options: vitmae, resnet18, resnet34, resnet50, resnet101, resnet152, Use '-beast' suffix for beast-trained checkpoints
-  encoder_checkpoint: /teamspace/studios/this_studio/lightning-action/data/checkpoints/encoder/vitm.ckpt
-  encoder_config_path: /teamspace/studios/this_studio/lightning-action/configs/encoders/vit.yaml
-  freeze_encoder: true
+  # Backbone configuration
+  backbone: vitmae                                # Options: vitmae, resnet18, resnet34, resnet50, resnet101, resnet152, Use '-beast' suffix for beast-trained checkpoints
+  backbone_checkpoint: /teamspace/studios/this_studio/lightning-action/data/checkpoints/backbone/vitm.ckpt
+  backbone_config_path: /teamspace/studios/this_studio/lightning-action/configs/backbones/vit.yaml
+  freeze_backbone: true
   
-  # Temporal backbone
-  backbone: dtcn
+  # Temporal head
+  head: dtcn
   dropout_rate: 0.1
   # input_size: 1536                             # Optional - auto-computed as 2 x 768
   num_hid_units: 32
