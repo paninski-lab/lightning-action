@@ -60,9 +60,10 @@ class BaseModel(pl.LightningModule):
         # build model architecture (implemented by subclasses)
         self._build_model()
 
-        # compute sequence padding (after _build_model to make it easier to test unsupported backbones)
-        self.sequence_pad = compute_sequence_pad(config['model']['backbone'], **config['model'])
-
+        # compute sequence padding (after _build_model to make it easier to test unsupported heads)
+        self.sequence_pad = compute_sequence_pad(config['model']['head'], **config['model'])
+        config['model']['sequence_pad'] = self.sequence_pad
+        
     def _setup_metrics(self):
         """Set up torchmetrics for evaluation."""
         num_classes = self.output_size
@@ -432,33 +433,33 @@ class Segmenter(BaseModel):
     """Main segmentation model for action recognition.
     
     This model implements supervised action segmentation using a flexible
-    backbone architecture with a classification head.
+    temporal model architecture with a classification head.
     """
 
     def _build_model(self):
         """Build the segmentation model architecture."""
-        # build backbone network
-        self.backbone = self._build_backbone()
+        # build head network
+        self.head = self._build_head()
         
         # build classification head
-        backbone_output_size = self._get_backbone_output_size()
-        self.classifier = nn.Linear(backbone_output_size, self.output_size)
+        head_output_size = self._get_head_output_size()
+        self.classifier = nn.Linear(head_output_size, self.output_size)
         
         # initialize weights
         self._initialize_weights()
 
-    def _build_backbone(self) -> nn.Module:
-        """Build the backbone network.
+    def _build_head(self) -> nn.Module:
+        """Build the head network.
         
         Returns:
-            backbone network module
+            head network module
         """
-        backbone_type = self.model_config.get('backbone', 'temporalmlp')
+        head_type = self.model_config.get('head', 'temporalmlp')
 
-        logger.info(f'Contructing Segmenter model with {backbone_type} backbone')
+        logger.info(f'Contructing Segmenter model with {head_type} head')
         
-        if backbone_type.lower() == 'temporalmlp':
-            from lightning_action.models.backbones import TemporalMLP
+        if head_type.lower() == 'temporalmlp':
+            from lightning_action.models.heads import TemporalMLP
             return TemporalMLP(
                 input_size=self.input_size,
                 num_hid_units=self.model_config['num_hid_units'],
@@ -468,8 +469,8 @@ class Segmenter(BaseModel):
                 dropout_rate=self.model_config.get('dropout_rate', 0.0),
                 seed=self.model_config.get('seed', 42),
             )
-        elif backbone_type.lower() == 'rnn':
-            from lightning_action.models.backbones import RNN
+        elif head_type.lower() == 'rnn':
+            from lightning_action.models.heads import RNN
             return RNN(
                 input_size=self.input_size,
                 num_hid_units=self.model_config['num_hid_units'],
@@ -479,8 +480,8 @@ class Segmenter(BaseModel):
                 dropout_rate=self.model_config.get('dropout_rate', 0.0),
                 seed=self.model_config.get('seed', 42),
             )
-        elif backbone_type.lower() in ['dtcn', 'dilatedtcn']:
-            from lightning_action.models.backbones import DilatedTCN
+        elif head_type.lower() in ['dtcn', 'dilatedtcn']:
+            from lightning_action.models.heads import DilatedTCN
             return DilatedTCN(
                 input_size=self.input_size,
                 num_hid_units=self.model_config['num_hid_units'],
@@ -491,13 +492,13 @@ class Segmenter(BaseModel):
                 seed=self.model_config.get('seed', 42),
             )
         else:
-            raise ValueError(f'Unsupported backbone type: {backbone_type}')
+            raise ValueError(f'Unsupported head type: {head_type}')
 
-    def _get_backbone_output_size(self) -> int:
-        """Get the output size of the backbone network.
+    def _get_head_output_size(self) -> int:
+        """Get the output size of the head network.
         
         Returns:
-            output feature size of the backbone
+            output feature size of the head
         """
         # both TemporalMLP and RNN output num_hid_units features
         return self.model_config['num_hid_units']
@@ -525,11 +526,11 @@ class Segmenter(BaseModel):
         """
         batch_size, sequence_length, features = x.shape
 
-        # pass through backbone
-        backbone_features = self.backbone(x)
+        # pass through head
+        head_features = self.head(x)
 
         # classify each time step
-        logits = self.classifier(backbone_features)
+        logits = self.classifier(head_features)
 
         # compute probabilities
         probabilities = F.softmax(logits, dim=-1)
@@ -537,5 +538,5 @@ class Segmenter(BaseModel):
         return {
             'logits': logits,
             'probabilities': probabilities,
-            'features': backbone_features.view(batch_size, sequence_length, -1),
+            'features': head_features.view(batch_size, sequence_length, -1),
         }
