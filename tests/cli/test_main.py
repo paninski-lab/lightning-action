@@ -18,7 +18,7 @@ class TestMain:
         # Create a temporary config file
         test_config_data = {
             'data': {'data_path': '/test/data'},
-            'model': {'backbone': 'temporalmlp'},
+            'model': {'head': 'temporalmlp'},
             'training': {'num_epochs': 10}
         }
         
