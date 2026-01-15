@@ -67,7 +67,7 @@ class VideoDataset:
         input_size: int = 1536,
         num_lags: int = 0,
         ignore_index: int = -100,
-        backbone: str = 'dtcn',
+        head: str = 'dtcn',
         num_layers: int = 2,
         require_labels: bool = True,
         num_classes: Optional[int] = None,
@@ -86,11 +86,11 @@ class VideoDataset:
             resolution: Target frame resolution for preprocessing (square).
             expt_ids: Optional list of experiment IDs to include. If provided,
                 only videos whose names start with one of these IDs are used.
-            input_size: Feature dimension for the temporal backbone.
-            num_lags: Number of temporal lags for the backbone (affects padding).
+            input_size: Feature dimension for the temporal head.
+            num_lags: Number of temporal lags for the head (affects padding).
             ignore_index: Label value to ignore in loss computation (default -100).
-            backbone: Type of temporal backbone ('dtcn', 'temporalmlp', 'rnn').
-            num_layers: Number of layers in the temporal backbone.
+            head: Type of temporal head ('dtcn', 'temporalmlp', 'rnn').
+            num_layers: Number of layers in the temporal head.
             require_labels: If True (default), raise error if labels are missing.
                 If False, allow videos without labels (for prediction).
             num_classes: Number of classes (required if labels_dir is None).
@@ -110,13 +110,13 @@ class VideoDataset:
         self.input_size = input_size
         self.num_lags = num_lags
         self.ignore_index = ignore_index
-        self.backbone = backbone
+        self.head = head
         self.num_layers = num_layers
         self.require_labels = require_labels
         
-        # Calculate TCN padding based on backbone architecture
+        # Calculate TCN padding based on head architecture
         self.tcn_padding = compute_sequence_pad(
-            model_type=backbone,
+            model_type=head,
             num_lags=num_lags,
             num_layers=num_layers,
             default=0,
