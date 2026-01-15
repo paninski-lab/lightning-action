@@ -525,9 +525,9 @@ class VideoDataModule(pl.LightningDataModule):
             if world_size > 1:
                 self.num_threads = max(1, os.cpu_count() // world_size)
 
-        # Determine num_lags based on backbone type
-        backbone_type = self.model_config.get('backbone', 'dtcn').lower()
-        if backbone_type in ['dtcn', 'dilatedtcn', 'temporalmlp']:
+        # Determine num_lags based on head type
+        head_type = self.model_config.get('head', 'dtcn').lower()
+        if head_type in ['dtcn', 'dilatedtcn', 'temporalmlp']:
             num_lags = self.model_config.get('num_lags', 2)
         else:
             num_lags = (
@@ -545,7 +545,7 @@ class VideoDataModule(pl.LightningDataModule):
             input_size=self.data_config.get('input_size', 1536),
             num_lags=num_lags,
             ignore_index=self.data_config.get('ignore_index', -100),
-            backbone=self.model_config.get('backbone', 'dtcn'),
+            head=self.model_config.get('head', 'dtcn'),
             num_layers=self.model_config.get('num_layers', 4),
             require_labels=self.labels_dir is not None,
             num_classes=self.data_config.get('num_classes'),
@@ -809,4 +809,5 @@ class VideoDataModule(pl.LightningDataModule):
     @property
     def num_classes(self) -> int:
         """Get the number of action classes."""
+        return self.dataset.num_classes
         return self.dataset.num_classes
