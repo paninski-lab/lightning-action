@@ -1,13 +1,13 @@
-"""Tests for RNN backbone model."""
+"""Tests for RNN head model."""
 
 import pytest
 import torch
 
-from lightning_action.models.backbones import RNN
+from lightning_action.models.heads import RNN
 
 
 class TestRNN:
-    """Test the RNN backbone class."""
+    """Test the RNN head class."""
 
     @pytest.fixture
     def rnn_configs(self):
@@ -276,3 +276,4 @@ class TestRNN:
             assert config['rnn_type'] in repr_str
             assert str(config['bidirectional']) in repr_str
             assert str(config['dropout_rate']) in repr_str
+
