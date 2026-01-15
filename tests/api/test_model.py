@@ -49,7 +49,7 @@ class TestModelIntegration:
         assert model.model_dir is None
         
         # check model components
-        assert hasattr(model.model, 'backbone')
+        assert hasattr(model.model, 'head')
         assert hasattr(model.model, 'classifier')
 
     def test_model_from_config_file(self, fast_config):
@@ -63,7 +63,8 @@ class TestModelIntegration:
             model = Model.from_config(temp_config_path)
             
             assert model.model is not None
-            assert hasattr(model.model, 'sequence_pad')
+            assert 'sequence_pad' in model.config['model']  # this gets added before model creation
+            del model.config['model']['sequence_pad']
             assert model.config == fast_config
             assert model.model_dir is None
         finally:
@@ -264,25 +265,25 @@ class TestModelIntegration:
                 # should have reasonable number of time steps
                 assert predictions.shape[0] > 10
 
-    def test_model_different_backbones(self, data_dir, fast_config):
-        """Test training with different backbone architectures."""
-        backbones = ['temporalmlp', 'rnn', 'dtcn']
+    def test_model_different_heads(self, data_dir, fast_config):
+        """Test training with different head architectures."""
+        heads = ['temporalmlp', 'rnn', 'dtcn']
         
-        for backbone in backbones:
-            # update config for this backbone
+        for head in heads:
+            # update config for this head
             config = fast_config.copy()
             config['data']['data_path'] = str(data_dir)
-            config['model']['backbone'] = backbone
+            config['model']['head'] = head
             
-            # adjust backbone-specific parameters
-            if backbone == 'rnn':
+            # adjust head-specific parameters
+            if head == 'rnn':
                 config['model']['rnn_type'] = 'lstm'
                 config['model']['bidirectional'] = False
             
             model = Model.from_config(config)
             
             with tempfile.TemporaryDirectory() as temp_dir:
-                output_dir = Path(temp_dir) / f'test_run_{backbone}'
+                output_dir = Path(temp_dir) / f'test_run_{head}'
                 
                 # train model
                 model.train(output_dir=output_dir, post_inference=False)
@@ -480,7 +481,7 @@ class TestModelSequencePadding:
     """Test sequence padding computation in Model.from_config."""
     
     def test_sequence_pad_temporal_mlp(self):
-        """Test sequence padding computation for TemporalMLP backbone."""
+        """Test sequence padding computation for TemporalMLP head."""
         config = {
             'data': {
                 'data_path': '/tmp/test',
@@ -489,7 +490,7 @@ class TestModelSequencePadding:
             'model': {
                 'input_size': 10,
                 'output_size': 4,
-                'backbone': 'temporalmlp',
+                'head': 'temporalmlp',
                 'num_hid_units': 32,
                 'num_layers': 2,
                 'num_lags': 3,
@@ -507,10 +508,10 @@ class TestModelSequencePadding:
         model = Model.from_config(config)
         
         # For temporal-mlp, sequence_pad should equal num_lags
-        assert model.model.sequence_pad == 3
-
+        assert model.config['model']['sequence_pad'] == 3
+        
     def test_sequence_pad_dilated_tcn(self):
-        """Test sequence padding computation for DilatedTCN backbone."""
+        """Test sequence padding computation for DilatedTCN head."""
         config = {
             'data': {
                 'data_path': '/tmp/test',
@@ -519,7 +520,7 @@ class TestModelSequencePadding:
             'model': {
                 'input_size': 10,
                 'output_size': 4,
-                'backbone': 'dtcn',
+                'head': 'dtcn',
                 'num_hid_units': 32,
                 'num_layers': 3,
                 'num_lags': 2,
@@ -542,10 +543,10 @@ class TestModelSequencePadding:
         # pad per layer: 2*1*2=4, 2*2*2=8, 2*4*2=16
         # total: 4 + 8 + 16 = 28
         expected_pad = 2 * (2 ** 0) * 2 + 2 * (2 ** 1) * 2 + 2 * (2 ** 2) * 2
-        assert model.model.sequence_pad == expected_pad
+        assert model.config['model']['sequence_pad'] == expected_pad
         
     def test_sequence_pad_lstm(self):
-        """Test sequence padding computation for LSTM backbone."""
+        """Test sequence padding computation for LSTM head."""
         config = {
             'data': {
                 'data_path': '/tmp/test',
@@ -554,7 +555,7 @@ class TestModelSequencePadding:
             'model': {
                 'input_size': 10,
                 'output_size': 4,
-                'backbone': 'rnn',
+                'head': 'rnn',
                 'rnn_type': 'lstm',
                 'num_hid_units': 32,
                 'num_layers': 2,
@@ -573,10 +574,10 @@ class TestModelSequencePadding:
         model = Model.from_config(config)
         
         # For LSTM/GRU, sequence_pad should be fixed at 4
-        assert model.model.sequence_pad == 4
-
+        assert model.config['model']['sequence_pad'] == 4
+        
     def test_sequence_pad_gru(self):
-        """Test sequence padding computation for GRU backbone."""
+        """Test sequence padding computation for GRU head."""
         config = {
             'data': {
                 'data_path': '/tmp/test',
@@ -585,7 +586,7 @@ class TestModelSequencePadding:
             'model': {
                 'input_size': 10,
                 'output_size': 4,
-                'backbone': 'rnn',
+                'head': 'rnn',
                 'rnn_type': 'gru',
                 'num_hid_units': 32,
                 'num_layers': 2,
@@ -604,7 +605,7 @@ class TestModelSequencePadding:
         model = Model.from_config(config)
         
         # For LSTM/GRU, sequence_pad should be fixed at 4
-        assert model.model.sequence_pad == 4
+        assert model.config['model']['sequence_pad'] == 4
         
     def test_sequence_pad_different_parameters(self):
         """Test sequence padding with different parameter combinations."""
@@ -616,7 +617,7 @@ class TestModelSequencePadding:
             'model': {
                 'input_size': 10,
                 'output_size': 4,
-                'backbone': 'temporalmlp',
+                'head': 'temporalmlp',
                 'num_hid_units': 32,
                 'num_layers': 2,
             },
@@ -638,4 +639,4 @@ class TestModelSequencePadding:
             model = Model.from_config(config)
             
             # sequence_pad should equal num_lags for temporal-mlp
-            assert model.model.sequence_pad == num_lags
+            assert model.config['model']['sequence_pad'] == num_lags
