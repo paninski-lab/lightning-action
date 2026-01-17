@@ -3,7 +3,7 @@
 import pytest
 import torch
 
-from lightning_action.models import TemporalMLP
+from lightning_action.models.heads import TemporalMLP
 
 
 class TestTemporalMLP:
