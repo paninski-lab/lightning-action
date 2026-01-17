@@ -91,7 +91,7 @@ class TestPrettyPrintConfig:
         """Test pretty printing nested configuration."""
         config = {
             'model': {
-                'backbone': 'temporalmlp',
+                'head': 'temporalmlp',
                 'params': {'units': 128}
             },
             'simple_value': 'test'
@@ -101,7 +101,7 @@ class TestPrettyPrintConfig:
         captured = capsys.readouterr()
         
         # check nested dict is handled
-        assert 'backbone: temporalmlp' in captured.out
+        assert 'head: temporalmlp' in captured.out
         assert 'params: {' in captured.out
         
         # check simple value is handled
@@ -483,7 +483,7 @@ class TestTrain:
             'model': {
                 'input_size': 10,
                 'output_size': 4,
-                'backbone': 'temporalmlp',
+                'head': 'temporalmlp',
                 'num_hid_units': 32,
                 'num_layers': 2,
             },

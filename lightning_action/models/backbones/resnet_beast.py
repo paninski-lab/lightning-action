@@ -1,11 +1,11 @@
-"""Beast ResNet encoder for video action segmentation.
+"""Beast ResNet backbone for video action segmentation.
 
-This module provides the ImageEncoderResNetBeast class, which wraps the
+This module provides the ResNetBeastBackbone class, which wraps the
 custom ResNet implementation from the beast package for use as a frame
-encoder in video action segmentation.
+backbone in video action segmentation.
 
-This encoder is compatible with checkpoints trained using the beast
-ResnetAutoencoder. It uses the encoder portion only.
+This backbone is compatible with checkpoints trained using the beast
+ResnetAutoEncoder. It uses the backbone portion only.
 
 Architecture:
     Input: Image tensor (B, C, H, W)
@@ -65,33 +65,33 @@ BEAST_RESNET_HIDDEN_SIZES = {
 }
 
 
-class ImageEncoderResNetBeast(nn.Module):
-    """Image encoder using beast's custom ResNet implementation.
+class ResNetBeastBackbone(nn.Module):
+    """Image backbone using beast's custom ResNet implementation.
     
-    This encoder is compatible with checkpoints trained using beast's
-    ResnetAutoencoder. It extracts only the encoder portion.
+    This backbone is compatible with checkpoints trained using beast's
+    ResnetAutoEncoder. It extracts only the backbone portion.
     
     Attributes:
-        encoder: The ResNetEncoder module.
+        backbone: The ResNetBeast module.
     
     Properties:
         hidden_size: Output feature dimension.
         num_channels: Number of input channels (3 for RGB).
         image_size: Expected input image size (224).
         patch_size: Effective patch size (32, due to total stride).
-        encoder_type: Returns 'resnet-beast'.
+        backbone_type: Returns 'resnet-beast'.
     
     Example:
         config = {'backbone': 'resnet50'}
-        encoder = ImageEncoderResNetBeast(config)
+        backbone = ResNetBeastBackbone(config)
         
         images = torch.randn(4, 3, 224, 224)
-        features = encoder(images)  # (4, 2048, 7, 7)
+        features = backbone(images)  # (4, 2048, 7, 7)
     """
     
     @typechecked
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize the beast ResNet encoder.
+        """Initialize the beast ResNet backbone.
         
         Args:
             config: Configuration dictionary with optional keys:
@@ -120,9 +120,9 @@ class ImageEncoderResNetBeast(nn.Module):
         self._hidden_size = BEAST_RESNET_HIDDEN_SIZES[self._backbone_name]
         self._config = config
         
-        # Build encoder
+        # Build backbone
         resnet_config, bottleneck = get_configs(self._backbone_name)
-        self.encoder = ResNetEncoder(configs=resnet_config, bottleneck=bottleneck)
+        self.backbone = ResNetBeast(configs=resnet_config, bottleneck=bottleneck)
     
     @property
     def hidden_size(self) -> int:
@@ -145,13 +145,13 @@ class ImageEncoderResNetBeast(nn.Module):
         return 32  # 224 -> 7 means stride of 32
     
     @property
-    def encoder_type(self) -> str:
-        """Return encoder type identifier."""
+    def backbone_type(self) -> str:
+        """Return backbone type identifier."""
         return 'resnet-beast'
     
     @typechecked
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass through the encoder.
+        """Forward pass through the backbone.
         
         Args:
             x: Input images, shape (B, C, H, W).
@@ -160,7 +160,7 @@ class ImageEncoderResNetBeast(nn.Module):
             Spatial features, shape (B, hidden_size, H', W').
             For 224x224 input: (B, hidden_size, 7, 7).
         """
-        return self.encoder(x)
+        return self.backbone(x)
     
     @typechecked
     def load_pretrained_weights(
@@ -170,7 +170,7 @@ class ImageEncoderResNetBeast(nn.Module):
     ) -> None:
         """Load pretrained weights from a beast checkpoint.
         
-        Handles beast's ResnetAutoencoder checkpoint format, extracting
+        Handles beast's ResnetAutoEncoder checkpoint format, extracting
         only the encoder weights.
         
         Args:
@@ -195,7 +195,7 @@ class ImageEncoderResNetBeast(nn.Module):
         
         # Extract encoder weights with various possible prefixes
         encoder_state_dict = {}
-        current_state_dict = self.encoder.state_dict()
+        current_state_dict = self.backbone.state_dict()
         
         prefixes_to_try = [
             'encoder.',           # Direct encoder save
@@ -222,7 +222,7 @@ class ImageEncoderResNetBeast(nn.Module):
                         break
         
         if encoder_state_dict:
-            self.encoder.load_state_dict(encoder_state_dict, strict=strict)
+            self.backbone.load_state_dict(encoder_state_dict, strict=strict)
             print(f"Loaded {len(encoder_state_dict)} weights from checkpoint")
         else:
             print("Warning: No matching weights found in checkpoint")
@@ -233,15 +233,15 @@ class ImageEncoderResNetBeast(nn.Module):
         Returns:
             Iterator over parameters of conv5 (last residual block).
         """
-        return self.encoder.conv5.parameters()
+        return self.backbone.conv5.parameters()
 
 
 # =============================================================================
-# Beast ResNet Encoder Components (from beast/models/resnet_ae.py)
+# Beast ResNet Backbone Components (from beast/models/resnet_ae.py)
 # =============================================================================
 
-class ResNetEncoder(nn.Module):
-    """ResNet encoder from beast package."""
+class ResNetBeast(nn.Module):
+    """ResNet backbone from beast package."""
 
     def __init__(self, configs: list, bottleneck: bool = False) -> None:
         super().__init__()
@@ -258,33 +258,33 @@ class ResNetEncoder(nn.Module):
         )
 
         if bottleneck:
-            self.conv2 = EncoderBottleneckBlock(
+            self.conv2 = BottleneckBlock(
                 in_channels=64, hidden_channels=64, up_channels=256, layers=configs[0],
                 downsample_method='pool',
             )
-            self.conv3 = EncoderBottleneckBlock(
+            self.conv3 = BottleneckBlock(
                 in_channels=256, hidden_channels=128, up_channels=512, layers=configs[1],
                 downsample_method='conv',
             )
-            self.conv4 = EncoderBottleneckBlock(
+            self.conv4 = BottleneckBlock(
                 in_channels=512, hidden_channels=256, up_channels=1024, layers=configs[2],
                 downsample_method='conv',
             )
-            self.conv5 = EncoderBottleneckBlock(
+            self.conv5 = BottleneckBlock(
                 in_channels=1024, hidden_channels=512, up_channels=2048, layers=configs[3],
                 downsample_method='conv',
             )
         else:
-            self.conv2 = EncoderResidualBlock(
+            self.conv2 = ResidualBlock(
                 in_channels=64, hidden_channels=64, layers=configs[0], downsample_method='pool',
             )
-            self.conv3 = EncoderResidualBlock(
+            self.conv3 = ResidualBlock(
                 in_channels=64, hidden_channels=128, layers=configs[1], downsample_method='conv',
             )
-            self.conv4 = EncoderResidualBlock(
+            self.conv4 = ResidualBlock(
                 in_channels=128, hidden_channels=256, layers=configs[2], downsample_method='conv',
             )
-            self.conv5 = EncoderResidualBlock(
+            self.conv5 = ResidualBlock(
                 in_channels=256, hidden_channels=512, layers=configs[3], downsample_method='conv',
             )
 
@@ -297,7 +297,7 @@ class ResNetEncoder(nn.Module):
         return x
 
 
-class EncoderResidualBlock(nn.Module):
+class ResidualBlock(nn.Module):
     """Residual block for non-bottleneck ResNets (18, 34)."""
 
     def __init__(
@@ -312,18 +312,18 @@ class EncoderResidualBlock(nn.Module):
         if downsample_method == 'conv':
             for i in range(layers):
                 if i == 0:
-                    layer = EncoderResidualLayer(
+                    layer = ResidualLayer(
                         in_channels=in_channels,
                         hidden_channels=hidden_channels,
                         downsample=True,
                     )
                 else:
-                    layer = EncoderResidualLayer(
+                    layer = ResidualLayer(
                         in_channels=hidden_channels,
                         hidden_channels=hidden_channels,
                         downsample=False,
                     )
-                self.add_module(f'{i} EncoderLayer', layer)
+                self.add_module(f'{i} Layer', layer)
 
         elif downsample_method == 'pool':
             maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -331,18 +331,18 @@ class EncoderResidualBlock(nn.Module):
 
             for i in range(layers):
                 if i == 0:
-                    layer = EncoderResidualLayer(
+                    layer = ResidualLayer(
                         in_channels=in_channels,
                         hidden_channels=hidden_channels,
                         downsample=False,
                     )
                 else:
-                    layer = EncoderResidualLayer(
+                    layer = ResidualLayer(
                         in_channels=hidden_channels,
                         hidden_channels=hidden_channels,
                         downsample=False,
                     )
-                self.add_module(f'{i + 1} EncoderLayer', layer)
+                self.add_module(f'{i + 1} Layer', layer)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         for name, layer in self.named_children():
@@ -350,7 +350,7 @@ class EncoderResidualBlock(nn.Module):
         return x
 
 
-class EncoderBottleneckBlock(nn.Module):
+class BottleneckBlock(nn.Module):
     """Bottleneck block for deeper ResNets (50, 101, 152)."""
 
     def __init__(
@@ -366,16 +366,16 @@ class EncoderBottleneckBlock(nn.Module):
         if downsample_method == 'conv':
             for i in range(layers):
                 if i == 0:
-                    layer = EncoderBottleneckLayer(
+                    layer = BottleneckLayer(
                         in_channels=in_channels, hidden_channels=hidden_channels,
                         up_channels=up_channels, downsample=True,
                     )
                 else:
-                    layer = EncoderBottleneckLayer(
+                    layer = BottleneckLayer(
                         in_channels=up_channels, hidden_channels=hidden_channels,
                         up_channels=up_channels, downsample=False,
                     )
-                self.add_module(f'{i} EncoderLayer', layer)
+                self.add_module(f'{i} Layer', layer)
 
         elif downsample_method == 'pool':
             maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -383,16 +383,16 @@ class EncoderBottleneckBlock(nn.Module):
 
             for i in range(layers):
                 if i == 0:
-                    layer = EncoderBottleneckLayer(
+                    layer = BottleneckLayer(
                         in_channels=in_channels, hidden_channels=hidden_channels,
                         up_channels=up_channels, downsample=False,
                     )
                 else:
-                    layer = EncoderBottleneckLayer(
+                    layer = BottleneckLayer(
                         in_channels=up_channels, hidden_channels=hidden_channels,
                         up_channels=up_channels, downsample=False,
                     )
-                self.add_module(f'{i + 1} EncoderLayer', layer)
+                self.add_module(f'{i + 1} Layer', layer)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         for name, layer in self.named_children():
@@ -400,7 +400,7 @@ class EncoderBottleneckBlock(nn.Module):
         return x
 
 
-class EncoderResidualLayer(nn.Module):
+class ResidualLayer(nn.Module):
     """Single residual layer for non-bottleneck ResNets."""
 
     def __init__(
@@ -462,7 +462,7 @@ class EncoderResidualLayer(nn.Module):
         return x
 
 
-class EncoderBottleneckLayer(nn.Module):
+class BottleneckLayer(nn.Module):
     """Single bottleneck layer for deeper ResNets."""
 
     def __init__(

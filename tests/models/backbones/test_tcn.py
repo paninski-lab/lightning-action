@@ -1,10 +1,10 @@
-"""Tests for DilatedTCN backbone model."""
+"""Tests for DilatedTCN head model."""
 
 import pytest
 import torch
 
-from lightning_action.models.backbones import DilatedTCN
-from lightning_action.models.backbones.tcn import DilationBlock
+from lightning_action.models.heads import DilatedTCN
+from lightning_action.models.heads.tcn import DilationBlock
 
 
 class TestDilationBlock:
@@ -146,7 +146,7 @@ class TestDilationBlock:
 
 
 class TestDilatedTCN:
-    """Test the DilatedTCN backbone class."""
+    """Test the DilatedTCN head class."""
 
     @pytest.fixture
     def tcn_configs(self):

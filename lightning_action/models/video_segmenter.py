@@ -1,9 +1,9 @@
-"""Video segmentation model with ViT-MAE backbone and temporal modeling.
+"""Video segmentation model with image encoder backbone and temporal modeling head.
 
 This module implements a video action segmentation model that:
 1. Encodes individual frames using a ViT-MAE (Vision Transformer with Masked Autoencoding)
 2. Pools spatial features from each frame into a single vector
-3. Models temporal dynamics using a backbone network (TCN, MLP, or RNN)
+3. Models temporal dynamics using a head network (TCN, MLP, or RNN)
 4. Classifies each frame into an action class
 
 VideoBaseModel inherits from BaseModel (models/segmenter.py) and overrides
@@ -20,11 +20,13 @@ from jaxtyping import Float
 from typeguard import typechecked
 
 from lightning_action.models.segmenter import BaseModel
-from lightning_action.models.encoders.vitmae import ImageEncoderViTMAE
-from lightning_action.models.encoders.resnet import ImageEncoderResNet
-from lightning_action.models.encoders.resnet_beast import ImageEncoderResNetBeast
+from lightning_action.models.backbones import (
+    ResNetBackbone,
+    ResNetBeastBackbone,
+    ViTMAEBackbone,
+)
 from lightning_action.models.necks.mha_pooling import MultiheadAttentionPooling
-from lightning_action.models.backbones import DilatedTCN, TemporalMLP, RNN
+from lightning_action.models.heads import DilatedTCN, TemporalMLP, RNN
 
 
 class VideoBaseModel(BaseModel):
@@ -228,29 +230,26 @@ class VideoBaseModel(BaseModel):
 
 
 class VideoSegmenter(VideoBaseModel):
-    """Video action segmentation model with swappable encoder.
+    """Video action segmentation model with swappable backbone.
     
     This model processes video frames through:
-    1. Configurable encoder: Extract spatial features from each frame
+    1. Configurable backbone: Extract spatial features from each frame
        - ViT-MAE: Patch-level transformer features (hidden_size=768)
        - ResNet: Convolutional feature maps (hidden_size=512-2048)
     2. Attention pooling: Aggregate spatial features per frame
     3. Feature augmentation: Concatenate positions with velocities
-    4. Temporal backbone: Model dynamics (TCN, MLP, or RNN)
+    4. Temporal head: Model dynamics (TCN, MLP, or RNN)
     5. Classifier: Per-frame action prediction
     
-    The encoder is selected via encoder_type in the model config section.
-    
     Attributes:
-        encoder: Image encoder (ViT-MAE or ResNet).
-        encoder_type: String identifying the encoder type.
+        backbone: Image encoder (ViT-MAE or ResNet).
         pooling: MultiheadAttentionPooling for spatial pooling.
-        backbone: Temporal sequence model.
+        head: Temporal sequence model.
         classifier: Linear classification head.
     """
     
-    # Hidden sizes for each encoder type (used for input_size auto-computation)
-    ENCODER_HIDDEN_SIZES = {
+    # Hidden sizes for each backbone type (used for input_size auto-computation)
+    BACKBONE_HIDDEN_SIZES = {
         'vitmae': 768,
         'vit-mae': 768,
         'vit': 768,
@@ -276,8 +275,8 @@ class VideoSegmenter(VideoBaseModel):
         # Auto-compute input_size if not provided, before BaseModel.__init__ runs
         model_config = config.get('model', {})
         if model_config.get('input_size') is None:
-            encoder_name = model_config.get('encoder', 'vitmae').lower()
-            hidden_size = self.ENCODER_HIDDEN_SIZES.get(encoder_name, 768)
+            backbone_name = model_config.get('backbone', 'vitmae').lower()
+            hidden_size = self.BACKBONE_HIDDEN_SIZES.get(backbone_name, 768)
             # input_size = 2 * hidden_size (position + velocity features)
             config['model']['input_size'] = hidden_size * 2
         
@@ -285,78 +284,78 @@ class VideoSegmenter(VideoBaseModel):
 
     def _build_model(self) -> None:
         """Build the complete video segmentation model."""
-        # Load encoder config from file if provided
-        encoder_file_config = {}
-        encoder_config_path = self.model_config.get('encoder_config_path')
-        if encoder_config_path and os.path.exists(encoder_config_path):
+        # Load backbone config from file if provided
+        backbone_file_config = {}
+        backbone_config_path = self.model_config.get('backbone_config_path')
+        if backbone_config_path and os.path.exists(backbone_config_path):
             import yaml
-            with open(encoder_config_path, 'r') as f:
-                encoder_file_config = yaml.safe_load(f)
+            with open(backbone_config_path, 'r') as f:
+                backbone_file_config = yaml.safe_load(f)
         
-        # Extract model_params from encoder config (mirrors vit.yaml / resnet_ae.yaml structure)
-        encoder_model_params = encoder_file_config.get('model', {}).get('model_params', {})
+        # Extract model_params from backbone config (mirrors vit.yaml / resnet_ae.yaml structure)
+        backbone_model_params = backbone_file_config.get('model', {}).get('model_params', {})
         
-        # Get encoder name: main config 'encoder' overrides encoder_config_path
-        encoder_name = self.model_config.get('encoder')
-        if encoder_name is None:
-            # Fall back to model_class or model_params.backbone from encoder config
-            encoder_name = encoder_file_config.get('model', {}).get('model_class')
-            if encoder_name == 'resnet':
-                encoder_name = encoder_model_params.get('backbone', 'resnet50')
-            elif encoder_name is None:
-                encoder_name = 'vitmae'
-        encoder_name = encoder_name.lower()
+        # Get backbone name: main config 'backbone' overrides backbone_config_path
+        backbone_name = self.model_config.get('backbone')
+        if backbone_name is None:
+            # Fall back to model_class or model_params.backbone from backbone config
+            backbone_name = backbone_file_config.get('model', {}).get('model_class')
+            if backbone_name == 'resnet':
+                backbone_name = backbone_model_params.get('backbone', 'resnet50')
+            elif backbone_name is None:
+                backbone_name = 'vitmae'
+        backbone_name = backbone_name.lower()
         
-        # Build encoder based on name
-        if encoder_name in ['vitmae', 'vit-mae', 'vit']:
-            self.encoder_type = 'vitmae'
+        # Build backbone based on name
+        if backbone_name in ['vitmae', 'vit-mae', 'vit']:
+            self.backbone_type = 'vitmae'
             vitmae_config = {
-                # model_name at top level of encoder config
-                'model_name': encoder_file_config.get('model_name',
-                    self.model_config.get('encoder_model_name', 'facebook/vit-mae-base')),
+                # model_name at top level of backbone config
+                'model_name': backbone_file_config.get('model_name',
+                    self.model_config.get('backbone_model_name', 'facebook/vit-mae-base')),
                 # mask_ratio in model.model_params
-                'mask_ratio': encoder_model_params.get('mask_ratio',
-                    self.model_config.get('encoder_mask_ratio', 0.0)),
+                'mask_ratio': backbone_model_params.get('mask_ratio',
+                    self.model_config.get('backbone_mask_ratio', 0.0)),
             }
-            self.encoder = ImageEncoderViTMAE(vitmae_config)
+            self.backbone = ViTMAEBackbone(vitmae_config)
         
-        elif encoder_name.endswith('-beast'):
+        elif backbone_name.endswith('-beast'):
             # Beast ResNet variant (custom implementation from beast package)
-            self.encoder_type = 'resnet-beast'
-            backbone_name = encoder_name.replace('-beast', '')  # e.g., 'resnet50-beast' -> 'resnet50'
+            self.backbone_type = 'resnet-beast'
+            backbone_name = backbone_name.replace('-beast', '')  # e.g., 'resnet50-beast' -> 'resnet50'
             resnet_config = {
                 'backbone': backbone_name,
-                'image_size': encoder_model_params.get('image_size', 
-                    self.model_config.get('encoder_image_size', 224)),
+                'image_size': backbone_model_params.get('image_size', 
+                    self.model_config.get('backbone_image_size', 224)),
             }
-            self.encoder = ImageEncoderResNetBeast(resnet_config)
+            self.backbone = ResNetBeastBackbone(resnet_config)
             
-        elif encoder_name.startswith('resnet'):
+        elif backbone_name.startswith('resnet'):
             # Standard torchvision ResNet
-            self.encoder_type = 'resnet'
+            self.backbone_type = 'resnet'
             resnet_config = {
-                'backbone': encoder_name,
-                'image_size': encoder_model_params.get('image_size', 
-                    self.model_config.get('encoder_image_size', 224)),
+                'backbone': backbone_name,
+                'image_size': backbone_model_params.get('image_size', 
+                    self.model_config.get('backbone_image_size', 224)),
             }
-            self.encoder = ImageEncoderResNet(resnet_config)
+            self.backbone = ResNetBackbone(resnet_config)
             
         else:
             raise ValueError(
-                f"Unknown encoder: {encoder_name}. "
+                f"Unknown backbone: {backbone_name}. "
                 f"Supported: 'vitmae', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', "
                 f"'resnet18-beast', 'resnet34-beast', 'resnet50-beast', 'resnet101-beast', 'resnet152-beast'"
             )
         
-        # Load encoder checkpoint if specified
-        encoder_ckpt = self.model_config.get('encoder_checkpoint')
-        if encoder_ckpt and os.path.exists(encoder_ckpt):
-            self.encoder.load_pretrained_weights(encoder_ckpt)
+        # Load backbone checkpoint if specified
+        backbone_ckpt = self.model_config.get('backbone_checkpoint')
+        if backbone_ckpt and os.path.exists(backbone_ckpt):
+            self.backbone.load_pretrained_weights(backbone_ckpt)
         
-        # Get encoder hidden size
-        self.embed_dim = self.encoder.hidden_size
+        # Get backbone hidden size
+        self.embed_dim = self.backbone.hidden_size
         
-        # Validate input_size matches encoder (it was auto-computed in __init__ if not set)
+        # Validate input_size matches backbone (it was auto-computed in __init__ if not set)
         expected_input_size = self.embed_dim * 2
         if self.input_size != expected_input_size:
             import warnings
@@ -366,9 +365,9 @@ class VideoSegmenter(VideoBaseModel):
                 f"Using config value."
             )
         
-        # Configure encoder freezing
-        self.freeze_encoder = self.model_config.get('freeze_encoder', True)
-        self._configure_encoder_freezing()
+        # Configure backbone freezing
+        self.freeze_backbone = self.model_config.get('freeze_backbone', True)
+        self._configure_backbone_freezing()
         
         # Spatial pooling using learned queries
         self.pooling = MultiheadAttentionPooling(
@@ -380,44 +379,44 @@ class VideoSegmenter(VideoBaseModel):
             layer_norm=False,
         )
         
-        # Build temporal backbone
-        self.backbone = self._build_backbone()
+        # Build temporal head
+        self.head = self._build_head()
         
         # Classification head
-        backbone_output_size = self._get_backbone_output_size()
-        self.classifier = nn.Linear(backbone_output_size, self.output_size)
+        head_output_size = self._get_head_output_size()
+        self.classifier = nn.Linear(head_output_size, self.output_size)
         
-        # Initialize weights (excluding encoder)
+        # Initialize weights
         self._initialize_weights()
 
-    def _configure_encoder_freezing(self) -> None:
-        """Configure encoder parameter freezing based on settings."""
-        if self.freeze_encoder:
-            # Full freeze: no encoder gradients
-            self.encoder.eval()
-            for param in self.encoder.parameters():
+    def _configure_backbone_freezing(self) -> None:
+        """Configure backbone parameter freezing based on settings."""
+        if self.freeze_backbone:
+            # Full freeze: no backbone gradients
+            self.backbone.eval()
+            for param in self.backbone.parameters():
                 param.requires_grad = False
         else:
             # Partial fine-tuning: freeze all except last layer
-            for param in self.encoder.parameters():
+            for param in self.backbone.parameters():
                 param.requires_grad = False
             
-            # Unfreeze last layer using encoder's helper method
-            for param in self.encoder.get_last_layer_params():
+            # Unfreeze last layer using backbone's helper method
+            for param in self.backbone.get_last_layer_params():
                 param.requires_grad = True
 
-    def _build_backbone(self) -> nn.Module:
-        """Construct temporal backbone for sequence modeling.
+    def _build_head(self) -> nn.Module:
+        """Construct temporal head for sequence modeling.
         
         Returns:
-            Configured temporal backbone module.
+            Configured temporal head module.
         
         Raises:
-            ValueError: If backbone type is not supported.
+            ValueError: If head type is not supported.
         """
-        backbone_type = self.model_config.get('backbone', 'dtcn')
+        head_type = self.model_config.get('head', 'dtcn')
         
-        if backbone_type.lower() == 'temporalmlp':
+        if head_type.lower() == 'temporalmlp':
             return TemporalMLP(
                 input_size=self.input_size,
                 num_hid_units=self.model_config['num_hid_units'],
@@ -427,7 +426,7 @@ class VideoSegmenter(VideoBaseModel):
                 dropout_rate=self.model_config.get('dropout_rate', 0.0),
                 seed=self.model_config.get('seed', 42),
             )
-        elif backbone_type.lower() == 'rnn':
+        elif head_type.lower() == 'rnn':
             return RNN(
                 input_size=self.input_size,
                 num_hid_units=self.model_config['num_hid_units'],
@@ -437,7 +436,7 @@ class VideoSegmenter(VideoBaseModel):
                 dropout_rate=self.model_config.get('dropout_rate', 0.0),
                 seed=self.model_config.get('seed', 42),
             )
-        elif backbone_type.lower() in ['dtcn', 'dilatedtcn']:
+        elif head_type.lower() in ['dtcn', 'dilatedtcn']:
             return DilatedTCN(
                 input_size=self.input_size,
                 num_hid_units=self.model_config['num_hid_units'],
@@ -448,15 +447,15 @@ class VideoSegmenter(VideoBaseModel):
                 seed=self.model_config.get('seed', 42),
             )
         else:
-            raise ValueError(f'Unsupported backbone type: {backbone_type}')
+            raise ValueError(f'Unsupported head type: {head_type}')
 
-    def _get_backbone_output_size(self) -> int:
-        """Get the output feature dimension of the backbone."""
+    def _get_head_output_size(self) -> int:
+        """Get the output feature dimension of the head."""
         return self.model_config['num_hid_units']
 
     def _initialize_weights(self) -> None:
         """Initialize weights using Xavier uniform initialization."""
-        for module in [self.pooling, self.backbone, self.classifier]:
+        for module in [self.pooling, self.head, self.classifier]:
             for submodule in module.modules():
                 if isinstance(submodule, nn.Linear):
                     nn.init.xavier_uniform_(submodule.weight)
@@ -466,31 +465,31 @@ class VideoSegmenter(VideoBaseModel):
     def _get_optimizer_params(self):
         """Get parameters to optimize with specific groups.
         
-        Returns parameters from pooling, backbone, and classifier.
-        Encoder parameters are handled separately based on freeze settings.
+        Returns parameters from pooling, head, and classifier.
+        Backbone parameters are handled separately based on freeze settings.
         
         Returns:
             List of parameter group dicts.
         """
         param_groups = [
             {'params': self.pooling.parameters()},
-            {'params': self.backbone.parameters()},
+            {'params': self.head.parameters()},
             {'params': self.classifier.parameters()},
         ]
         
-        # Add encoder parameters if not fully frozen
-        if not self.freeze_encoder:
-            encoder_params = [p for p in self.encoder.parameters() if p.requires_grad]
-            if encoder_params:
-                # Use lower learning rate for encoder fine-tuning
-                encoder_lr = self.config.get('optimizer', {}).get('encoder_lr')
-                if encoder_lr is None:
+        # Add backbone parameters if not fully frozen
+        if not self.freeze_backbone:
+            backbone_params = [p for p in self.backbone.parameters() if p.requires_grad]
+            if backbone_params:
+                # Use lower learning rate for backbone fine-tuning
+                backbone_lr = self.config.get('optimizer', {}).get('backbone_lr')
+                if backbone_lr is None:
                     base_lr = self.config.get('optimizer', {}).get('lr', 1e-3)
-                    encoder_lr = base_lr * 0.1
+                    backbone_lr = base_lr * 0.1
                 
                 param_groups.append({
-                    'params': encoder_params,
-                    'lr': encoder_lr,
+                    'params': backbone_params,
+                    'lr': backbone_lr,
                 })
         
         return param_groups
@@ -504,10 +503,10 @@ class VideoSegmenter(VideoBaseModel):
         
         Processing steps:
         1. Reshape for batch encoding: (B, T, C, H, W) -> (B*T, C, H, W)
-        2. Encoder: Extract spatial features (works for both ViT and ResNet)
+        2. Backbone: Extract spatial features (works for both ViT and ResNet)
         3. Spatial pooling: Aggregate to frame-level features
         4. Feature augmentation: Add temporal differences (velocity)
-        5. Temporal backbone: Model dynamics
+        5. Temporal head: Model dynamics
         6. Classification: Per-frame action prediction
         
         Args:
@@ -517,18 +516,18 @@ class VideoSegmenter(VideoBaseModel):
             Dict containing:
             - 'logits': Raw class scores, shape (B, T, num_classes)
             - 'probabilities': Softmax probabilities, shape (B, T, num_classes)
-            - 'features': Frame features before backbone, shape (B, T, 2*embed_dim)
+            - 'features': Frame features before head, shape (B, T, 2*embed_dim)
         """
         b, s, c, h, w = x.shape
         
         # Flatten batch and time for frame-wise encoding
         x = x.view(b * s, c, h, w)
         
-        # Encode frames with selected encoder
-        with torch.set_grad_enabled(not self.freeze_encoder):
-            if self.freeze_encoder:
-                self.encoder.eval()
-            spatial_features = self.encoder(x)  # (B*T, hidden_dim, H', W')
+        # Encode frames with selected backbone
+        with torch.set_grad_enabled(not self.freeze_backbone):
+            if self.freeze_backbone:
+                self.backbone.eval()
+            spatial_features = self.backbone(x)  # (B*T, hidden_dim, H', W')
         
         # Reshape for attention pooling: (B*T, H'*W', hidden_dim)
         bs, feat_d, feat_h, feat_w = spatial_features.shape
@@ -548,11 +547,11 @@ class VideoSegmenter(VideoBaseModel):
         # Concatenate position and velocity features
         features = torch.cat([pooled, diffs], dim=-1)  # (B, T, 2*hidden_dim)
         
-        # Apply temporal backbone
-        backbone_output = self.backbone(features)  # (B, T, num_hid_units)
+        # Apply temporal head
+        head_output = self.head(features)  # (B, T, num_hid_units)
         
         # Classify each frame
-        logits = self.classifier(backbone_output)  # (B, T, num_classes)
+        logits = self.classifier(head_output)  # (B, T, num_classes)
         probabilities = F.softmax(logits, dim=-1)
         
         return {
@@ -561,15 +560,15 @@ class VideoSegmenter(VideoBaseModel):
             'features': features,
         }
     
-    def get_encoder_info(self) -> Dict[str, Any]:
-        """Get information about the current encoder configuration.
+    def get_backbone_info(self) -> Dict[str, Any]:
+        """Get information about the current backbone configuration.
         
         Returns:
-            Dict with encoder type, hidden size, and other metadata.
+            Dict with backbone type, hidden size, and other metadata.
         """
         return {
-            'encoder_type': self.encoder_type,
+            'backbone_type': self.backbone_type,
             'hidden_size': self.embed_dim,
-            'patch_size': self.encoder.patch_size,
-            'frozen': self.freeze_encoder,
+            'patch_size': self.backbone.patch_size,
+            'frozen': self.freeze_backbone,
         }

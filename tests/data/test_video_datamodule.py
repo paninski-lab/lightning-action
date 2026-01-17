@@ -1849,7 +1849,7 @@ class TestDALIIntegration:
             
             # Use minimal TCN config to reduce padding requirements
             model_config = {
-                'backbone': 'dtcn',
+                'head': 'dtcn',
                 'num_layers': 2,  # Minimal layers -> less padding
                 'num_lags': 1,    # Minimal lags -> less padding
             }
@@ -1932,7 +1932,7 @@ class TestDALIIntegration:
             }
             
             model_config = {
-                'backbone': 'dtcn',
+                'head': 'dtcn',
                 'num_layers': 2,
                 'num_lags': 1,
             }
@@ -2004,7 +2004,7 @@ class TestDALIIntegration:
             }
             
             model_config = {
-                'backbone': 'dtcn',
+                'head': 'dtcn',
                 'num_layers': 2,
                 'num_lags': 1,
             }

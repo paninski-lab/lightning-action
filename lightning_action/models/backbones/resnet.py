@@ -1,12 +1,12 @@
 """ResNet image encoder for video action segmentation.
 
-This module provides the ImageEncoderResNet class, which wraps
-ResNet models for use as a frame encoder in video action segmentation.
+This module provides the ResNetBackbone class, which wraps
+ResNet models for use as a frame backbone in video action segmentation.
 
-The encoder outputs spatial feature maps that can be pooled or processed
-by downstream modules, matching the interface of ImageEncoderViTMAE.
+The backbone outputs spatial feature maps that can be pooled or processed
+by downstream modules, matching the interface of ViTMAEBackbone.
 
-Note: This encoder initializes with random weights. Use load_pretrained_weights()
+Note: This backbone initializes with random weights. Use load_pretrained_weights()
 to load a checkpoint file (e.g., from a pretrained autoencoder or classifier).
 
 Architecture:
@@ -54,17 +54,17 @@ RESNET_MODELS = {
 }
 
 
-class ImageEncoderResNet(nn.Module):
+class ResNetBackbone(nn.Module):
     """Image encoder using ResNet backbone.
     
-    This encoder processes individual frames to extract spatial features.
+    This backbone processes individual frames to extract spatial features.
     It uses torchvision's ResNet implementation.
     
     Note: Initializes with random weights. Call load_pretrained_weights()
     with your checkpoint file to load pretrained weights.
     
-    The encoder outputs spatial feature maps that preserve spatial structure,
-    matching the interface of ImageEncoderViTMAE for interchangeable use.
+    The backbone outputs spatial feature maps that preserve spatial structure,
+    matching the interface of ViTMAEBackbone for interchangeable use.
     
     Attributes:
         backbone: The underlying ResNet model (without final pooling/FC).
@@ -77,19 +77,19 @@ class ImageEncoderResNet(nn.Module):
     
     Example:
         config = {'backbone': 'resnet50'}
-        encoder = ImageEncoderResNet(config)
+        backbone = ResNetBackbone(config)
         
         # Load pretrained weights (required for useful features)
-        encoder.load_pretrained_weights('path/to/checkpoint.ckpt')
+        backbone.load_pretrained_weights('path/to/checkpoint.ckpt')
         
         # Encode images
         images = torch.randn(4, 3, 224, 224)
-        features = encoder(images)  # (4, 2048, 7, 7)
+        features = backbone(images)  # (4, 2048, 7, 7)
     """
     
     @typechecked
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize the ResNet image encoder.
+        """Initialize the ResNet image backbone.
         
         Args:
             config: Configuration dictionary with optional keys:
@@ -170,7 +170,7 @@ class ImageEncoderResNet(nn.Module):
         """Effective stride/patch size for the backbone.
         
         For ResNet, this is the total downsampling factor (32).
-        This property exists for API compatibility with ViT encoders.
+        This property exists for API compatibility with ViT backbones.
         """
         return 32
     
@@ -180,13 +180,13 @@ class ImageEncoderResNet(nn.Module):
         return self._backbone_name
     
     @property
-    def encoder_type(self) -> str:
-        """Return encoder type identifier."""
+    def backbone_type(self) -> str:
+        """Return backbone type identifier."""
         return 'resnet'
     
     @typechecked
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass through ResNet encoder.
+        """Forward pass through ResNet backbone.
         
         Processes input images through the ResNet backbone and
         returns spatial feature maps.
@@ -223,7 +223,7 @@ class ImageEncoderResNet(nn.Module):
         checkpoint_path: str, 
         strict: bool = False,
     ) -> None:
-        """Load pretrained ResNet encoder weights with shape filtering.
+        """Load pretrained ResNet backbone weights with shape filtering.
         
         This method loads weights from a checkpoint file, handling different
         checkpoint formats (Lightning, plain PyTorch) and filtering for

@@ -1,7 +1,7 @@
 """ViT-MAE image encoder for video action segmentation.
 
-This module provides the ImageEncoderViTMAE class, which wraps a Vision
-Transformer with Masked Autoencoding (ViT-MAE) for use as a frame encoder
+This module provides the ViTMAEBackbone class, which wraps a Vision
+Transformer with Masked Autoencoding (ViT-MAE) for use as a backbone
 in video action segmentation.
 
 Architecture:
@@ -27,13 +27,13 @@ from transformers import ViTMAEModel
 from typeguard import typechecked
 
 
-class ImageEncoderViTMAE(nn.Module):
+class ViTMAEBackbone(nn.Module):
     """Image encoder using ViT-MAE with optional pretrained weights.
     
-    This encoder processes individual frames to extract spatial features.
+    This backbone processes individual frames to extract spatial features.
     It uses the HuggingFace transformers implementation of ViT-MAE.
     
-    The encoder outputs spatial feature maps that preserve the patch grid
+    The backbone outputs spatial feature maps that preserve the patch grid
     structure, which can be useful for spatial attention or pooling.
     
     Attributes:
@@ -47,20 +47,20 @@ class ImageEncoderViTMAE(nn.Module):
     
     Example:
         # With config
-        config = {'model_name': 'facebook/vit-mae-base'}
-        encoder = ImageEncoderViTMAE(config)
+        config = {'backbone': 'vitmae'}
+        backbone = ViTMAEBackbone(config)
         
         # Load pretrained weights
-        encoder.load_pretrained_weights('path/to/checkpoint.ckpt')
+        backbone.load_pretrained_weights('path/to/checkpoint.ckpt')
         
         # Encode images
         images = torch.randn(4, 3, 224, 224)
-        features = encoder(images)  # (4, 768, 14, 14)
+        features = backbone(images)  # (4, 768, 14, 14)
     """
     
     @typechecked
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize the ViT-MAE image encoder.
+        """Initialize the ViT-MAE backbone.
         
         Args:
             config: Configuration dictionary with optional keys:
@@ -107,15 +107,15 @@ class ImageEncoderViTMAE(nn.Module):
         return self.vit_mae.config.patch_size
     
     @property
-    def encoder_type(self) -> str:
-        """Return encoder type identifier."""
+    def backbone_type(self) -> str:
+        """Return backbone type identifier."""
         return 'vitmae'
     
     @typechecked
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass through ViT-MAE encoder.
+        """Forward pass through ViT-MAE backbone.
         
-        Processes input images through the transformer encoder and
+        Processes input images through the transformer backbone and
         reshapes the output to a spatial feature map.
         
         Args:

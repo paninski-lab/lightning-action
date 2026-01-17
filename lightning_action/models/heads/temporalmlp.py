@@ -1,4 +1,4 @@
-"""Temporal MLP backbone for action segmentation.
+"""Temporal MLP head for action segmentation.
 
 This module implements the TemporalMLP architecture adapted from daart,
 which uses 1D convolution for temporal context followed by dense layers.
@@ -13,11 +13,11 @@ from typeguard import typechecked
 class TemporalMLP(nn.Module):
     """Temporal Multi-Layer Perceptron for sequence encoding.
     
-    This backbone uses 1D convolution to capture temporal dependencies
+    This head uses 1D convolution to capture temporal dependencies
     followed by dense layers for feature extraction.
     
     Architecture:
-    1. 1D Conv layer with temporal window (2 * num_lags + 1)
+    1. 1D Conv layer with temporal window (2*n_lags + 1)
     2. n_hid_layers dense layers with activations
     3. Final dense layer (no activation)
     
@@ -36,13 +36,13 @@ class TemporalMLP(nn.Module):
         dropout_rate: float = 0.0,
         seed: int = 42,
     ):
-        """Initialize TemporalMLP backbone.
+        """Initialize TemporalMLP head.
         
         Args:
             input_size: number of input features per timestep
             num_hid_units: number of hidden units in dense layers
             num_layers: number of hidden dense layers
-            num_lags: number of temporal lags for 1D conv window (creates 2 * num_lags + 1 kernel)
+            num_lags: number of temporal lags for 1D conv window (creates 2*n_lags + 1 kernel)
             activation: activation function ('relu', 'lrelu', 'sigmoid', 'tanh', 'linear')
             dropout_rate: dropout probability (0.0 = no dropout)
             seed: random seed for weight initialization

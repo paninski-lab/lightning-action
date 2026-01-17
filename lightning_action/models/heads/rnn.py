@@ -1,6 +1,6 @@
-"""RNN (LSTM/GRU) backbone for action segmentation.
+"""RNN (LSTM/GRU) head for action segmentation.
 
-This module implements RNN-based backbones adapted from daart for use with
+This module implements RNN-based heads adapted from daart for use with
 PyTorch Lightning. Supports both LSTM and GRU architectures with bidirectional
 processing capability.
 """
@@ -12,7 +12,7 @@ from typeguard import typechecked
 
 
 class RNN(nn.Module):
-    """RNN backbone for temporal sequence modeling.
+    """RNN head for temporal sequence modeling.
     
     Encoder-only implementation supporting LSTM and GRU architectures with
     optional bidirectional processing.
@@ -29,7 +29,7 @@ class RNN(nn.Module):
         dropout_rate: float = 0.0,
         seed: int = 42,
     ):
-        """Initialize RNN backbone.
+        """Initialize RNN head.
         
         Args:
             input_size: number of input features
@@ -95,7 +95,7 @@ class RNN(nn.Module):
         self,
         x: Float[torch.Tensor, 'batch sequence features']
     ) -> Float[torch.Tensor, 'batch sequence n_hid_units']:
-        """Forward pass through RNN backbone.
+        """Forward pass through RNN head.
         
         Args:
             x: input tensor of shape (batch_size, sequence_length, input_size)
