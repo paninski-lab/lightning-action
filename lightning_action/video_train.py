@@ -1,12 +1,17 @@
 """Training functionality for video action segmentation models.
 
 This module provides the main training loop and utilities for training
-VideoSegmenter models using PyTorch Lightning.
+VideoSegmenter models using PyTorch Lightning with NVIDIA DALI for
+GPU-accelerated video loading.
 
 Key functions:
-- train_video(): Main entry point for training a video segmentation model
-- reset_seeds(): Ensure reproducibility across runs
-- get_callbacks(): Configure Lightning callbacks for checkpointing, etc.
+- train_video: Main entry point for training a video segmentation model
+
+The video pipeline differs from the CSV pipeline in several ways:
+- Uses VideoDataModule with NVIDIA DALI for GPU video decoding
+- Supports multi-GPU training with DDP
+- Uses mixed precision training by default
+- Class weights are computed by VideoDataset
 
 Example usage:
     config = load_config('config.yaml')
@@ -17,26 +22,35 @@ Example usage:
 import logging
 import multiprocessing as mp
 import os
-import random
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import lightning as pl
-import numpy as np
 import torch
-import yaml
-from lightning.pytorch.callbacks import (
-    EarlyStopping,
-    LearningRateMonitor,
-    ModelCheckpoint,
-)
 from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.utilities import rank_zero_only
 from typeguard import typechecked
 
 from lightning_action.data.video_datamodule import VideoDataModule
 from lightning_action.models.video_segmenter import VideoSegmenter
-from lightning_action.train import reset_seeds, get_callbacks
+
+# Import shared utilities from train_utils
+from lightning_action.train_utils import (
+    reset_seeds,
+    get_callbacks,
+    validate_config,
+    update_config_with_class_weights,
+    update_config_with_label_names,
+    save_config,
+    get_callbacks_from_config,
+)
+
+# Re-export for backward compatibility
+__all__ = [
+    'train_video',
+    'reset_seeds',
+    'get_callbacks',
+]
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +62,14 @@ def train_video(
     output_dir: str | Path,
 ) -> pl.LightningModule:
     """Train a video action segmentation model.
+    
+    This function handles the complete training pipeline for video models:
+    1. Configuration validation and seed setup
+    2. DALI/multiprocessing configuration
+    3. VideoDataModule creation and setup
+    4. Class weight computation
+    5. Lightning Trainer configuration
+    6. Model training
     
     Args:
         config: Configuration dictionary containing data, training, model,
@@ -63,7 +85,7 @@ def train_video(
     """
     output_dir = Path(output_dir)
 
-    # Set random seeds for reproducibility
+    # Set random seeds for reproducibility (shared utility)
     seed = config.get('training', {}).get('seed', 0)
     reset_seeds(seed=seed)
 
@@ -84,11 +106,8 @@ def train_video(
     accelerator = 'gpu' if num_gpus > 0 else 'cpu'
     devices = num_gpus if num_gpus > 0 else 'auto'
 
-    # Validate configuration
-    if 'data' not in config:
-        raise ValueError("Configuration must contain 'data' section")
-    if 'training' not in config:
-        raise ValueError("Configuration must contain 'training' section")
+    # Validate configuration (shared utility)
+    validate_config(config, required_sections=['data', 'training'])
 
     data_config = config['data']
     training_config = config['training']
@@ -122,13 +141,16 @@ def train_video(
             )
             has_val_data = False
 
-    # Configure validation batch limiting
+    # Configure validation batch limiting and checkpoint monitoring
     if has_val_data:
         limit_val_batches = training_config.get('limit_val_batches', 1.0)
+        checkpoint_monitor = 'val_loss'
     else:
         limit_val_batches = 0
+        checkpoint_monitor = 'train_loss'
 
     # Get class weights from dataset
+    # Note: Video pipeline uses VideoDataset.class_weights which pre-computes weights
     weight_classes = data_config.get('weight_classes', True)
     if weight_classes:
         class_weights = datamodule.dataset.class_weights
@@ -136,25 +158,15 @@ def train_video(
     else:
         class_weights = None
     
-    # Update config with computed class weights
-    if 'model' not in config:
-        config['model'] = {}
-    config['model']['class_weights'] = class_weights
-    if hasattr(model, 'config'):
-        model.config['model']['class_weights'] = class_weights
+    # Update config and model with class weights (shared utility)
+    update_config_with_class_weights(config, model, class_weights)
 
-    # Store label names in config
+    # Store label names in config (shared utility)
     label_names = datamodule.get_label_names()
-    if len(label_names) > 0:
-        config['data']['label_names'] = label_names
-        if hasattr(model, 'config'):
-            model.config['data']['label_names'] = label_names
+    update_config_with_label_names(config, model, label_names)
 
-    # Save configuration (only on rank 0)
-    if rank_zero_only.rank == 0:
-        (output_dir / 'config.yaml').parent.mkdir(exist_ok=True, parents=True)
-        with open(output_dir / 'config.yaml', 'w') as f:
-            yaml.dump(config, f, default_flow_style=False)
+    # Save configuration (shared utility - only on rank 0)
+    save_config(config, output_dir)
 
     # Configure distributed training strategy
     if num_gpus > 1:
@@ -175,12 +187,10 @@ def train_video(
         'limit_val_batches': limit_val_batches,
         'precision': '16-mixed' if accelerator == 'gpu' else '32-true',
         'enable_checkpointing': training_config.get('checkpointing', True),
-        'callbacks': get_callbacks(
-            checkpointing=training_config.get('checkpointing', True),
-            lr_monitor=training_config.get('lr_monitor', True),
-            ckpt_every_n_epochs=training_config.get('ckpt_every_n_epochs', None),
-            early_stopping=training_config.get('early_stopping', False),
-            early_stopping_patience=training_config.get('early_stopping_patience', 10),
+        # Use shared utility for callbacks
+        'callbacks': get_callbacks_from_config(
+            {**training_config, 'early_stopping': training_config.get('early_stopping', False) and has_val_data},
+            monitor=checkpoint_monitor,
         ),
         'logger': TensorBoardLogger(
             save_dir=str(output_dir),
