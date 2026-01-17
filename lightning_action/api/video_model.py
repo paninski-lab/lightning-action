@@ -8,8 +8,10 @@ underlying VideoSegmenter model and handles common workflows:
 - Training models with automatic post-training inference
 - Running inference on new videos
 
-The VideoModel class abstracts away the complexity of Lightning modules,
-data modules, and file I/O to provide a simple interface for end users.
+The VideoModel class inherits from BaseModelAPI and provides video-specific:
+- GPU-accelerated prediction using DALI
+- Frame-by-frame classification from raw video files
+- Video-level post-training inference
 
 Example usage:
     # Load a trained model
@@ -26,8 +28,6 @@ Example usage:
     model.train(output_dir='runs/new_experiment')
 """
 
-import contextlib
-import os
 from pathlib import Path
 from typing import Any, Optional
 
@@ -36,38 +36,13 @@ import lightning as pl
 import numpy as np
 import pandas as pd
 import torch
-import yaml
 from typeguard import typechecked
 
+from lightning_action.api.base import BaseModelAPI
 from lightning_action.data.video_datamodule import VideoDataModule
 from lightning_action.models.video_segmenter import VideoSegmenter
 from lightning_action.video_train import train_video
 
-
-@contextlib.contextmanager
-def chdir(path: Path):
-    """Context manager for temporarily changing working directory.
-    
-    Useful when training requires relative paths from the output directory.
-    
-    Args:
-        path: Directory to change to.
-    
-    Yields:
-        None. Working directory is restored on exit.
-    
-    Example:
-        with chdir(Path('/some/dir')):
-            # Working directory is /some/dir here
-            do_something()
-        # Working directory is restored here
-    """
-    old_cwd = os.getcwd()
-    try:
-        os.chdir(path)
-        yield
-    finally:
-        os.chdir(old_cwd)
 
 @typechecked
 def _get_video_frame_count(video_path: str | Path) -> int:
@@ -96,29 +71,21 @@ def _get_video_frame_count(video_path: str | Path) -> int:
 
 
 @typechecked
-class VideoModel:
+class VideoModel(BaseModelAPI[VideoSegmenter]):
     """High-level wrapper for video action segmentation models.
     
     This class provides a simplified interface for working with video
     segmentation models, handling the complexity of model loading,
     training, and inference behind a clean API.
     
+    Inherits from BaseModelAPI and provides video-specific implementations
+    for model creation, training, and GPU-accelerated prediction.
+    
     Attributes:
         model: The underlying VideoSegmenter Lightning module.
         config: Configuration dictionary used to create/load the model.
         model_dir: Directory where the model is stored (after training/loading).
-    
-    Example:
-        # Training workflow
-        model = VideoModel.from_config('config.yaml')
-        model.train(output_dir='runs/exp1')
-        
-        # Inference workflow
-        model = VideoModel.from_dir('runs/exp1')
-        model.predict(
-            videos_dir='data/videos',
-            output_dir='results',
-        )
+        _trainer: Cached trainer instance for prediction (optional).
     """
 
     @typechecked
@@ -138,141 +105,42 @@ class VideoModel:
             config: Configuration dictionary.
             model_dir: Optional path to model directory.
         """
-        self.model = model
-        self.config = config
-        self.model_dir = Path(model_dir) if model_dir is not None else None
+        super().__init__(model, config, model_dir)
         self._trainer: Optional[pl.Trainer] = None
 
     @classmethod
-    @typechecked
-    def from_dir(cls, model_dir: str | Path) -> 'VideoModel':
-        """Load a trained model from a directory.
-        
-        Searches for configuration and checkpoint files in the directory
-        and loads the model with trained weights.
-        
-        Expected directory structure:
-            model_dir/
-                config.yaml (or hparams.yaml)
-                checkpoints/
-                    best-*.ckpt (or any .ckpt/.pt file)
-        
-        Args:
-            model_dir: Path to directory containing model files.
-        
-        Returns:
-            VideoModel instance with loaded weights.
-        
-        Raises:
-            FileNotFoundError: If config or checkpoint files are not found.
-        """
-        model_dir = Path(model_dir)
-        
-        # Try to find config file (prefer config.yaml over hparams.yaml)
-        config_path = model_dir / 'config.yaml'
-        if not config_path.exists():
-            config_path = model_dir / 'hparams.yaml'
-        
-        if not config_path.exists():
-            raise FileNotFoundError(f'Config file not found in {model_dir}')
-            
-        with open(config_path) as f:
-            config = yaml.safe_load(f)
-
-        # Create model architecture from config
-        model = VideoSegmenter(config)
-
-        # Find checkpoint file (prefer 'best' checkpoints)
-        checkpoint_patterns = ['*best*.ckpt', '*.ckpt', '*best*.pt', '*.pt']
-        checkpoint_path = None
-        
-        for pattern in checkpoint_patterns:
-            checkpoints = list(model_dir.rglob(pattern))
-            if checkpoints:
-                checkpoint_path = checkpoints[0]
-                break
-                
-        if checkpoint_path is None:
-            raise FileNotFoundError(f'No checkpoint files found in {model_dir}')
-        
-        # Load weights based on file format
-        if checkpoint_path.suffix == '.ckpt':
-            # Lightning checkpoint format
-            model = VideoSegmenter.load_from_checkpoint(
-                checkpoint_path, config=config
-            )
-        else:
-            # Plain PyTorch state dict
-            state_dict = torch.load(checkpoint_path, map_location='cpu')
-            model.load_state_dict(state_dict)
-            
-        model.eval()
-
-        return cls(model, config, model_dir)
+    def _get_model_class(cls) -> type:
+        """Return the VideoSegmenter model class."""
+        return VideoSegmenter
 
     @classmethod
-    @typechecked
-    def from_config(cls, config_path: str | Path | dict) -> 'VideoModel':
-        """Create a new untrained model from configuration.
+    def _get_train_function(cls):
+        """Return the video pipeline training function."""
+        return train_video
+
+    @classmethod
+    def _create_model_from_config(cls, config: dict[str, Any]) -> VideoSegmenter:
+        """Create a VideoSegmenter model from configuration.
         
         Args:
-            config_path: Path to YAML config file, or dict with config.
+            config: Configuration dictionary.
         
         Returns:
-            VideoModel instance with randomly initialized weights.
-        
-        Raises:
-            FileNotFoundError: If config file path doesn't exist.
+            Initialized VideoSegmenter model.
         """
-        if not isinstance(config_path, dict):
-            config_path = Path(config_path)
-            if not config_path.exists():
-                raise FileNotFoundError(f'Config file not found: {config_path}')
-            with open(config_path) as f:
-                config = yaml.safe_load(f)
-        else:
-            config = config_path
+        return VideoSegmenter(config)
 
-        model = VideoSegmenter(config)
-        return cls(model, config, model_dir=None)
-
-    @typechecked
-    def train(
-        self, 
-        output_dir: str | Path = 'runs/default', 
-        post_inference: bool = True,
-    ) -> None:
-        """Train the model and optionally run inference on training data.
-        
-        Args:
-            output_dir: Directory to save checkpoints, logs, and predictions.
-            post_inference: If True, run inference on all training videos
-                after training completes to generate predictions.
-        """
-        self.model_dir = Path(output_dir)
-        self.model_dir.mkdir(exist_ok=True, parents=True)
-        
-        # Train the model
-        with chdir(self.model_dir):
-            self.model = train_video(
-                self.config, self.model, output_dir=self.model_dir
-            )
-
-        # Optionally generate predictions on training data
-        if post_inference:
-            self._run_post_training_inference()
-    
     def _run_post_training_inference(self) -> None:
-        """Run inference on all training experiments after training.
+        """Run inference on all training videos after training.
         
-        This generates prediction CSV files for each video in the training
-        set, which is useful for evaluating model performance and debugging.
+        Generates prediction CSV files for each video in the training set,
+        which is useful for evaluating model performance and debugging.
         """
         if self.model is None or self.model_dir is None:
             return
             
         videos_dir = self.config['data']['videos_dir']
-        expt_ids = self.config['data']['expt_ids']
+        expt_ids = self.config['data'].get('expt_ids')
         
         predictions_dir = self.model_dir / 'predictions'
         predictions_dir.mkdir(exist_ok=True)
@@ -285,7 +153,7 @@ class VideoModel:
             )
         except Exception as e:
             print(f'Warning: Post-training inference failed: {e}')
-    
+
     @typechecked
     def _setup_trainer(self) -> pl.Trainer:
         """Set up a Lightning Trainer for prediction.
@@ -315,7 +183,7 @@ class VideoModel:
         }
         
         return pl.Trainer(**trainer_config)
-    
+
     @typechecked
     def _predict_single_video(
         self,
@@ -343,7 +211,7 @@ class VideoModel:
         if not video_path.exists():
             raise FileNotFoundError(f"Video not found: {video_path}")
         
-        # Get video metadata using OpenCV
+        # Get video metadata
         video_frame_count = _get_video_frame_count(video_path)
         
         # Extract config values
@@ -362,7 +230,7 @@ class VideoModel:
             'label_names': data_config_from_model.get('label_names'),
         }
         
-        # Create datamodule for this single video
+        # Create datamodule
         datamodule = VideoDataModule(
             data_config=data_config,
             sequence_length=sequence_length,
@@ -374,7 +242,6 @@ class VideoModel:
             model_config=self.config.get('model', {}),
         )
         
-        # Setup for prediction
         datamodule.setup('predict')
         
         # Run prediction
@@ -403,29 +270,26 @@ class VideoModel:
         # Adjust to match actual video length
         if predicted_frames != video_frame_count:
             if predicted_frames > video_frame_count:
-                # Trim excess predictions
                 final_probs = stacked_probs[:video_frame_count, :]
             else:
-                # Pad with NaN for missing frames
                 pad_rows = video_frame_count - predicted_frames
                 nan_pad = np.full((pad_rows, num_classes), np.nan)
                 final_probs = np.vstack([stacked_probs, nan_pad])
         else:
             final_probs = stacked_probs
         
-        # Get label names from datamodule or generate defaults
+        # Get label names
         label_names = datamodule.get_label_names()
         if not label_names:
             label_names = [f'class_{i}' for i in range(num_classes)]
         
-        # Create output DataFrame
+        # Create and save output DataFrame
         df = pd.DataFrame(data=final_probs, columns=label_names)
         df.insert(0, 'frame', np.arange(len(df)))
         
-        # Save predictions
         output_path.parent.mkdir(exist_ok=True, parents=True)
         df.to_csv(output_path, index=False)
-    
+
     @typechecked
     def predict(
         self,
@@ -462,7 +326,6 @@ class VideoModel:
         if self.model is None:
             raise ValueError('Model must be trained or loaded before prediction')
 
-        # Validate output_file usage
         if output_file is not None and expt_ids is not None and len(expt_ids) > 1:
             raise RuntimeError(
                 'Can only supply `output_file` when specifying a single expt_id'
@@ -476,7 +339,7 @@ class VideoModel:
             print("No videos to predict")
             return
 
-        # Validate that all video files exist
+        # Validate video files exist
         missing_videos = []
         for expt_id in expt_ids:
             video_path = videos_dir / f'{expt_id}.mp4'
@@ -495,7 +358,6 @@ class VideoModel:
         for i, expt_id in enumerate(expt_ids):
             video_path = videos_dir / f'{expt_id}.mp4'
             
-            # Determine output path
             if output_file is not None and len(expt_ids) == 1:
                 output_path = Path(output_file)
             else:
