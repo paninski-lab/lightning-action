@@ -810,4 +810,3 @@ class VideoDataModule(pl.LightningDataModule):
     def num_classes(self) -> int:
         """Get the number of action classes."""
         return self.dataset.num_classes
-        return self.dataset.num_classes
