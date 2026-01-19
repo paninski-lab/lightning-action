@@ -91,7 +91,15 @@ class VideoBaseModel(BaseModel):
         Returns:
             Loss tensor, or None if batch should be skipped.
         """
-        frames, labels, _ = self._get_inputs_and_targets(batch)
+        frames, labels, metadata = self._get_inputs_and_targets(batch)
+        
+        if metadata is not None:
+            is_partial = any(
+                m.get('is_start', False) or m.get('is_end', False) 
+                for m in metadata
+            )
+            if is_partial:
+                return None
         
         if self.sequence_pad and self.sequence_pad > 0:
             trimmed_labels = labels[:, self.sequence_pad:-self.sequence_pad]
