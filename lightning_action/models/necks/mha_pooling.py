@@ -20,7 +20,7 @@ Example usage:
     # Output: pooled representation
     pooled = pooling(x)  # (batch_size, 1, 768)
 """
-
+import math
 from typing import Optional, Tuple, Union
 
 import torch
@@ -91,19 +91,15 @@ class MultiheadAttentionPooling(nn.Module):
         self.num_heads = num_heads
         self.num_seeds = num_seeds
         self.use_ffn = use_ffn
-        
+        self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
+
         # Learnable seed vectors (queries for pooling)
         self.seeds = nn.Parameter(torch.empty(1, num_seeds, embed_dim))
         nn.init.xavier_uniform_(self.seeds)
         
-        # Multi-head cross-attention
-        # Seeds attend to input sequence (seeds=Q, input=K,V)
-        self.attention = nn.MultiheadAttention(
-            embed_dim=embed_dim,
-            num_heads=num_heads,
-            dropout=dropout,
-            batch_first=True,
-        )
+        self.fc_q = nn.Linear(embed_dim, embed_dim)
+        self.fc_k = nn.Linear(embed_dim, embed_dim)
+        self.fc_v = nn.Linear(embed_dim, embed_dim)
         
         # Optional layer normalization
         self.norm1 = nn.LayerNorm(embed_dim) if layer_norm else nn.Identity()
@@ -114,6 +110,7 @@ class MultiheadAttentionPooling(nn.Module):
             self.ffn = nn.Linear(embed_dim, embed_dim)
         else:
             self.ffn = None
+    
     
     @typechecked
     def forward(
@@ -129,31 +126,52 @@ class MultiheadAttentionPooling(nn.Module):
         
         Returns:
             Pooled output, shape (batch_size, num_seeds, embed_dim).
-            If return_attention=True, also returns attention weights
-            of shape (batch_size, num_heads, num_seeds, seq_len).
+            If return_attention=True, also returns attention weights.
         """
         batch_size = x.size(0)
+        seq_len = x.size(1)
         
         # Expand seeds for batch: (1, num_seeds, D) -> (B, num_seeds, D)
-        queries = self.seeds.expand(batch_size, -1, -1)
+        seeds = self.seeds.expand(batch_size, -1, -1)
         
-        # Cross-attention: seeds attend to input sequence
-        attn_output, attn_weights = self.attention(
-            query=queries,
-            key=x,
-            value=x,
-            need_weights=return_attention,
-            average_attn_weights=False,  # Return per-head weights
-        )
+        # Project Q, K, V (matching sandbox)
+        Q = self.fc_q(seeds)   # (B, num_seeds, embed_dim)
+        K = self.fc_k(x)       # (B, seq_len, embed_dim)
+        V = self.fc_v(x)       # (B, seq_len, embed_dim)
         
-        # Residual connection and layer norm
-        output = self.norm1(queries + attn_output)
+        # Split into heads: (B, L, D) -> (B*H, L, D/H)
+        dim_split = self.embed_dim // self.num_heads
         
-        # Optional FFN with residual
+        # Reshape for multi-head: concat along batch dim
+        Q_ = torch.cat(Q.split(dim_split, dim=2), dim=0)  # (B*H, num_seeds, D/H)
+        K_ = torch.cat(K.split(dim_split, dim=2), dim=0)  # (B*H, seq_len, D/H)
+        V_ = torch.cat(V.split(dim_split, dim=2), dim=0)  # (B*H, seq_len, D/H)
+        
+        # Compute attention scores
+        scores = Q_.bmm(K_.transpose(1, 2)) / math.sqrt(self.embed_dim)
+        A = torch.softmax(scores, dim=2)  # (B*H, num_seeds, seq_len)
+        A = self.dropout(A)
+        
+        # Per-head residual with PROJECTED query
+        # This preserves query information at each head before concatenation
+        O = Q_ + A.bmm(V_)  # (B*H, num_seeds, D/H)
+        
+        # Merge heads back: (B*H, num_seeds, D/H) -> (B, num_seeds, D)
+        O = torch.cat(O.split(batch_size, dim=0), dim=2)
+        
+        # Optional layer norm after attention
+        if self.norm1 is not None:
+            O = self.norm1(O)
+        
+        # FFN with residual 
         if self.ffn is not None:
-            output = self.norm2(output + F.relu(self.ffn(output)))
+            O = O + F.relu(self.ffn(O))
+            if self.norm2 is not None:
+                O = self.norm2(O)
         
         if return_attention:
-            return output, attn_weights
+            # Reshape attention weights: (B*H, num_seeds, seq_len) -> (B, H, num_seeds, seq_len)
+            A = A.view(batch_size, self.num_heads, self.num_seeds, seq_len)
+            return O, A
         
-        return output
+        return O

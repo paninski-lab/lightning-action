@@ -62,6 +62,8 @@ dev = [
     "sphinx-rtd-dark-mode",
     "sphinx-automodapi",
     "sphinx-copybutton",
+    "torchvision",
+    "transformers",
 ]
 
 [tool.isort]

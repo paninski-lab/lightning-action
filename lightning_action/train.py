@@ -1,12 +1,21 @@
-"""Training functionality for lightning-action models.
+"""Training functionality for lightning-action models (CSV pipeline).
 
-This module provides training functions adapted from beast and daart patterns,
-using PyTorch Lightning for action segmentation models.
+This module provides training functions for action segmentation models
+using tabular data (CSV/markers). Uses PyTorch Lightning for training
+orchestration.
+
+Key functions:
+- train: Main entry point for training a segmentation model
+- build_data_config_from_path: Build data configuration from directory structure
+- compute_class_weights: Compute class weights from training data
+
+Example usage:
+    config = load_config('config.yaml')
+    model = Segmenter(config)
+    trained_model = train(config, model, output_dir='runs/experiment1')
 """
 
 import logging
-import os
-import random
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +33,24 @@ from lightning_action.data.utils import (
     compute_class_weights as _compute_class_weights,
     collect_labels_from_datamodule,
 )
+
+# Import shared utilities
+from lightning_action.train_utils import (
+    reset_seeds,
+    get_callbacks,
+    validate_config,
+    update_config_with_class_weights,
+    update_config_with_label_names,
+    save_config,
+    pretty_print_config,
+    get_callbacks_from_config,
+)
+
+# Re-export for backward compatibility
+__all__ = [
+    'train',
+]
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,29 +63,29 @@ def train(
     """Train a Lightning model.
 
     Args:
-        config: configuration dictionary with data, model, and training settings
-        model: Lightning model to train
-        output_dir: directory to save outputs and checkpoints
+        config: Configuration dictionary with data, model, and training settings.
+        model: Lightning model to train.
+        output_dir: Directory to save outputs and checkpoints.
 
     Returns:
-        trained model
+        Trained model.
 
     Raises:
-        ValueError: if required configuration keys are missing
-        FileNotFoundError: if data directory doesn't exist
+        ValueError: If required configuration keys are missing.
+        FileNotFoundError: If data directory doesn't exist.
     """
     output_dir = Path(output_dir)
 
-    # print basic info
+    # Print basic info
     if rank_zero_only.rank == 0:
         print(f'Output directory: {output_dir}')
         print(f'Model type: {type(model)}')
 
-    # reset seeds for reproducibility
+    # Reset seeds for reproducibility
     seed = config.get('training', {}).get('seed', 0)
     reset_seeds(seed=seed)
 
-    # pretty print configuration
+    # Pretty print configuration
     pretty_print_config(config)
 
     # ----------------------------------------------------------------------------------
@@ -67,20 +94,17 @@ def train(
 
     logger.info("Setting up data module...")
 
-    # validate required config sections
-    if 'data' not in config:
-        raise ValueError("Configuration must contain 'data' section")
-    if 'training' not in config:
-        raise ValueError("Configuration must contain 'training' section")
+    # Validate required config sections
+    validate_config(config, required_sections=['data', 'training'])
 
     data_config = config['data']
     training_config = config['training']
 
-    # build data configuration from path if using simplified format
+    # Build data configuration from path if using simplified format
     if 'data_path' in data_config:
         logger.info("Building data config from data_path...")
         
-        # build full data config from path
+        # Build full data config from path
         full_data_config = build_data_config_from_path(
             data_path=data_config['data_path'],
             expt_ids=data_config.get('expt_ids'),
@@ -88,13 +112,13 @@ def train(
             transforms=data_config.get('transforms', None),  # for input stream only
         )
         
-        # use the full config for DataModule
+        # Use the full config for DataModule
         datamodule_config = full_data_config
     else:
-        # use existing full format
+        # Use existing full format
         datamodule_config = data_config
 
-    # create datamodule
+    # Create datamodule
     datamodule = DataModule(
         data_config=datamodule_config,
         sequence_length=training_config.get('sequence_length', 500),
@@ -106,10 +130,10 @@ def train(
         seed=seed,
     )
 
-    # setup datamodule to access datasets
+    # Setup datamodule to access datasets
     datamodule.setup('fit')
 
-    # compute class weights if enabled
+    # Compute class weights if enabled
     weight_classes = data_config.get('weight_classes', True)
     if weight_classes:
         logger.info("Computing class weights...")
@@ -117,37 +141,30 @@ def train(
             datamodule,
             ignore_index=data_config.get('ignore_index', -100),
         )
-
-        # update model configuration with class weights
-        if hasattr(model, 'config'):
-            if 'model' not in model.config:
-                model.config['model'] = {}
-            model.config['model']['class_weights'] = class_weights
-
-        # also store in main config for saving
-        config['model']['class_weights'] = class_weights
     else:
         logger.info("Class weighting disabled")
-        config['model']['class_weights'] = None
+        class_weights = None
 
-    # save feature/label names to config
+    # Update config and model with class weights (shared utility)
+    update_config_with_class_weights(config, model, class_weights)
+
+    # Save feature/label names to config
     feature_names = datamodule.dataset.feature_names
     if len(feature_names) > 0:
         config['data']['feature_names'] = feature_names
         model.config['data']['feature_names'] = feature_names
+    
     label_names = datamodule.dataset.label_names
-    if len(label_names) > 0:
-        config['data']['label_names'] = label_names
-        model.config['data']['label_names'] = label_names
+    update_config_with_label_names(config, model, label_names)
 
-    # update training steps information for schedulers
+    # Update training steps information for schedulers
     num_epochs = training_config.get('num_epochs', 100)
     batch_size = training_config.get('batch_size', 32)
 
     steps_per_epoch = int(np.ceil(len(datamodule.dataset_train) / batch_size))
     total_steps = steps_per_epoch * num_epochs
 
-    # update model config with step information
+    # Update model config with step information
     if hasattr(model, 'config'):
         if 'optimizer' not in model.config:
             model.config['optimizer'] = {}
@@ -163,38 +180,29 @@ def train(
     logger.info(f"Creating output directory: {output_dir}")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # log package version
+    # Log package version
     config['version'] = __version__
 
-    # save config file
-    dest_config_file = output_dir / 'config.yaml'
-    with open(dest_config_file, 'w') as file:
-        yaml.dump(config, file, default_flow_style=False)
-    logger.info(f"Saved configuration to: {dest_config_file}")
-
+    # Save config file (shared utility)
+    save_config(config, output_dir)
+    
     # ----------------------------------------------------------------------------------
     # Set up and run training
     # ----------------------------------------------------------------------------------
 
     logger.info("Setting up trainer...")
 
-    # logger
+    # Logger
     tb_logger = pl.loggers.TensorBoardLogger(
         save_dir=output_dir / 'tb_logs',
         name='',
         version='',
     )
 
-    # callbacks
-    callbacks = get_callbacks(
-        checkpointing=training_config.get('checkpointing', True),
-        lr_monitor=training_config.get('lr_monitor', True),
-        ckpt_every_n_epochs=training_config.get('ckpt_every_n_epochs', None),
-        early_stopping=training_config.get('early_stopping', False),
-        early_stopping_patience=training_config.get('early_stopping_patience', 10),
-    )
+    # Callbacks (using shared utility)
+    callbacks = get_callbacks_from_config(training_config)
 
-    # trainer configuration
+    # Trainer configuration
     trainer_config = {
         'max_epochs': num_epochs,
         'min_epochs': training_config.get('min_epochs', 1),
@@ -206,7 +214,7 @@ def train(
         'enable_model_summary': training_config.get('model_summary', True),
     }
 
-    # add GPU support if available and requested
+    # Add GPU support if available and requested
     if torch.cuda.is_available() and training_config.get('device', 'cpu') == 'gpu':
         trainer_config['accelerator'] = 'gpu'
         trainer_config['devices'] = 1  # single GPU only
@@ -215,20 +223,20 @@ def train(
         trainer_config['accelerator'] = 'cpu'
         logger.info("Using CPU for training")
 
-    # create trainer
+    # Create trainer
     trainer = pl.Trainer(**trainer_config)
 
-    # log model summary
+    # Log model summary
     logger.info(f"Model summary:\n{model}")
 
-    # train model
+    # Train model
     logger.info("Starting training...")
     trainer.fit(model=model, datamodule=datamodule)
 
-    # training completed
+    # Training completed
     logger.info("Training completed!")
 
-    # save final model state
+    # Save final model state
     final_model_path = output_dir / 'final_model.ckpt'
     trainer.save_checkpoint(final_model_path)
     logger.info(f"Saved final model to: {final_model_path}")
@@ -237,199 +245,21 @@ def train(
 
 
 @typechecked
-def reset_seeds(seed: int = 0) -> None:
-    """Reset all random seeds for reproducibility.
-    
-    Args:
-        seed: random seed value
-    """
-    os.environ["PYTHONHASHSEED"] = str(seed)
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
-
-
-@rank_zero_only
-@typechecked
-def pretty_print_config(config: dict[str, Any]) -> None:
-    """Pretty print configuration dictionary.
-    
-    Args:
-        config: configuration dictionary to print
-    """
-    print('Configuration:')
-    for key, val in config.items():
-        print('--------------------')
-        print(f'{key} parameters')
-        print('--------------------')
-        if isinstance(val, dict):
-            for k, v in val.items():
-                print(f'{k}: {v}')
-        else:
-            print(f'{val}')
-        print()
-    print('\n\n')
-
-
-@typechecked
-def build_data_config_from_path(
-    data_path: str | Path,
-    expt_ids: list[str] | None = None,
-    signal_types: list[str] | None = None,
-    transforms: list[str] | None = None,
-) -> dict[str, Any]:
-    """Build DataModule configuration from data directory path.
-    
-    Makes assumptions about data directory structure:
-    - Signal types are top-level directories under data_path
-      (e.g., 'markers', 'labels', 'features_0')
-    - Each signal directory contains CSV files named after experiment IDs
-    - Default signal types are ['markers', 'labels']
-    - Applies configurable transforms to input signals, defaults to Z-score for markers/features
-    
-    Expected structure:
-    data_path/
-      markers/
-        experiment1.csv
-        experiment2.csv
-      labels/
-        experiment1.csv
-        experiment2.csv
-      features_0/  # optional additional signal types
-        experiment1.csv
-        experiment2.csv
-    
-    Args:
-        data_path: path to data directory containing signal type subdirectories
-        expt_ids: list of experiment IDs to include (None for all)
-        signal_types: list of signal types to load (None for auto-detect)
-        transforms: list of transform class names to apply (None for default ZScore)
-        
-    Returns:
-        DataModule configuration dictionary
-        
-    Raises:
-        FileNotFoundError: if data_path doesn't exist
-        ValueError: if no valid experiments found
-    """
-    data_path = Path(data_path)
-    
-    if not data_path.exists():
-        raise FileNotFoundError(f"Data path does not exist: {data_path}")
-    
-    # discover available signal types if not specified
-    if signal_types is None:
-        # find all directories that could be signal types
-        signal_dirs = [d for d in data_path.iterdir() if d.is_dir()]
-        signal_types = [d.name for d in signal_dirs]
-        logger.info(f"Auto-detected signal types: {signal_types}")
-    else:
-        logger.info(f"Using specified signal types: {signal_types}")
-    
-    if not signal_types:
-        raise ValueError(f"No signal directories found in {data_path}")
-    
-    # set up default transforms if not specified
-    if transforms is None:
-        transforms = ['ZScore']
-        logger.info(f"Using default transforms: {transforms}")
-    else:
-        logger.info(f"Using specified transforms: {transforms}")
-    
-    # create transform instances from class names
-    def create_transform_instance(transform_name: str):
-        """Create transform instance from class name."""
-        if hasattr(transform_module, transform_name):
-            transform_class = getattr(transform_module, transform_name)
-            return transform_class()
-        else:
-            raise ValueError(f"Unknown transform class: {transform_name}")
-    
-    # discover experiment IDs if not specified
-    if expt_ids is None:
-        # find experiment IDs by looking at CSV files in the first signal directory
-        first_signal_dir = data_path / signal_types[0]
-        if first_signal_dir.exists():
-            csv_files = list(first_signal_dir.glob("*.csv"))
-            expt_ids = [f.stem for f in csv_files]  # use filename without .csv extension
-            logger.info(f"Auto-detected {len(expt_ids)} experiments: {expt_ids}")
-        else:
-            raise NotADirectoryError(f"Signal directory not found: {first_signal_dir}")
-    else:
-        logger.info(f"Using specified experiments: {expt_ids}")
-    
-    if not expt_ids:
-        raise ValueError(f"No experiment CSV files found in {data_path}")
-    
-    # build configuration for each experiment
-    ids_all = []
-    signals_all = []
-    transforms_all = []
-    paths_all = []
-    
-    for expt_id in expt_ids:
-        # build paths for each signal type for this experiment
-        expt_signals = []
-        expt_transforms = []
-        expt_paths = []
-
-        for signal_type in signal_types:
-
-            signal_dir = data_path / signal_type
-            if not signal_dir.is_dir():
-                raise NotADirectoryError(f"Signal directory not found: {signal_dir}")
-            try:
-                signal_file = next(signal_dir.glob(f"{expt_id}*.csv"))
-            except StopIteration:
-                raise FileNotFoundError(f"Did not find expt_id={expt_id} in {signal_dir}")
-            expt_paths.append(signal_file)
-            expt_signals.append(signal_type)
-
-            # set up transforms: configurable transforms for markers/features, None for labels
-            if not signal_type.startswith('labels'):
-                signal_transforms = []
-                for transform in transforms:
-                    signal_transforms.append(create_transform_instance(transform))
-                expt_transforms.append(signal_transforms)
-            else:
-                expt_transforms.append(None)
-
-        # add experiment
-        ids_all.append(expt_id)
-        signals_all.append(expt_signals)
-        transforms_all.append(expt_transforms)
-        paths_all.append(expt_paths)
-    
-    if not ids_all:
-        raise ValueError(f"No valid experiments found in {data_path}")
-    
-    logger.info(
-        f"Built data config for {len(ids_all)} experiments with {len(signal_types)} signal types"
-    )
-    
-    return {
-        'ids': ids_all,
-        'signals': signals_all,
-        'transforms': transforms_all,
-        'paths': paths_all,
-    }
-
-
-@typechecked
-def compute_class_weights(datamodule: DataModule, ignore_index: int = -100) -> list[float]:
-    """Compute class weights for imbalanced dataset.
+def compute_class_weights(
+    datamodule: DataModule,
+    ignore_index: int = -100,
+) -> list[float]:
+    """Compute class weights from training data.
     
     Computes weights inversely proportional to class frequency, with the most
     frequent class having weight 1.0. Based on daart's class weight computation.
     
     Args:
-        datamodule: Lightning DataModule with class counting capability
-        ignore_index: class index to ignore (typically background class)
+        datamodule: Lightning DataModule with class counting capability.
+        ignore_index: Class index to ignore (typically background class).
         
     Returns:
-        list of class weights
+        List of class weights.
     """
     logger.info("Computing class weights from training data...")
     
@@ -462,60 +292,119 @@ def compute_class_weights(datamodule: DataModule, ignore_index: int = -100) -> l
 
 
 @typechecked
-def get_callbacks(
-    checkpointing: bool = True,
-    lr_monitor: bool = True,
-    ckpt_every_n_epochs: int | None = None,
-    early_stopping: bool = False,
-    early_stopping_patience: int = 10,
-) -> list[pl.Callback]:
-    """Get Lightning callbacks for training.
+def build_data_config_from_path(
+    data_path: str | Path,
+    expt_ids: list[str] | None = None,
+    signal_types: list[str] | None = None,
+    transforms: list[str] | None = None,
+) -> dict[str, Any]:
+    """Build data configuration from directory structure.
+    
+    Creates a data configuration dictionary by scanning a data directory
+    for signal subdirectories and experiment files.
+    
+    Expected directory structure:
+        data_path/
+            markers/
+                exp1.csv
+                exp2.csv
+            labels/
+                exp1.csv
+                exp2.csv
     
     Args:
-        checkpointing: whether to enable model checkpointing
-        lr_monitor: whether to monitor learning rate
-        ckpt_every_n_epochs: save checkpoint every N epochs (None to disable)
-        early_stopping: whether to enable early stopping
-        early_stopping_patience: patience for early stopping
-        
+        data_path: Root directory containing signal subdirectories.
+        expt_ids: List of experiment IDs to include. If None, includes all.
+        signal_types: List of signal types to include. If None, auto-detects.
+        transforms: List of transform class names for input signals.
+            If None, applies ZScore by default to marker/feature signals.
+    
     Returns:
-        list of Lightning callbacks
+        Data configuration dictionary with keys: ids, signals, transforms, paths.
+    
+    Raises:
+        FileNotFoundError: If data_path doesn't exist or experiments not found.
+        ValueError: If no signal directories found or invalid transform name.
+        NotADirectoryError: If expected signal directory is missing.
     """
-    callbacks = []
+    data_path = Path(data_path)
     
-    # learning rate monitoring
-    if lr_monitor:
-        lr_monitor_cb = pl.callbacks.LearningRateMonitor(logging_interval='epoch')
-        callbacks.append(lr_monitor_cb)
+    if not data_path.exists():
+        raise FileNotFoundError(f"Data path does not exist: {data_path}")
     
-    # model checkpointing - save best model
-    if checkpointing:
-        ckpt_best_callback = pl.callbacks.ModelCheckpoint(
-            monitor='val_loss',
-            mode='min',
-            filename='{epoch}-{step}-best',
-            save_top_k=1,
-        )
-        callbacks.append(ckpt_best_callback)
+    # Find signal directories
+    if signal_types is None:
+        # Auto-detect signal directories
+        signal_dirs = [d for d in data_path.iterdir() if d.is_dir()]
+        if not signal_dirs:
+            raise ValueError(f"No signal directories found in: {data_path}")
+        signal_types = [d.name for d in signal_dirs]
+    else:
+        # Validate specified signal types exist
+        for sig_type in signal_types:
+            sig_dir = data_path / sig_type
+            if not sig_dir.is_dir():
+                raise NotADirectoryError(
+                    f"Signal directory not found: {sig_dir}"
+                )
     
-    # periodic checkpointing
-    if ckpt_every_n_epochs is not None:
-        ckpt_callback = pl.callbacks.ModelCheckpoint(
-            monitor=None,
-            every_n_epochs=ckpt_every_n_epochs,
-            save_top_k=-1,
-            filename='{epoch}-{step}',
-        )
-        callbacks.append(ckpt_callback)
+    # Find experiments from first signal directory
+    first_sig_dir = data_path / signal_types[0]
+    all_expt_ids = [f.stem for f in first_sig_dir.glob('*.csv')]
     
-    # early stopping
-    if early_stopping:
-        early_stop_callback = pl.callbacks.EarlyStopping(
-            monitor='val_loss',
-            mode='min',
-            patience=early_stopping_patience,
-            verbose=True,
-        )
-        callbacks.append(early_stop_callback)
+    if not all_expt_ids:
+        raise ValueError(f"No CSV files found in: {first_sig_dir}")
     
-    return callbacks
+    # Filter experiments if specified
+    if expt_ids is not None:
+        for expt_id in expt_ids:
+            if expt_id not in all_expt_ids:
+                raise FileNotFoundError(f"Did not find expt_id={expt_id}")
+        selected_expt_ids = expt_ids
+    else:
+        selected_expt_ids = sorted(all_expt_ids)
+    
+    # Build transforms list
+    if transforms is None:
+        # Default: ZScore for markers/features, None for labels
+        transform_classes = [transform_module.ZScore()]
+    else:
+        # Create transform instances from class names
+        transform_classes = []
+        for t_name in transforms:
+            if not hasattr(transform_module, t_name):
+                raise ValueError(f"Unknown transform class: {t_name}")
+            transform_classes.append(getattr(transform_module, t_name)())
+    
+    # Build config
+    config = {
+        'ids': [],
+        'signals': [],
+        'transforms': [],
+        'paths': [],
+    }
+    
+    for expt_id in selected_expt_ids:
+        config['ids'].append(expt_id)
+        
+        expt_signals = []
+        expt_transforms = []
+        expt_paths = []
+        
+        for sig_type in signal_types:
+            expt_signals.append(sig_type)
+            
+            # Apply transforms to input signals (markers/features), not labels
+            if sig_type.startswith(('markers', 'features')):
+                expt_transforms.append(transform_classes)
+            else:
+                expt_transforms.append(None)
+            
+            sig_path = data_path / sig_type / f'{expt_id}.csv'
+            expt_paths.append(str(sig_path))
+        
+        config['signals'].append(expt_signals)
+        config['transforms'].append(expt_transforms)
+        config['paths'].append(expt_paths)
+    
+    return config
