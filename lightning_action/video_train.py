@@ -48,8 +48,6 @@ from lightning_action.train_utils import (
 # Re-export for backward compatibility
 __all__ = [
     'train_video',
-    'reset_seeds',
-    'get_callbacks',
 ]
 
 logger = logging.getLogger(__name__)
