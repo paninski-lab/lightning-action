@@ -85,28 +85,7 @@ class VideoModel(BaseModelAPI[VideoSegmenter]):
         model: The underlying VideoSegmenter Lightning module.
         config: Configuration dictionary used to create/load the model.
         model_dir: Directory where the model is stored (after training/loading).
-        _trainer: Cached trainer instance for prediction (optional).
     """
-
-    @typechecked
-    def __init__(
-        self,
-        model: VideoSegmenter,
-        config: dict[str, Any],
-        model_dir: str | Path | None = None,
-    ) -> None:
-        """Initialize the VideoModel wrapper.
-        
-        This constructor is typically not called directly. Use the
-        class methods `from_dir()` or `from_config()` instead.
-        
-        Args:
-            model: Initialized VideoSegmenter model.
-            config: Configuration dictionary.
-            model_dir: Optional path to model directory.
-        """
-        super().__init__(model, config, model_dir)
-        self._trainer: Optional[pl.Trainer] = None
 
     @classmethod
     def _get_model_class(cls) -> type:
