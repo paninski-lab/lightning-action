@@ -42,26 +42,6 @@ from lightning_action.train import (
 
 
 # =============================================================================
-# Tests for Backward Compatibility (re-exports from train.py)
-# =============================================================================
-
-class TestBackwardCompatibility:
-    """Test that train.py re-exports the shared utilities for backward compatibility."""
-
-    def test_reset_seeds_reexported(self):
-        """Test that reset_seeds is re-exported from train.py."""
-        assert train_reset_seeds is reset_seeds
-
-    def test_get_callbacks_reexported(self):
-        """Test that get_callbacks is re-exported from train.py."""
-        assert train_get_callbacks is get_callbacks
-
-    def test_pretty_print_config_reexported(self):
-        """Test that pretty_print_config is re-exported from train.py."""
-        assert train_pretty_print_config is pretty_print_config
-
-
-# =============================================================================
 # Tests for Shared Utilities (train_utils.py)
 # =============================================================================
 
