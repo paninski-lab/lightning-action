@@ -92,7 +92,8 @@ class VideoBaseModel(BaseModel):
             Loss tensor, or None if batch should be skipped.
         """
         frames, labels, metadata = self._get_inputs_and_targets(batch)
-        
+
+        # Removes the start and end chunks during training to prevent context corruption. 
         if metadata is not None:
             is_partial = any(
                 m.get('is_start', False) or m.get('is_end', False) 
