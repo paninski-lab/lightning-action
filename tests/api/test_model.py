@@ -487,7 +487,6 @@ class TestVideoModelAPI:
         assert model.model is not None
         assert model.config is not None
         assert model.model_dir is None
-        assert model._trainer is None
 
     def test_videomodel_from_config_file(self, video_config):
         """Test creating VideoModel from config file."""
@@ -603,6 +602,7 @@ class TestInheritance:
             '_find_config_file',
             '_find_checkpoint_file',
             '_load_checkpoint',
+            '_setup_trainer',
         ]
         
         for method in shared_methods:
@@ -615,6 +615,7 @@ class TestInheritance:
             '_create_model_from_config',
             '_get_model_class',
             '_get_train_function',
+            '_setup_trainer',
             '_run_post_training_inference',
             'predict',
         ]
