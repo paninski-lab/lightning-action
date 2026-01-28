@@ -12,6 +12,7 @@ Subclasses must implement:
 - _create_model_from_config(): Create the underlying model from config
 - _get_model_class(): Return the model class (Segmenter or VideoSegmenter)
 - _get_train_function(): Return the training function
+- _setup_trainer(): Set up a Lightning Trainer for prediction
 - _run_post_training_inference(): Pipeline-specific post-training inference
 - predict(): Pipeline-specific prediction logic
 """
@@ -130,6 +131,18 @@ class BaseModelAPI(ABC, Generic[ModelT]):
         
         Returns:
             The train function (e.g., train, train_video).
+        """
+        pass
+
+    @abstractmethod
+    def _setup_trainer(self) -> pl.Trainer:
+        """Set up a Lightning Trainer for prediction.
+        
+        Subclasses implement this with pipeline-specific configuration
+        (e.g., CPU vs GPU, precision settings, progress bar options).
+        
+        Returns:
+            Configured Trainer instance for prediction.
         """
         pass
 
