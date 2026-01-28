@@ -81,6 +81,28 @@ class Model(BaseModelAPI[Segmenter]):
         
         return Segmenter(config)
 
+    def _setup_trainer(self) -> pl.Trainer:
+        """Set up a Lightning Trainer for prediction.
+        
+        Configures trainer based on the device setting in the training config.
+        Supports both CPU and GPU prediction.
+        
+        Returns:
+            Configured Trainer instance for prediction.
+        """
+        training_config = self.config.get('training', {})
+        device = training_config.get('device', 'cpu')
+        
+        trainer_config = {
+            'accelerator': 'gpu' if device == 'gpu' and torch.cuda.is_available() else 'cpu',
+            'devices': 1,
+            'logger': False,
+            'enable_checkpointing': False,
+            'enable_progress_bar': False,
+        }
+        
+        return pl.Trainer(**trainer_config)
+
     def _run_post_training_inference(self) -> None:
         """Run inference on all training experiment IDs after training.
         
@@ -187,6 +209,8 @@ class Model(BaseModelAPI[Segmenter]):
         training_config = self.config.get('training', {})
         experiment_ids = data_config['ids']
 
+        trainer = self._setup_trainer()
+        
         for expt_id in experiment_ids:
             print(f'Generating predictions for experiment: {expt_id}')
 
@@ -211,18 +235,6 @@ class Model(BaseModelAPI[Segmenter]):
             )
 
             datamodule.setup('predict')
-            
-            # Create trainer
-            device = training_config.get('device', 'cpu')
-            trainer_config = {
-                'accelerator': 'gpu' if device == 'gpu' and torch.cuda.is_available() else 'cpu',
-                'devices': 1,
-                'logger': False,
-                'enable_checkpointing': False,
-                'enable_progress_bar': False,
-            }
-            
-            trainer = pl.Trainer(**trainer_config)
             
             # Generate predictions
             predictions = trainer.predict(self.model, datamodule=datamodule)
