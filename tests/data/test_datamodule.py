@@ -99,7 +99,7 @@ class TestDataModule:
         with tempfile.TemporaryDirectory() as tmpdir:
             # create test files
             feature_file = Path(tmpdir) / 'features.csv'
-            create_test_feature_csv(feature_file, n_frames=30, n_features=4)
+            create_test_feature_csv(feature_file, n_frames=100, n_features=4)
             
             # create data config
             data_config = {
@@ -139,8 +139,8 @@ class TestDataModule:
             marker_file1 = Path(tmpdir) / 'markers1.csv'
             marker_file2 = Path(tmpdir) / 'markers2.csv'
             
-            create_test_marker_csv(marker_file1, n_frames=20, n_markers=2)
-            create_test_marker_csv(marker_file2, n_frames=25, n_markers=2)
+            create_test_marker_csv(marker_file1, n_frames=50, n_markers=2)
+            create_test_marker_csv(marker_file2, n_frames=50, n_markers=2)
             
             # create data config
             data_config = {
