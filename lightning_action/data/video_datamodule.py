@@ -652,7 +652,11 @@ class VideoDataModule(pl.LightningDataModule):
         device_id = torch.cuda.current_device() if torch.cuda.is_available() else 0
 
         # Set up distributed sharding
-        if use_dali_sharding and torch.distributed.is_available() and torch.distributed.is_initialized():
+        if (
+            use_dali_sharding
+            and torch.distributed.is_available()
+            and torch.distributed.is_initialized()
+        ):
             shard_id = torch.distributed.get_rank()
             num_shards = torch.distributed.get_world_size()
         else:

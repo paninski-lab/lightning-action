@@ -317,7 +317,7 @@ class BaseModel(pl.LightningModule):
                     # Scheduler-specific params (T_max, step_size, etc.)
 
         Returns:
-            optimizer 
+            optimizer
         """
         optimizer_config = self.config.get('optimizer', {})
 

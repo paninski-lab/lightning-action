@@ -10,7 +10,7 @@ from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
-from jaxtyping import Float, Int
+from jaxtyping import Float
 from typeguard import typechecked
 
 logger = logging.getLogger(__name__)
@@ -85,7 +85,7 @@ def compute_sequence_pad(
     temporal context and handle boundary effects.
 
     Args:
-        model_type: type of model ('temporal-mlp', 'tcn', 'dtcn', 'dilatedtcn', 
+        model_type: type of model ('temporal-mlp', 'tcn', 'dtcn', 'dilatedtcn',
             'lstm', 'gru', 'rnn', etc.)
         default: if provided, return this value for unknown model types instead
             of raising ValueError. Use default=0 to silently handle unknown types.

@@ -20,9 +20,7 @@ Test Categories:
 
 import os
 import tempfile
-from pathlib import Path
 from typing import Optional
-from unittest.mock import MagicMock, PropertyMock, patch
 
 import cv2
 import numpy as np
@@ -37,8 +35,7 @@ import torch
 def dali_available() -> bool:
     """Check if NVIDIA DALI is installed."""
     try:
-        from nvidia.dali import fn, types
-        from nvidia.dali.pipeline import Pipeline
+        from nvidia.dali import types  # noqa
         return True
     except ImportError:
         return False
@@ -1805,7 +1802,7 @@ class TestDALIIntegration:
                 if iterator is not None:
                     try:
                         iterator.reset()
-                    except:
+                    except Exception:
                         pass
                 del iterator
                 del pipe
@@ -1815,7 +1812,12 @@ class TestDALIIntegration:
                 torch.cuda.synchronize()
                 os.unlink(file_list)
 
-    def test_video_datamodule_train_dataloader(self, create_test_video, create_test_labels, cleanup_gpu):
+    def test_video_datamodule_train_dataloader(
+        self,
+        create_test_video,
+        create_test_labels,
+        cleanup_gpu,
+    ):
         """Test VideoDataModule creates working train dataloader.
 
         Uses minimal TCN padding configuration to reduce required video length.
@@ -1901,7 +1903,7 @@ class TestDALIIntegration:
                 if train_loader is not None:
                     try:
                         train_loader.reset()
-                    except:
+                    except Exception:
                         pass
                 del train_loader
                 del datamodule
@@ -1909,7 +1911,12 @@ class TestDALIIntegration:
                 torch.cuda.empty_cache()
                 torch.cuda.synchronize()
 
-    def test_video_datamodule_val_dataloader(self, create_test_video, create_test_labels, cleanup_gpu):
+    def test_video_datamodule_val_dataloader(
+        self,
+        create_test_video,
+        create_test_labels,
+        cleanup_gpu,
+    ):
         """Test VideoDataModule creates working validation dataloader."""
         import gc
 
@@ -1982,7 +1989,7 @@ class TestDALIIntegration:
                 if val_loader is not None:
                     try:
                         val_loader.reset()
-                    except:
+                    except Exception:
                         pass
                 del val_loader
                 del datamodule
@@ -2049,7 +2056,7 @@ class TestDALIIntegration:
                 if predict_loader is not None:
                     try:
                         predict_loader.reset()
-                    except:
+                    except Exception:
                         pass
                 del predict_loader
                 del datamodule

@@ -124,7 +124,7 @@ def pytest_runtest_setup(item):
             timeout_marker = item.get_closest_marker('timeout')
             if timeout_marker is None:
                 item.add_marker(pytest.mark.timeout(120))
-        except:
+        except Exception:
             pass  # pytest-timeout not installed
 
 
@@ -152,7 +152,7 @@ def cleanup_gpu():
         # Force CUDA context sync
         try:
             torch.cuda.current_stream().synchronize()
-        except:
+        except Exception:
             pass
 
 

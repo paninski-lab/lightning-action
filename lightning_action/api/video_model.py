@@ -306,9 +306,7 @@ class VideoModel(BaseModelAPI[VideoSegmenter]):
             raise ValueError('Model must be trained or loaded before prediction')
 
         if output_file is not None and expt_ids is not None and len(expt_ids) > 1:
-            raise RuntimeError(
-                'Can only supply `output_file` when specifying a single expt_id'
-            )
+            raise RuntimeError('Can only supply `output_file` when specifying a single expt_id')
 
         # Discover videos if not specified
         if expt_ids is None:
@@ -326,9 +324,7 @@ class VideoModel(BaseModelAPI[VideoSegmenter]):
                 missing_videos.append(str(video_path))
 
         if missing_videos:
-            raise FileNotFoundError(
-                f"Missing video files:\n" + "\n".join(missing_videos)
-            )
+            raise FileNotFoundError("Missing video files:\n" + "\n".join(missing_videos))
 
         # Set up trainer once for all predictions
         trainer = self._setup_trainer()

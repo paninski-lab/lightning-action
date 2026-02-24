@@ -320,11 +320,15 @@ class VideoSegmenter(VideoBaseModel):
             self.backbone_type = 'vitmae'
             vitmae_config = {
                 # model_name at top level of backbone config
-                'model_name': backbone_file_config.get('model_name',
-                                                       self.model_config.get('backbone_model_name', 'facebook/vit-mae-base')),
+                'model_name': backbone_file_config.get(
+                    'model_name',
+                    self.model_config.get('backbone_model_name', 'facebook/vit-mae-base'),
+                ),
                 # mask_ratio in model.model_params
-                'mask_ratio': backbone_model_params.get('mask_ratio',
-                                                        self.model_config.get('backbone_mask_ratio', 0.0)),
+                'mask_ratio': backbone_model_params.get(
+                    'mask_ratio',
+                    self.model_config.get('backbone_mask_ratio', 0.0),
+                ),
             }
             self.backbone = ViTMAEBackbone(vitmae_config)
 
@@ -335,8 +339,10 @@ class VideoSegmenter(VideoBaseModel):
             backbone_name = backbone_name.replace('-beast', '')
             resnet_config = {
                 'backbone': backbone_name,
-                'image_size': backbone_model_params.get('image_size',
-                                                        self.model_config.get('backbone_image_size', 224)),
+                'image_size': backbone_model_params.get(
+                    'image_size',
+                    self.model_config.get('backbone_image_size', 224),
+                ),
             }
             self.backbone = ResNetBeastBackbone(resnet_config)
 
@@ -345,16 +351,20 @@ class VideoSegmenter(VideoBaseModel):
             self.backbone_type = 'resnet'
             resnet_config = {
                 'backbone': backbone_name,
-                'image_size': backbone_model_params.get('image_size',
-                                                        self.model_config.get('backbone_image_size', 224)),
+                'image_size': backbone_model_params.get(
+                    'image_size',
+                    self.model_config.get('backbone_image_size', 224),
+                ),
             }
             self.backbone = ResNetBackbone(resnet_config)
 
         else:
             raise ValueError(
                 f"Unknown backbone: {backbone_name}. "
-                f"Supported: 'vitmae', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', "
-                f"'resnet18-beast', 'resnet34-beast', 'resnet50-beast', 'resnet101-beast', 'resnet152-beast'"
+                f"Supported: 'vitmae', "
+                f"'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', "
+                f"'resnet18-beast', 'resnet34-beast', 'resnet50-beast', 'resnet101-beast', "
+                f"'resnet152-beast'"
             )
 
         # Load backbone checkpoint if specified

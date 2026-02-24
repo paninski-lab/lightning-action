@@ -156,7 +156,7 @@ class VideoDataset:
             expt_ids: Optional list of experiment IDs to filter by.
 
         Raises:
-            FileNotFoundError: If require_labels=True and any video is missing 
+            FileNotFoundError: If require_labels=True and any video is missing
                 its label file.
         """
         # Find all MP4 files

@@ -22,21 +22,17 @@ from typing import Any
 import lightning.pytorch as pl
 import numpy as np
 import torch
-import yaml
 from lightning.pytorch.utilities import rank_zero_only
 from typeguard import typechecked
 
 from lightning_action import __version__
 from lightning_action.data import DataModule
 from lightning_action.data import transforms as transform_module
-from lightning_action.data.utils import (
-    collect_labels_from_datamodule,
-)
+from lightning_action.data.utils import collect_labels_from_datamodule
 from lightning_action.data.utils import compute_class_weights as _compute_class_weights
 
 # Import shared utilities
 from lightning_action.train_utils import (
-    get_callbacks,
     get_callbacks_from_config,
     pretty_print_config,
     reset_seeds,

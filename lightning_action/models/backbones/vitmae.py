@@ -64,7 +64,7 @@ class ViTMAEBackbone(nn.Module):
 
         Args:
             config: Configuration dictionary with optional keys:
-                - model_name: HuggingFace model identifier 
+                - model_name: HuggingFace model identifier
                     (default: 'facebook/vit-mae-base')
                 - mask_ratio: Masking ratio, should be 0.0 for inference
                     (default: 0.0)

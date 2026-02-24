@@ -142,7 +142,7 @@ class Model(BaseModelAPI[Segmenter]):
         predictions_dir = self.model_dir / 'predictions'
         predictions_dir.mkdir(exist_ok=True)
 
-        print(f'Running post-training inference on all training experiments...')
+        print('Running post-training inference on all training experiments...')
         print(f'Data path: {data_path}')
         print(f'Input directory: {input_dir}')
         print(f'Experiment IDs: {expt_ids if expt_ids else "all"}')

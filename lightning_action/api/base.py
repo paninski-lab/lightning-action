@@ -21,7 +21,7 @@ import contextlib
 import os
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 import lightning as pl
 import torch

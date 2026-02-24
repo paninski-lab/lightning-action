@@ -355,7 +355,8 @@ class TestSegmenter:
         assert metrics['train_loss'] == 0.0
         # Accuracy and F1 should be NaN when all ignored
         # NaN check
-        assert 'train_accuracy' not in metrics or metrics['train_accuracy'] != metrics['train_accuracy']
+        assert 'train_accuracy' not in metrics \
+               or metrics['train_accuracy'] != metrics['train_accuracy']
         assert 'train_f1' not in metrics or metrics['train_f1'] != metrics['train_f1']  # NaN check
 
     def test_compute_loss_partial_ignore_index(self, head_configs):

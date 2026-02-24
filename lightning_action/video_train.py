@@ -28,7 +28,6 @@ from typing import Any
 import lightning as pl
 import torch
 from lightning.pytorch.loggers import TensorBoardLogger
-from lightning.pytorch.utilities import rank_zero_only
 from typeguard import typechecked
 
 from lightning_action.data.video_datamodule import VideoDataModule
@@ -36,7 +35,6 @@ from lightning_action.models.video_segmenter import VideoSegmenter
 
 # Import shared utilities from train_utils
 from lightning_action.train_utils import (
-    get_callbacks,
     get_callbacks_from_config,
     reset_seeds,
     save_config,
@@ -200,7 +198,9 @@ def train_video(
         'num_sanity_val_steps': 0,
         'sync_batchnorm': training_config.get('sync_batchnorm', False),
         'accumulate_grad_batches': training_config.get('accumulate_grad_batches', 1),
-        'reload_dataloaders_every_n_epochs': training_config.get('reload_dataloaders_every_n_epochs', 0),
+        'reload_dataloaders_every_n_epochs': training_config.get(
+            'reload_dataloaders_every_n_epochs', 0,
+        ),
         'use_distributed_sampler': False,
     }
 

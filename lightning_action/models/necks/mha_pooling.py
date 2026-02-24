@@ -21,7 +21,7 @@ Example usage:
     pooled = pooling(x)  # (batch_size, 1, 768)
 """
 import math
-from typing import Optional, Tuple, Union
+from typing import Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -153,24 +153,24 @@ class MultiheadAttentionPooling(nn.Module):
 
         # Per-head residual with PROJECTED query
         # This preserves query information at each head before concatenation
-        O = Q_ + A.bmm(V_)  # (B*H, num_seeds, D/H)
+        out = Q_ + A.bmm(V_)  # (B*H, num_seeds, D/H)
 
         # Merge heads back: (B*H, num_seeds, D/H) -> (B, num_seeds, D)
-        O = torch.cat(O.split(batch_size, dim=0), dim=2)
+        out = torch.cat(out.split(batch_size, dim=0), dim=2)
 
         # Optional layer norm after attention
         if self.norm1 is not None:
-            O = self.norm1(O)
+            out = self.norm1(out)
 
         # FFN with residual
         if self.ffn is not None:
-            O = O + F.relu(self.ffn(O))
+            out = out + F.relu(self.ffn(out))
             if self.norm2 is not None:
-                O = self.norm2(O)
+                out = self.norm2(out)
 
         if return_attention:
             # Reshape attention weights: (B*H, num_seeds, seq_len) -> (B, H, num_seeds, seq_len)
             A = A.view(batch_size, self.num_heads, self.num_seeds, seq_len)
-            return O, A
+            return out, A
 
-        return O
+        return out

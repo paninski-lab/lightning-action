@@ -2,7 +2,7 @@
 
 This module contains tests for:
 - BaseModelAPI shared functionality
-- Model (CSV pipeline) specific functionality  
+- Model (CSV pipeline) specific functionality
 - VideoModel (video pipeline) specific functionality
 
 The tests verify that the refactored inheritance structure works correctly
@@ -21,7 +21,7 @@ New tests added for refactored code:
 
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
@@ -761,7 +761,7 @@ class TestModelIntegration:
             assert model2.config is not None
 
             # Models should have same structure
-            assert type(model1.model) == type(model2.model)
+            assert isinstance(model1.model, type(model2.model))
 
     def test_model_from_dir_missing_files(self):
         """Test error handling when loading from directory with missing files."""
@@ -1033,7 +1033,10 @@ class TestModelIntegration:
 
             # Verify that all expected experiments have predictions
             for expected_expt in expected_experiments:
-                assert expected_expt in found_experiments, f'Missing predictions for {expected_expt}'
+                assert (
+                    expected_expt in found_experiments,
+                    f'Missing predictions for {expected_expt}',
+                )
 
     def test_model_predict_with_data_length_padding(self, data_dir, fast_config):
         """Test prediction with various sequence lengths to verify padding behavior."""
