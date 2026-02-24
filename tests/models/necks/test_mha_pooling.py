@@ -612,7 +612,7 @@ class TestMultiheadAttentionPoolingIntegration:
     def test_typical_vit_usage(self):
         """Test with typical ViT output dimensions."""
         from lightning_action.models.necks.mha_pooling import MultiheadAttentionPooling
-        
+
         # ViT-Base: 768-dim features, 196 patches (14x14)
         pooling = MultiheadAttentionPooling(
             embed_dim=768,
@@ -632,7 +632,7 @@ class TestMultiheadAttentionPoolingIntegration:
     def test_typical_resnet_usage(self):
         """Test with typical ResNet output dimensions."""
         from lightning_action.models.necks.mha_pooling import MultiheadAttentionPooling
-        
+
         # ResNet-50: 2048-dim features, 7x7=49 spatial locations
         pooling = MultiheadAttentionPooling(
             embed_dim=2048,

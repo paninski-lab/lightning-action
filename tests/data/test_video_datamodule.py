@@ -22,7 +22,7 @@ import os
 import tempfile
 from pathlib import Path
 from typing import Optional
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import cv2
 import numpy as np
@@ -36,8 +36,8 @@ import torch
 def dali_available() -> bool:
     """Check if NVIDIA DALI is installed."""
     try:
-        from nvidia.dali.pipeline import Pipeline
         from nvidia.dali import fn, types
+        from nvidia.dali.pipeline import Pipeline
         return True
     except ImportError:
         return False
@@ -290,7 +290,7 @@ class TestGetVideoFrameCountCV2:
     def test_nonexistent_file_returns_zero(self):
         """Test that non-existent file returns 0 (not raises exception)."""
         from lightning_action.data.video_datamodule import _get_video_frame_count_cv2
-        
+
         # Should return 0, not raise an exception
         result = _get_video_frame_count_cv2("/nonexistent/path/video.mp4")
         assert result == 0
@@ -298,7 +298,7 @@ class TestGetVideoFrameCountCV2:
     def test_invalid_file_returns_zero(self):
         """Test that invalid video file returns 0."""
         from lightning_action.data.video_datamodule import _get_video_frame_count_cv2
-        
+
         # Create a non-video file with .mp4 extension
         with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as f:
             f.write(b"not a video file - just random bytes")
@@ -1653,9 +1653,10 @@ class TestDALIIntegration:
     
     def test_dali_pipeline_builds(self, create_test_video, cleanup_gpu):
         """Test that DALI pipeline builds successfully."""
-        from lightning_action.data.video_datamodule import VideoPipeline
-        import tempfile as tf
         import gc
+        import tempfile as tf
+
+        from lightning_action.data.video_datamodule import VideoPipeline
         
         with tempfile.TemporaryDirectory() as tmpdir:
             videos_dir = os.path.join(tmpdir, 'videos')
@@ -1702,12 +1703,17 @@ class TestDALIIntegration:
 
     def test_dali_iterator_with_labels(self, create_test_video, create_test_labels, cleanup_gpu):
         """Test DALIIterator with label loading."""
-        from lightning_action.data.video_datamodule import (
-            VideoPipeline, DALIIterator, load_labels_for_videos, get_video_lengths
-        )
-        from nvidia.dali.plugin.pytorch import LastBatchPolicy
-        import tempfile as tf
         import gc
+        import tempfile as tf
+
+        from nvidia.dali.plugin.pytorch import LastBatchPolicy
+
+        from lightning_action.data.video_datamodule import (
+            DALIIterator,
+            VideoPipeline,
+            get_video_lengths,
+            load_labels_for_videos,
+        )
         
         with tempfile.TemporaryDirectory() as tmpdir:
             videos_dir = os.path.join(tmpdir, 'videos')
@@ -1810,8 +1816,9 @@ class TestDALIIntegration:
         Uses minimal TCN padding configuration to reduce required video length.
         Uses batch_size=1 to avoid prefetch stalls in test environment.
         """
-        from lightning_action.data.video_datamodule import VideoDataModule
         import gc
+
+        from lightning_action.data.video_datamodule import VideoDataModule
         
         with tempfile.TemporaryDirectory() as tmpdir:
             videos_dir = os.path.join(tmpdir, 'videos')
@@ -1899,8 +1906,9 @@ class TestDALIIntegration:
 
     def test_video_datamodule_val_dataloader(self, create_test_video, create_test_labels, cleanup_gpu):
         """Test VideoDataModule creates working validation dataloader."""
-        from lightning_action.data.video_datamodule import VideoDataModule
         import gc
+
+        from lightning_action.data.video_datamodule import VideoDataModule
         
         with tempfile.TemporaryDirectory() as tmpdir:
             videos_dir = os.path.join(tmpdir, 'videos')
@@ -1979,8 +1987,9 @@ class TestDALIIntegration:
 
     def test_video_datamodule_predict_dataloader(self, create_test_video, cleanup_gpu):
         """Test VideoDataModule creates working prediction dataloader."""
-        from lightning_action.data.video_datamodule import VideoDataModule
         import gc
+
+        from lightning_action.data.video_datamodule import VideoDataModule
         
         with tempfile.TemporaryDirectory() as tmpdir:
             videos_dir = os.path.join(tmpdir, 'videos')
@@ -2106,7 +2115,7 @@ class TestVideoPipelineConfig:
         """Test last batch policy string to enum conversion."""
         try:
             from nvidia.dali.plugin.pytorch import LastBatchPolicy
-            
+
             # Test 'drop' policy
             policy_str = 'drop'
             policy = (

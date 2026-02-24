@@ -6,13 +6,12 @@ adapted from the daart package with modern type hints and Lightning compatibilit
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
 from jaxtyping import Float, Int
 from typeguard import typechecked
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 

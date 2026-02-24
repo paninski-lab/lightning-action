@@ -18,7 +18,6 @@ from typeguard import typechecked
 
 from lightning_action.data.utils import compute_sequence_pad
 
-
 logger = logging.getLogger(__name__)
 
 

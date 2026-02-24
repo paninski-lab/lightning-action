@@ -28,6 +28,7 @@ import torch
 import torch.nn as nn
 from typeguard import typechecked
 
+
 @typechecked
 def get_configs(arch: str = 'resnet50') -> tuple:
     """Get number and type of layers for resnet models.

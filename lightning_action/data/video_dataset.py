@@ -31,8 +31,8 @@ from tqdm import tqdm
 from typeguard import typechecked
 
 from lightning_action.data.utils import (
-    compute_class_weights,
     collect_labels_from_files,
+    compute_class_weights,
     compute_sequence_pad,
 )
 

@@ -19,7 +19,7 @@ Reference:
 
 import math
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 import torch
 import torch.nn as nn

@@ -13,9 +13,9 @@ from lightning_action.data import (
     split_sizes_from_probabilities,
 )
 from lightning_action.data.utils import (
-    compute_class_weights,
-    collect_labels_from_files,
     collect_labels_from_datamodule,
+    collect_labels_from_files,
+    compute_class_weights,
 )
 
 

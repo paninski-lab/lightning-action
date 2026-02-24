@@ -36,13 +36,13 @@ from lightning_action.models.video_segmenter import VideoSegmenter
 
 # Import shared utilities from train_utils
 from lightning_action.train_utils import (
-    reset_seeds,
     get_callbacks,
-    validate_config,
+    get_callbacks_from_config,
+    reset_seeds,
+    save_config,
     update_config_with_class_weights,
     update_config_with_label_names,
-    save_config,
-    get_callbacks_from_config,
+    validate_config,
 )
 
 # Re-export for backward compatibility

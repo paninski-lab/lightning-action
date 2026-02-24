@@ -30,20 +30,20 @@ from lightning_action import __version__
 from lightning_action.data import DataModule
 from lightning_action.data import transforms as transform_module
 from lightning_action.data.utils import (
-    compute_class_weights as _compute_class_weights,
     collect_labels_from_datamodule,
 )
+from lightning_action.data.utils import compute_class_weights as _compute_class_weights
 
 # Import shared utilities
 from lightning_action.train_utils import (
-    reset_seeds,
     get_callbacks,
-    validate_config,
+    get_callbacks_from_config,
+    pretty_print_config,
+    reset_seeds,
+    save_config,
     update_config_with_class_weights,
     update_config_with_label_names,
-    save_config,
-    pretty_print_config,
-    get_callbacks_from_config,
+    validate_config,
 )
 
 # Re-export for backward compatibility

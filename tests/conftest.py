@@ -1,10 +1,10 @@
+import gc
 from pathlib import Path
 from typing import Callable
 
 import numpy as np
 import pandas as pd
 import pytest
-import gc
 import torch
 
 ROOT = Path(__file__).parent.parent

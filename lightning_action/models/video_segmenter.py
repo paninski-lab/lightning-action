@@ -19,14 +19,14 @@ import torch.nn.functional as F
 from jaxtyping import Float
 from typeguard import typechecked
 
-from lightning_action.models.segmenter import BaseModel
 from lightning_action.models.backbones import (
     ResNetBackbone,
     ResNetBeastBackbone,
     ViTMAEBackbone,
 )
+from lightning_action.models.heads import RNN, DilatedTCN, TemporalMLP
 from lightning_action.models.necks.mha_pooling import MultiheadAttentionPooling
-from lightning_action.models.heads import DilatedTCN, TemporalMLP, RNN
+from lightning_action.models.segmenter import BaseModel
 
 
 class VideoBaseModel(BaseModel):

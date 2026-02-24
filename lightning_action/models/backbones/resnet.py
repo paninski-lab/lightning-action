@@ -27,13 +27,12 @@ Reference:
 """
 
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 import torch
 import torch.nn as nn
 import torchvision.models as models
 from typeguard import typechecked
-
 
 # Mapping of backbone names to output dimensions
 RESNET_HIDDEN_SIZES = {
