@@ -15,7 +15,7 @@ class TestValidFile:
         """Test valid_file with existing file."""
         with tempfile.NamedTemporaryFile(delete=False) as f:
             temp_file = Path(f.name)
-        
+
         try:
             result = valid_file(temp_file)
             assert result == temp_file
@@ -28,7 +28,7 @@ class TestValidFile:
         with tempfile.NamedTemporaryFile(delete=False) as f:
             temp_file_str = f.name
             temp_file = Path(temp_file_str)
-        
+
         try:
             result = valid_file(temp_file_str)
             assert result == temp_file
@@ -75,7 +75,7 @@ class TestValidDir:
         """Test valid_dir with file instead of directory."""
         with tempfile.NamedTemporaryFile(delete=False) as f:
             temp_file = Path(f.name)
-        
+
         try:
             with pytest.raises(IOError, match='Not a directory'):
                 valid_dir(temp_file)
@@ -90,7 +90,7 @@ class TestConfigFile:
         """Test config_file with .yaml extension."""
         with tempfile.NamedTemporaryFile(suffix='.yaml', delete=False) as f:
             temp_file = Path(f.name)
-        
+
         try:
             result = config_file(temp_file)
             assert result == temp_file
@@ -101,7 +101,7 @@ class TestConfigFile:
         """Test config_file with .yml extension."""
         with tempfile.NamedTemporaryFile(suffix='.yml', delete=False) as f:
             temp_file = Path(f.name)
-        
+
         try:
             result = config_file(temp_file)
             assert result == temp_file
@@ -112,7 +112,7 @@ class TestConfigFile:
         """Test config_file with invalid extension."""
         with tempfile.NamedTemporaryFile(suffix='.txt', delete=False) as f:
             temp_file = Path(f.name)
-        
+
         try:
             with pytest.raises(ValueError, match='Config file must be YAML'):
                 config_file(temp_file)
@@ -129,7 +129,7 @@ class TestConfigFile:
         with tempfile.NamedTemporaryFile(suffix='.yaml', delete=False) as f:
             temp_file_str = f.name
             temp_file = Path(temp_file_str)
-        
+
         try:
             result = config_file(temp_file_str)
             assert result == temp_file
@@ -153,7 +153,7 @@ class TestOutputDir:
         with tempfile.TemporaryDirectory() as temp_dir:
             new_dir = Path(temp_dir) / 'new_subdir'
             assert not new_dir.exists()
-            
+
             result = output_dir(new_dir)
             assert result == new_dir
             assert result.is_dir()
@@ -163,7 +163,7 @@ class TestOutputDir:
         with tempfile.TemporaryDirectory() as temp_dir:
             nested_dir = Path(temp_dir) / 'level1' / 'level2' / 'level3'
             assert not nested_dir.exists()
-            
+
             result = output_dir(nested_dir)
             assert result == nested_dir
             assert result.is_dir()
@@ -174,7 +174,7 @@ class TestOutputDir:
             new_dir_str = str(Path(temp_dir) / 'string_subdir')
             new_dir = Path(new_dir_str)
             assert not new_dir.exists()
-            
+
             result = output_dir(new_dir_str)
             assert result == new_dir
             assert result.is_dir()
@@ -183,7 +183,7 @@ class TestOutputDir:
         """Test output_dir behavior when path exists as file."""
         with tempfile.NamedTemporaryFile(delete=False) as f:
             temp_file = Path(f.name)
-        
+
         try:
             # This should raise an error because the path exists as a file
             with pytest.raises(FileExistsError):

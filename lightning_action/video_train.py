@@ -60,7 +60,7 @@ def train_video(
     output_dir: str | Path,
 ) -> pl.LightningModule:
     """Train a video action segmentation model.
-    
+
     This function handles the complete training pipeline for video models:
     1. Configuration validation and seed setup
     2. DALI/multiprocessing configuration
@@ -68,16 +68,16 @@ def train_video(
     4. Class weight computation
     5. Lightning Trainer configuration
     6. Model training
-    
+
     Args:
         config: Configuration dictionary containing data, training, model,
             and optimizer settings.
         model: Initialized VideoSegmenter model to train.
         output_dir: Directory for saving checkpoints, logs, and config.
-    
+
     Returns:
         Trained model.
-    
+
     Raises:
         ValueError: If required config sections are missing.
     """
@@ -92,7 +92,7 @@ def train_video(
         mp.set_start_method('spawn', force=True)
     except RuntimeError:
         pass
-    
+
     # Configure NCCL for distributed training stability
     if 'NCCL_TIMEOUT' not in os.environ:
         os.environ['NCCL_TIMEOUT'] = '1800'
@@ -128,7 +128,7 @@ def train_video(
 
     # Check if validation is enabled
     has_val_data = datamodule.validation_enabled
-    
+
     # For multi-GPU, ensure enough validation videos
     if has_val_data and num_gpus > 1:
         num_val_videos = len(datamodule.val_video_paths) if datamodule.val_video_paths else 0
@@ -155,7 +155,7 @@ def train_video(
         logger.info(f"Using class weights: {class_weights}")
     else:
         class_weights = None
-    
+
     # Update config and model with class weights (shared utility)
     update_config_with_class_weights(config, model, class_weights)
 
@@ -187,7 +187,8 @@ def train_video(
         'enable_checkpointing': training_config.get('checkpointing', True),
         # Use shared utility for callbacks
         'callbacks': get_callbacks_from_config(
-            {**training_config, 'early_stopping': training_config.get('early_stopping', False) and has_val_data},
+            {**training_config,
+                'early_stopping': training_config.get('early_stopping', False) and has_val_data},
             monitor=checkpoint_monitor,
         ),
         'logger': TensorBoardLogger(
@@ -202,7 +203,7 @@ def train_video(
         'reload_dataloaders_every_n_epochs': training_config.get('reload_dataloaders_every_n_epochs', 0),
         'use_distributed_sampler': False,
     }
-    
+
     trainer = pl.Trainer(**trainer_config)
     trainer.fit(model, datamodule)
 

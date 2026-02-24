@@ -139,19 +139,19 @@ def apply_overrides(config: dict[str, Any], args) -> dict[str, Any]:
     # Apply direct overrides
     if args.data_dir:
         config['data']['data_path'] = str(args.data_dir)
-    
+
     if args.device:
         config.setdefault('training', {})['device'] = args.device
-    
+
     if args.epochs:
         config.setdefault('training', {})['num_epochs'] = args.epochs
-    
+
     if args.batch_size:
         config.setdefault('training', {})['batch_size'] = args.batch_size
-    
+
     if args.lr:
         config.setdefault('optimizer', {})['lr'] = args.lr
-    
+
     if args.seed:
         config.setdefault('training', {})['seed'] = args.seed
 
@@ -198,19 +198,19 @@ def parse_config_value(value: str) -> Any:
         return False
     elif value.lower() == 'null' or value.lower() == 'none':
         return None
-    
+
     # Handle numbers
     if value.isdigit() or (value.startswith('-') and value[1:].isdigit()):
         return int(value)
-    
+
     try:
         return float(value)
     except ValueError:
         pass
-    
+
     # Handle lists (comma-separated)
     if ',' in value:
         return [parse_config_value(v.strip()) for v in value.split(',')]
-    
+
     # Return as string
     return value

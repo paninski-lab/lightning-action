@@ -21,15 +21,15 @@ class TestMain:
             'model': {'head': 'temporalmlp'},
             'training': {'num_epochs': 10}
         }
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
             yaml.dump(test_config_data, f)
             test_config = f.name
-        
+
         try:
             with patch('sys.argv', ['lightning-action', 'train', '--config', test_config]):
                 main()
-                
+
             mock_train_handle.assert_called_once()
         finally:
             Path(test_config).unlink()
@@ -42,11 +42,11 @@ class TestMain:
             with tempfile.TemporaryDirectory() as temp_data_dir:
                 test_model = temp_model_dir
                 test_data = temp_data_dir
-                
+
                 with patch(
                     'sys.argv',
                     ['lightning-action', 'predict', '--model', test_model, '--data', test_data]
                 ):
                     main()
-                    
+
                 mock_predict_handle.assert_called_once()

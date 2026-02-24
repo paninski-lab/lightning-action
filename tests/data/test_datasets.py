@@ -42,7 +42,7 @@ class TestFeatureDataset:
             # create test files
             marker_file = Path(tmpdir) / 'markers.csv'
             create_test_marker_csv(marker_file, n_frames=50, n_markers=2)
-            
+
             # create dataset
             dataset = FeatureDataset(
                 ids=['test_dataset'],
@@ -52,13 +52,13 @@ class TestFeatureDataset:
                 sequence_length=10,
                 sequence_pad=2,
             )
-            
+
             # check dataset properties
             assert len(dataset) > 0
             assert dataset.input_size == 4  # 2 markers * 2 coords (x,y)
             assert len(dataset.get_feature_names()) == 4
             assert len(dataset.get_label_names()) == 0
-            
+
             # check sequence
             sequence = dataset[0]
             assert 'input' in sequence
@@ -70,11 +70,11 @@ class TestFeatureDataset:
             # create test files
             marker_file = Path(tmpdir) / 'markers.csv'
             label_file = Path(tmpdir) / 'labels.csv'
-            
+
             n_frames = 50
             create_test_marker_csv(marker_file, n_frames=n_frames, n_markers=3)
             create_test_label_csv(label_file, n_frames=n_frames, n_classes=5)
-            
+
             # create dataset
             dataset = FeatureDataset(
                 ids=['test_dataset'],
@@ -83,13 +83,13 @@ class TestFeatureDataset:
                 paths=[[str(marker_file), str(label_file)]],
                 sequence_length=10,
             )
-            
+
             # check dataset properties
             assert len(dataset) > 0
             assert dataset.input_size == 6  # 3 markers * 2 coords
             assert len(dataset.get_feature_names()) == 6
             assert len(dataset.get_label_names()) == 5
-            
+
             # check sequence
             sequence = dataset[0]
             assert 'input' in sequence
@@ -103,7 +103,7 @@ class TestFeatureDataset:
             # create test files
             feature_file = Path(tmpdir) / 'features.csv'
             create_test_feature_csv(feature_file, n_frames=40, n_features=8)
-            
+
             # create dataset
             dataset = FeatureDataset(
                 ids=['test_dataset'],
@@ -112,7 +112,7 @@ class TestFeatureDataset:
                 paths=[[str(feature_file)]],
                 sequence_length=5
             )
-            
+
             # check dataset properties
             assert len(dataset) > 0
             assert dataset.input_size == 8
@@ -125,10 +125,10 @@ class TestFeatureDataset:
             # create test files for two datasets
             marker_file1 = Path(tmpdir) / 'markers1.csv'
             marker_file2 = Path(tmpdir) / 'markers2.csv'
-            
+
             create_test_marker_csv(marker_file1, n_frames=30, n_markers=2)
             create_test_marker_csv(marker_file2, n_frames=40, n_markers=2)
-            
+
             # create dataset
             dataset = FeatureDataset(
                 ids=['dataset1', 'dataset2'],
@@ -150,7 +150,7 @@ class TestFeatureDataset:
             # create test file
             marker_file = Path(tmpdir) / 'markers.csv'
             create_test_marker_csv(marker_file, n_frames=20, n_markers=1)
-            
+
             # create dataset
             dataset = FeatureDataset(
                 ids=['test_dataset'],
@@ -159,11 +159,11 @@ class TestFeatureDataset:
                 paths=[[str(marker_file)]],
                 sequence_length=5,
             )
-            
+
             # check tensor output (default)
             sequence_tensor = dataset[0]
             assert isinstance(sequence_tensor['input'], torch.Tensor)
-            
+
             # check numpy output
             sequence_numpy = dataset.__getitem__(idx=0, as_numpy=True)
             assert isinstance(sequence_numpy['input'], np.ndarray)
@@ -174,7 +174,7 @@ class TestFeatureDataset:
             # create test file
             marker_file = Path(tmpdir) / 'markers.csv'
             create_test_marker_csv(marker_file, n_frames=25, n_markers=1)
-            
+
             # create dataset
             dataset = FeatureDataset(
                 ids=['test_dataset'],
@@ -183,7 +183,7 @@ class TestFeatureDataset:
                 paths=[[str(marker_file)]],
                 sequence_length=5
             )
-            
+
             # check metadata
             info = dataset.get_sequence_info(0)
             assert 'dataset_id' in info
@@ -197,7 +197,7 @@ class TestFeatureDataset:
             # create test file
             marker_file = Path(tmpdir) / 'markers.csv'
             create_test_marker_csv(marker_file, n_frames=15, n_markers=1)
-            
+
             # create dataset
             dataset = FeatureDataset(
                 ids=['test_dataset'],
@@ -206,10 +206,10 @@ class TestFeatureDataset:
                 paths=[[str(marker_file)]],
                 sequence_length=5
             )
-            
+
             # test out of range access
             with pytest.raises(IndexError):
                 dataset[len(dataset)]
-            
+
             with pytest.raises(IndexError):
                 dataset.get_sequence_info(len(dataset))

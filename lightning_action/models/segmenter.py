@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 class BaseModel(pl.LightningModule):
     """Base Lightning model for action segmentation.
-    
+
     This class provides the Lightning infrastructure and common functionality
     for segmentation models. Inherit from this class to create specific
     segmentation architectures.
@@ -32,14 +32,14 @@ class BaseModel(pl.LightningModule):
     @typechecked
     def __init__(self, config: dict[str, Any]):
         """Initialize base model.
-        
+
         Args:
             config: configuration dictionary with model, optimizer, and training settings
         """
         super().__init__()
         self.save_hyperparameters(config)
         self.config = config
-        
+
         # extract model configuration
         self.model_config = config.get('model', {})
         self.input_size = self.model_config['input_size']
@@ -55,14 +55,14 @@ class BaseModel(pl.LightningModule):
 
         # initialize metrics
         self._setup_metrics()
-        
+
         # build model architecture (implemented by subclasses)
         self._build_model()
 
         # compute sequence padding (after _build_model to make it easier to test unsupported heads)
         self.sequence_pad = compute_sequence_pad(config['model']['head'], **config['model'])
         config['model']['sequence_pad'] = self.sequence_pad
-        
+
     def _setup_metrics(self):
         """Set up torchmetrics for evaluation."""
         num_classes = self.output_size
@@ -94,10 +94,10 @@ class BaseModel(pl.LightningModule):
         x: Float[torch.Tensor, 'batch sequence features'],
     ) -> dict[str, torch.Tensor]:
         """Forward pass through the model.
-        
+
         Args:
             x: input tensor with shape (batch, sequence, features)
-            
+
         Returns:
             dictionary with model outputs including 'logits' and 'probabilities'
         """
@@ -126,14 +126,14 @@ class BaseModel(pl.LightningModule):
         stage: str = 'train',
     ) -> tuple[torch.Tensor, dict[str, float]]:
         """Compute loss and metrics.
-        
+
         Args:
             outputs: model outputs dictionary containing 'logits' and 'probabilities'
             targets: ground truth labels, either:
                 - One-hot encoded: shape (batch, sequence, num_classes)
                 - Class indices: shape (batch, sequence)
             stage: training stage ('train', 'val', 'test')
-            
+
         Returns:
             tuple of (loss tensor, metrics dictionary)
         """
@@ -141,7 +141,7 @@ class BaseModel(pl.LightningModule):
 
         # Flatten for loss computation
         logits_flat = logits.reshape(-1, self.output_size)
-        
+
         # Handle both one-hot and class index targets
         if targets.dim() == 3 and targets.shape[-1] == self.output_size:
             # One-hot encoded: (batch, sequence, num_classes) -> class indices
@@ -164,7 +164,7 @@ class BaseModel(pl.LightningModule):
         class_weights = self.model_config.get('class_weights', None)
         if class_weights is not None:
             class_weights = torch.tensor(class_weights, device=self.device, dtype=torch.float)
-            
+
         # Compute cross entropy loss
         loss = F.cross_entropy(
             logits_flat,
@@ -192,7 +192,7 @@ class BaseModel(pl.LightningModule):
             metrics[f'{stage}_accuracy'] = accuracy.item()
         if not torch.isnan(torch.tensor(f1)):
             metrics[f'{stage}_f1'] = f1.item()
-        
+
         return loss, metrics
 
     def training_step(
@@ -201,18 +201,18 @@ class BaseModel(pl.LightningModule):
         batch_idx: int,
     ) -> torch.Tensor:
         """Training step.
-        
+
         Args:
             batch: batch dictionary with input data and targets
             batch_idx: batch index
-            
+
         Returns:
             loss tensor
         """
         # get inputs and targets
         x = batch['input']
         targets = batch['labels']
-        
+
         # forward pass
         outputs = self.forward(x)
 
@@ -222,7 +222,7 @@ class BaseModel(pl.LightningModule):
 
         # compute loss and metrics
         loss, metrics = self.compute_loss(outputs_no_pad, targets_no_pad, stage='train')
-        
+
         # log metrics (only if we have valid metrics to log)
         if metrics:  # will be empty if all metrics were NaN
             self.log_dict(
@@ -239,7 +239,7 @@ class BaseModel(pl.LightningModule):
         batch_idx: int,
     ) -> None:
         """Validation step.
-        
+
         Args:
             batch: batch dictionary with input data and targets
             batch_idx: batch index
@@ -247,7 +247,7 @@ class BaseModel(pl.LightningModule):
         # get inputs and targets
         x = batch['input']
         targets = batch['labels']
-        
+
         # forward pass
         outputs = self.forward(x)
 
@@ -274,17 +274,17 @@ class BaseModel(pl.LightningModule):
         batch_idx: int,
     ) -> dict[str, torch.Tensor]:
         """Prediction step.
-        
+
         Args:
             batch: batch dictionary with input data
             batch_idx: batch index
-            
+
         Returns:
             dictionary with predictions
         """
         # get inputs
         x = batch['input']
-        
+
         # forward pass
         outputs = self.forward(x)
 
@@ -300,11 +300,11 @@ class BaseModel(pl.LightningModule):
 
     def configure_optimizers(self) -> dict[str, Any]:
         """Configure optimizers and learning rate schedulers.
-        
+
         Supports:
         - Optimizers: Adam, AdamW, SGD
         - Schedulers: step, cosine, cosine_warm_restarts, reduce_on_plateau
-        
+
         Config structure:
             optimizer:
                 type: Adam  # or AdamW, SGD
@@ -315,20 +315,20 @@ class BaseModel(pl.LightningModule):
                     use_scheduler: true
                     type: cosine  # or step, cosine_warm_restarts, reduce_on_plateau
                     # Scheduler-specific params (T_max, step_size, etc.)
-        
+
         Returns:
             optimizer 
         """
         optimizer_config = self.config.get('optimizer', {})
-        
+
         # Optimizer settings
         optimizer_type = optimizer_config.get('type', 'Adam')
         lr = float(optimizer_config.get('lr', 1e-3))
         weight_decay = float(optimizer_config.get('wd', 0.1))
-        
+
         # Get parameters to optimize (allows subclass customization)
         params = self._get_optimizer_params()
-        
+
         # Create optimizer
         if optimizer_type.lower() == 'adam':
             optimizer = torch.optim.Adam(params, lr=lr, weight_decay=weight_decay)
@@ -341,10 +341,10 @@ class BaseModel(pl.LightningModule):
             )
         else:
             raise ValueError(f'Unsupported optimizer type: {optimizer_type}')
-        
+
         # Parse scheduler config (support both flat and nested structures)
         scheduler_config = optimizer_config.get('scheduler', None)
-        
+
         # Handle flat scheduler specification: scheduler: 'cosine'
         if isinstance(scheduler_config, str):
             scheduler_type = scheduler_config.lower()
@@ -357,7 +357,7 @@ class BaseModel(pl.LightningModule):
             return {'optimizer': optimizer}
         else:
             scheduler_type = scheduler_config.get('type', 'cosine').lower()
-        
+
         # Create scheduler
         if scheduler_type == 'step':
             scheduler = torch.optim.lr_scheduler.StepLR(
@@ -365,34 +365,34 @@ class BaseModel(pl.LightningModule):
                 step_size=scheduler_config.get('step_size', 30),
                 gamma=scheduler_config.get('gamma', 0.1),
             )
-        
+
         elif scheduler_type == 'cosine':
             T_max = scheduler_config.get('T_max', optimizer_config.get('T_max', 100))
             eta_min_factor = scheduler_config.get('eta_min_factor', 20)
             eta_min = lr / eta_min_factor if eta_min_factor else 0
-            
+
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                 optimizer, T_max=T_max, eta_min=eta_min
             )
-        
+
         elif scheduler_type in ['cosine_warm_restarts', 'cosineannealingwarmrestarts']:
             T_0 = scheduler_config.get('T_0', 34)
             T_mult = scheduler_config.get('T_mult', 2)
             eta_min_factor = scheduler_config.get('eta_min_factor', 20)
             eta_min = lr / eta_min_factor if eta_min_factor else 0
-            
+
             scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
                 optimizer, T_0=T_0, T_mult=T_mult, eta_min=eta_min
             )
-        
+
         elif scheduler_type in ['reduce_on_plateau', 'reducelronplateau']:
             factor = scheduler_config.get('factor', 0.5)
             patience = scheduler_config.get('patience', 10)
-            
+
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 optimizer, mode='min', factor=factor, patience=patience
             )
-            
+
             return {
                 'optimizer': optimizer,
                 'lr_scheduler': {
@@ -402,26 +402,26 @@ class BaseModel(pl.LightningModule):
                     'frequency': 1,
                 }
             }
-        
+
         else:
             raise ValueError(f'Unsupported scheduler type: {scheduler_type}')
-        
+
         return {
-                'optimizer': optimizer,
-                'lr_scheduler': {
-                    'scheduler': scheduler,
-                    'monitor': 'val_loss',  # Pointless for most schedulers
-                    'interval': 'epoch',
-                    'frequency': 1,
-                }
+            'optimizer': optimizer,
+            'lr_scheduler': {
+                'scheduler': scheduler,
+                'monitor': 'val_loss',  # Pointless for most schedulers
+                'interval': 'epoch',
+                'frequency': 1,
             }
+        }
 
     def _get_optimizer_params(self):
         """Get parameters to optimize.
-        
+
         Override in subclasses for custom parameter groups.
         Default returns self.parameters().
-        
+
         Returns:
             Parameters or list of parameter group dicts.
         """
@@ -430,7 +430,7 @@ class BaseModel(pl.LightningModule):
 
 class Segmenter(BaseModel):
     """Main segmentation model for action recognition.
-    
+
     This model implements supervised action segmentation using a flexible
     temporal model architecture with a classification head.
     """
@@ -439,24 +439,24 @@ class Segmenter(BaseModel):
         """Build the segmentation model architecture."""
         # build head network
         self.head = self._build_head()
-        
+
         # build classification head
         head_output_size = self._get_head_output_size()
         self.classifier = nn.Linear(head_output_size, self.output_size)
-        
+
         # initialize weights
         self._initialize_weights()
 
     def _build_head(self) -> nn.Module:
         """Build the head network.
-        
+
         Returns:
             head network module
         """
         head_type = self.model_config.get('head', 'temporalmlp')
 
         logger.info(f'Contructing Segmenter model with {head_type} head')
-        
+
         if head_type.lower() == 'temporalmlp':
             from lightning_action.models.heads import TemporalMLP
             return TemporalMLP(
@@ -495,7 +495,7 @@ class Segmenter(BaseModel):
 
     def _get_head_output_size(self) -> int:
         """Get the output size of the head network.
-        
+
         Returns:
             output feature size of the head
         """
@@ -516,10 +516,10 @@ class Segmenter(BaseModel):
         x: Float[torch.Tensor, 'batch sequence features'],
     ) -> dict[str, torch.Tensor]:
         """Forward pass through the segmentation model.
-        
+
         Args:
             x: input tensor with shape (batch, sequence, features)
-            
+
         Returns:
             dictionary with 'logits' and 'probabilities'
         """

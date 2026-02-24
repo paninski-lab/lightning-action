@@ -23,18 +23,18 @@ def compute_sequences(
     sequence_pad: int = 0,
 ) -> list:
     """Convert continuous data into fixed-length sequences.
-    
+
     Creates sliding windows over the data with the specified sequence length.
     Optionally pads sequences for models that need context (e.g., TCNs).
-    
+
     Args:
         data: input data with shape (n_frames, ...)
         sequence_length: length of each sequence
         sequence_pad: additional padding for model context
-        
+
     Returns:
         sequences with shape (n_sequences, sequence_length + sequence_pad, ...)
-        
+
     Raises:
         ValueError: if sequence parameters are invalid
     """
@@ -75,15 +75,15 @@ def compute_sequences(
 
 @typechecked
 def compute_sequence_pad(
-    model_type: str, 
+    model_type: str,
     default: Optional[int] = None,
     **model_params: Any,
 ) -> int:
     """Compute required sequence padding based on model architecture.
-    
+
     Different model types require different amounts of padding to maintain
     temporal context and handle boundary effects.
-    
+
     Args:
         model_type: type of model ('temporal-mlp', 'tcn', 'dtcn', 'dilatedtcn', 
             'lstm', 'gru', 'rnn', etc.)
@@ -92,25 +92,25 @@ def compute_sequence_pad(
         **model_params: model-specific parameters:
             - num_lags: number of temporal lags (required for mlp, tcn, dtcn)
             - num_layers: number of layers (required for tcn, dtcn)
-        
+
     Returns:
         required padding in number of timesteps
-        
+
     Raises:
         ValueError: if model_type is not recognized and default is None
-    
+
     Examples:
         # Dilated TCN with 4 layers and 2 lags
         pad = compute_sequence_pad('dtcn', num_layers=4, num_lags=2)
-        
+
         # Unknown model type with default fallback
         pad = compute_sequence_pad('transformer', default=0, num_layers=4)
     """
     model_type = model_type.lower()
-    
+
     if model_type in ['temporal-mlp', 'temporalmlp']:
         return model_params['num_lags']
-    
+
     elif model_type == 'tcn':
         num_layers = model_params['num_layers']
         num_lags = model_params['num_lags']
@@ -123,11 +123,11 @@ def compute_sequence_pad(
         return sum(
             [2 * (2 ** n) * model_params['num_lags'] for n in range(model_params['num_layers'])]
         )
-    
+
     elif model_type in ['lstm', 'gru', 'rnn']:
         # fixed warmup period for recurrent models
         return 4
-    
+
     else:
         if default is not None:
             return default
@@ -142,60 +142,60 @@ def load_marker_csv(file_path: str | Path) -> tuple[
     list[str],
 ]:
     """Load DLC-format marker data from CSV file.
-    
+
     Handles the multi-level header structure typical of DLC output files.
-    
+
     Args:
         file_path: path to CSV file with DLC marker data
-        
+
     Returns:
         tuple containing:
         - x_coords: x coordinates for each marker and frame
         - y_coords: y coordinates for each marker and frame
         - likelihoods: confidence scores for each marker and frame
         - marker_names: list of marker names
-        
+
     Raises:
         FileNotFoundError: if file does not exist
         ValueError: if file format is invalid
     """
     file_path = Path(file_path)
-    
+
     if not file_path.exists():
         raise FileNotFoundError(f'File not found: {file_path}')
-    
+
     try:
         # load with multi-level headers
         df = pd.read_csv(file_path, header=[0, 1, 2], index_col=0)
-        
+
         # extract marker names from column structure
         marker_names = df.columns.get_level_values(1).unique().tolist()
-        
+
         # extract coordinates and likelihoods
         x_coords = []
         y_coords = []
         likelihoods = []
-        
+
         for marker in marker_names:
             x_coords.append(
                 df.loc[:, (df.columns.get_level_values(1) == marker) &
                           (df.columns.get_level_values(2) == 'x')
-                ].values.flatten())
+                       ].values.flatten())
             y_coords.append(
                 df.loc[:, (df.columns.get_level_values(1) == marker) &
                           (df.columns.get_level_values(2) == 'y')
-                ].values.flatten())
+                       ].values.flatten())
             likelihoods.append(
                 df.loc[:, (df.columns.get_level_values(1) == marker) &
                           (df.columns.get_level_values(2) == 'likelihood')
-                ].values.flatten())
-        
+                       ].values.flatten())
+
         x_coords = np.column_stack(x_coords)
         y_coords = np.column_stack(y_coords)
         likelihoods = np.column_stack(likelihoods)
-        
+
         return x_coords, y_coords, likelihoods, marker_names
-        
+
     except Exception as e:
         raise ValueError(f'Error loading marker CSV file {file_path}: {e}')
 
@@ -206,31 +206,31 @@ def load_feature_csv(file_path: str | Path) -> tuple[
     list[str],
 ]:
     """Load feature data from simple CSV file.
-    
+
     Args:
         file_path: path to CSV file with feature data
-        
+
     Returns:
         tuple containing:
         - features: feature values for each frame
         - feature_names: list of feature names
-        
+
     Raises:
         FileNotFoundError: if file does not exist
         ValueError: if file format is invalid
     """
     file_path = Path(file_path)
-    
+
     if not file_path.exists():
         raise FileNotFoundError(f'File not found: {file_path}')
-    
+
     try:
         df = pd.read_csv(file_path, index_col=0)
         features = df.values.astype(np.float32)
         feature_names = df.columns.tolist()
-        
+
         return features, feature_names
-        
+
     except Exception as e:
         raise ValueError(f'Error loading feature CSV file {file_path}: {e}')
 
@@ -241,33 +241,33 @@ def load_label_csv(file_path: str | Path) -> tuple[
     list[str],
 ]:
     """Load behavioral labels from CSV file.
-    
+
     Expects one-hot encoded labels that will be converted to integer indices.
-    
+
     Args:
         file_path: path to CSV file with label data
-        
+
     Returns:
         tuple containing:
         - labels: one-hot encoded labels for each frame
         - class_names: list of behavior class names
-        
+
     Raises:
         FileNotFoundError: if file does not exist
         ValueError: if file format is invalid
     """
     file_path = Path(file_path)
-    
+
     if not file_path.exists():
         raise FileNotFoundError(f'File not found: {file_path}')
-    
+
     try:
         df = pd.read_csv(file_path, index_col=0)
         labels = df.values.astype(np.int32)
         class_names = df.columns.tolist()
-        
+
         return labels, class_names
-        
+
     except Exception as e:
         raise ValueError(f'Error loading label CSV file {file_path}: {e}')
 
@@ -305,6 +305,7 @@ def split_sizes_from_probabilities(
 
     return [train_number, val_number]
 
+
 @typechecked
 def compute_class_weights(
     labels: np.ndarray,
@@ -313,14 +314,14 @@ def compute_class_weights(
     sqrt_dampening: bool = False,
 ) -> list[float]:
     """Compute inverse frequency class weights for imbalanced datasets.
-    
+
     Computes weights inversely proportional to class frequency. The most
     frequent class gets weight close to 1.0, while less frequent classes
     get higher weights to compensate for their underrepresentation.
-    
+
     This function provides a unified implementation for class weight
     computation, usable by both the CSV pipeline and video pipeline.
-    
+
     Args:
         labels: 1D array of integer class labels. Can contain ignore_index
             values which will be excluded from counting.
@@ -331,65 +332,65 @@ def compute_class_weights(
         sqrt_dampening: If True, apply square root dampening to weights
             to avoid over-weighting very rare classes. Formula becomes
             sqrt(max_count / count) instead of max_count / count.
-    
+
     Returns:
         List of class weights, one per class. Classes with zero samples
         get weight 0.0.
-    
+
     Example:
         # From label files (video pipeline)
         all_labels = np.concatenate([np.load(f) for f in label_files])
         weights = compute_class_weights(all_labels, num_classes=3, sqrt_dampening=True)
-        
+
         # From datamodule (CSV pipeline)
         all_labels = np.concatenate([batch['labels'].flatten() for batch in dataset])
         weights = compute_class_weights(all_labels, num_classes=4)
     """
     # Flatten in case input is not 1D
     labels = labels.flatten()
-    
+
     # Filter out ignored labels
     valid_labels = labels[labels != ignore_index]
-    
+
     if len(valid_labels) == 0:
         logger.warning("No valid labels found, returning uniform weights")
         if num_classes is None:
             num_classes = 1
         return [1.0] * num_classes
-    
+
     # Count occurrences of each class
     unique_classes, counts = np.unique(valid_labels, return_counts=True)
-    
+
     # Determine number of classes
     if num_classes is None:
         num_classes = int(max(unique_classes)) + 1
-    
+
     # Build counts array for all classes
     totals = np.zeros(num_classes, dtype=np.float64)
     for cls, count in zip(unique_classes, counts):
         cls_int = int(cls)
         if 0 <= cls_int < num_classes:
             totals[cls_int] = count
-    
+
     # Handle edge case of all zeros
     max_count = np.max(totals)
     if max_count == 0:
         logger.warning("No labeled examples found, returning uniform weights")
         return [1.0] * num_classes
-    
+
     # Compute inverse frequency weights
     weights = max_count / (totals + 1e-10)
-    
+
     # Apply optional sqrt dampening
     if sqrt_dampening:
         weights = np.sqrt(weights)
-    
+
     # Zero weight for classes with no samples
     weights[totals == 0] = 0.0
-    
+
     logger.info(f"Class counts: {totals.astype(int).tolist()}")
     logger.info(f"Class weights: {[f'{w:.3f}' for w in weights]}")
-    
+
     return weights.tolist()
 
 
@@ -400,86 +401,86 @@ def collect_labels_from_files(
     show_progress: bool = True,
 ) -> tuple[np.ndarray, int]:
     """Collect and concatenate labels from multiple .npy files.
-    
+
     Helper function that loads labels from numpy files and returns
     a flattened array suitable for compute_class_weights().
-    
+
     Handles both:
     - 1D arrays of class indices, shape (num_frames,)
     - 2D one-hot arrays, shape (num_frames, num_classes)
-    
+
     Args:
         label_paths: List of paths to .npy label files.
         ignore_index: Value to use for ignored/padding frames.
         show_progress: Whether to show a progress bar.
-    
+
     Returns:
         Tuple of:
         - Flattened 1D array of all labels
         - Number of classes (inferred from labels)
-    
+
     Example:
         labels, num_classes = collect_labels_from_files(dataset.label_paths)
         weights = compute_class_weights(labels, num_classes, sqrt_dampening=True)
     """
     from tqdm import tqdm
-    
+
     all_labels = []
     num_classes = 0
-    
+
     iterator = tqdm(label_paths, desc="Collecting labels") if show_progress else label_paths
-    
+
     for label_path in iterator:
         labels = np.load(label_path)
-        
+
         # Handle one-hot encoded labels
         if labels.ndim > 1 and labels.shape[1] > 1:
             num_classes = max(num_classes, labels.shape[1])
             labels = np.argmax(labels, axis=1)
         elif labels.ndim > 1:
             labels = labels.squeeze()
-        
+
         # Update num_classes from max label value
         valid = labels[labels != ignore_index]
         if len(valid) > 0:
             num_classes = max(num_classes, int(np.max(valid)) + 1)
-        
+
         all_labels.append(labels.flatten())
-    
+
     if not all_labels:
         return np.array([], dtype=np.int64), num_classes
-    
+
     return np.concatenate(all_labels), num_classes
 
 
-@typechecked  
+@typechecked
 def collect_labels_from_datamodule(
     dataset,
     ignore_index: int = -100,
     show_progress: bool = True,
 ) -> tuple[np.ndarray, int]:
     """Collect and concatenate labels from a PyTorch dataset.
-    
+
     Helper function that iterates over a dataset and extracts labels,
     returning a flattened array suitable for compute_class_weights().
-    
+
     Expects dataset items to be dicts with a 'labels' key.
-    
+
     Handles both:
     - 1D arrays of class indices
     - 2D one-hot arrays
-    
+
     Args:
         dataset: PyTorch dataset where __getitem__ returns a dict
             with 'labels' key.
         ignore_index: Value used for ignored/padding frames.
         show_progress: Whether to show a progress bar.
-    
+
     Returns:
         Tuple of:
         - Flattened 1D array of all labels
         - Number of classes (inferred from labels)
-    
+
     Example:
         datamodule.setup('fit')
         labels, num_classes = collect_labels_from_datamodule(datamodule.dataset_train)
@@ -487,41 +488,41 @@ def collect_labels_from_datamodule(
     """
     import torch
     from tqdm import tqdm
-    
+
     all_labels = []
     num_classes = 0
-    
+
     indices = range(len(dataset))
     iterator = tqdm(indices, desc="Collecting labels") if show_progress else indices
-    
+
     for i in iterator:
         batch = dataset[i]
-        
+
         if 'labels' not in batch:
             continue
-        
+
         labels = batch['labels']
-        
+
         if isinstance(labels, torch.Tensor):
             labels = labels.numpy()
-        
+
         # Handle one-hot encoded labels
         if labels.ndim > 1 and labels.shape[-1] > 1:
             num_classes = max(num_classes, labels.shape[-1])
             labels = np.argmax(labels, axis=-1)
-        
+
         # Update num_classes from max label value
         valid = labels.flatten()
         valid = valid[valid != ignore_index]
         if len(valid) > 0:
             num_classes = max(num_classes, int(np.max(valid)) + 1)
-        
+
         all_labels.append(labels.flatten())
-    
+
     if not all_labels:
         # Try to get num_classes from dataset
         if hasattr(dataset, 'label_names'):
             num_classes = len(dataset.label_names)
         return np.array([], dtype=np.int64), num_classes
-    
+
     return np.concatenate(all_labels), num_classes

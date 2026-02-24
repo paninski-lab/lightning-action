@@ -83,6 +83,7 @@ def data_dir() -> Path:
 def config_path() -> Path:
     return ROOT.joinpath('data', 'fly.yaml')
 
+
 def pytest_configure(config):
     """Register custom markers."""
     config.addinivalue_line(
@@ -105,7 +106,7 @@ def pytest_collection_modifyitems(config, items):
         # Check if test has @requires_gpu decorator or is in GPU test class
         if 'TestDALIIntegration' in item.nodeid:
             item.add_marker(pytest.mark.gpu)
-        
+
         # Skip GPU tests if no GPU available
         if item.get_closest_marker('gpu'):
             if not torch.cuda.is_available():
@@ -130,7 +131,7 @@ def pytest_runtest_setup(item):
 @pytest.fixture
 def cleanup_gpu():
     """Fixture to clean up GPU resources before and after each test.
-    
+
     This is critical for DALI tests to prevent resource leaks and stalls.
     DALI maintains internal state that can cause deadlocks if not properly
     released between tests.
@@ -140,9 +141,9 @@ def cleanup_gpu():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
-    
+
     yield
-    
+
     # Cleanup after test - more aggressive
     gc.collect()
     if torch.cuda.is_available():
@@ -158,7 +159,7 @@ def cleanup_gpu():
 @pytest.fixture(scope="class")
 def cleanup_gpu_class():
     """Class-scoped GPU cleanup fixture.
-    
+
     Use this for test classes where you want cleanup before/after
     the entire class runs, not between individual tests.
     """
@@ -166,9 +167,9 @@ def cleanup_gpu_class():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
-    
+
     yield
-    
+
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()

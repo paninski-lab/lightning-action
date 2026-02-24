@@ -27,10 +27,10 @@ class TestDataModule:
             # create test files
             marker_file = Path(tmpdir) / 'markers.csv'
             label_file = Path(tmpdir) / 'labels.csv'
-            
+
             create_test_marker_csv(marker_file, n_frames=50, n_markers=2)
             create_test_label_csv(label_file, n_frames=50, n_classes=3)
-            
+
             # create data config
             data_config = {
                 'ids': ['test_dataset'],
@@ -38,7 +38,7 @@ class TestDataModule:
                 'transforms': [[None, None]],
                 'paths': [[str(marker_file), str(label_file)]],
             }
-            
+
             # create datamodule
             datamodule = DataModule(
                 data_config=data_config,
@@ -47,11 +47,11 @@ class TestDataModule:
                 train_probability=0.8,
                 val_probability=0.2,
             )
-            
+
             # check that dataset was created
             assert datamodule.dataset is not None
             assert len(datamodule.dataset) > 0
-            
+
             # check that splits were created
             assert datamodule.dataset_train is not None
             assert datamodule.dataset_val is not None
@@ -62,7 +62,7 @@ class TestDataModule:
             # create test files
             marker_file = Path(tmpdir) / 'markers.csv'
             create_test_marker_csv(marker_file, n_frames=40, n_markers=1)
-            
+
             # create data config
             data_config = {
                 'ids': ['test_dataset'],
@@ -70,7 +70,7 @@ class TestDataModule:
                 'transforms': [[None]],
                 'paths': [[str(marker_file)]],
             }
-            
+
             # create datamodule
             datamodule = DataModule(
                 data_config=data_config,
@@ -79,15 +79,15 @@ class TestDataModule:
                 num_workers=0,  # avoid multiprocessing in tests
                 persistent_workers=False,
             )
-            
+
             # get train dataloader
             train_loader = datamodule.train_dataloader()
-            
+
             # check dataloader properties
             assert isinstance(train_loader, DataLoader)
             assert train_loader.batch_size == 2
             assert train_loader.dataset == datamodule.dataset_train
-            
+
             # check that we can iterate through batches
             batch = next(iter(train_loader))
             assert 'input' in batch
@@ -100,7 +100,7 @@ class TestDataModule:
             # create test files
             feature_file = Path(tmpdir) / 'features.csv'
             create_test_feature_csv(feature_file, n_frames=100, n_features=4)
-            
+
             # create data config
             data_config = {
                 'ids': ['test_dataset'],
@@ -108,7 +108,7 @@ class TestDataModule:
                 'transforms': [[None]],
                 'paths': [[str(feature_file)]],
             }
-            
+
             # create datamodule
             datamodule = DataModule(
                 data_config=data_config,
@@ -117,15 +117,15 @@ class TestDataModule:
                 num_workers=0,  # avoid multiprocessing in tests
                 persistent_workers=False,
             )
-            
+
             # get val dataloader
             val_loader = datamodule.val_dataloader()
-            
+
             # check dataloader properties
             assert isinstance(val_loader, DataLoader)
             assert val_loader.batch_size == 3
             assert val_loader.dataset == datamodule.dataset_val
-            
+
             # check that we can iterate through batches
             batch = next(iter(val_loader))
             assert 'input' in batch
@@ -138,10 +138,10 @@ class TestDataModule:
             # create test files for two datasets
             marker_file1 = Path(tmpdir) / 'markers1.csv'
             marker_file2 = Path(tmpdir) / 'markers2.csv'
-            
+
             create_test_marker_csv(marker_file1, n_frames=50, n_markers=2)
             create_test_marker_csv(marker_file2, n_frames=50, n_markers=2)
-            
+
             # create data config
             data_config = {
                 'ids': ['dataset1', 'dataset2'],
@@ -149,7 +149,7 @@ class TestDataModule:
                 'transforms': [[None], [None]],
                 'paths': [[str(marker_file1)], [str(marker_file2)]],
             }
-            
+
             # create datamodule
             datamodule = DataModule(
                 data_config=data_config,
@@ -158,16 +158,16 @@ class TestDataModule:
                 num_workers=0,
                 persistent_workers=False,
             )
-            
+
             # check that both datasets are represented
             dataset_ids = datamodule.get_dataset_ids()
             assert 'dataset1' in dataset_ids
             assert 'dataset2' in dataset_ids
-            
+
             # check dataloaders work
             train_loader = datamodule.train_dataloader()
             val_loader = datamodule.val_dataloader()
-            
+
             assert len(train_loader) > 0
             assert len(val_loader) > 0
 
@@ -177,7 +177,7 @@ class TestDataModule:
             # create test file
             marker_file = Path(tmpdir) / 'markers.csv'
             create_test_marker_csv(marker_file, n_frames=50, n_markers=1)
-            
+
             # create data config
             data_config = {
                 'ids': ['test_dataset'],
@@ -185,7 +185,7 @@ class TestDataModule:
                 'transforms': [[None]],
                 'paths': [[str(marker_file)]],
             }
-            
+
             # create datamodule with specific split
             datamodule = DataModule(
                 data_config=data_config,
@@ -193,16 +193,16 @@ class TestDataModule:
                 train_probability=0.7,
                 val_probability=0.3,
             )
-            
+
             # check split sizes
             total_size = len(datamodule.dataset)
             train_size = len(datamodule.dataset_train)
             val_size = len(datamodule.dataset_val)
-            
+
             assert train_size + val_size == total_size
             assert train_size > 0
             assert val_size > 0
-            
+
             # check approximate proportions (allowing for rounding)
             train_ratio = train_size / total_size
             assert 0.6 <= train_ratio <= 0.8  # should be around 0.7
@@ -213,7 +213,7 @@ class TestDataModule:
             # create test file
             marker_file = Path(tmpdir) / 'markers.csv'
             create_test_marker_csv(marker_file, n_frames=20, n_markers=1)
-            
+
             # create data config
             data_config = {
                 'ids': ['test_dataset'],
@@ -221,16 +221,16 @@ class TestDataModule:
                 'transforms': [[None]],
                 'paths': [[str(marker_file)]],
             }
-            
+
             # create datamodule
             datamodule = DataModule(
                 data_config=data_config,
                 sequence_length=5,
             )
-            
+
             # call setup with test stage (should do nothing)
             datamodule.setup(stage='test')
-            
+
             # should still have train/val datasets from initialization
             assert datamodule.dataset_train is not None
             assert datamodule.dataset_val is not None
@@ -241,7 +241,7 @@ class TestDataModule:
             # create test file
             marker_file = Path(tmpdir) / 'markers.csv'
             create_test_marker_csv(marker_file, n_frames=30, n_markers=1)
-            
+
             # create data config
             data_config = {
                 'ids': ['test_dataset'],
@@ -249,7 +249,7 @@ class TestDataModule:
                 'transforms': [[None]],
                 'paths': [[str(marker_file)]],
             }
-            
+
             # create datamodule with specific parameters
             datamodule = DataModule(
                 data_config=data_config,
@@ -259,14 +259,14 @@ class TestDataModule:
                 pin_memory=False,
                 persistent_workers=False,
             )
-            
+
             # check train dataloader configuration
             train_loader = datamodule.train_dataloader()
             assert train_loader.batch_size == 4
             assert train_loader.num_workers == 0
             assert train_loader.pin_memory is False
             assert train_loader.persistent_workers is False
-            
+
             # check val dataloader configuration
             val_loader = datamodule.val_dataloader()
             assert val_loader.batch_size == 4

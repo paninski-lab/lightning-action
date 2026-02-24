@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class DataModule(pl.LightningDataModule):
     """Lightning DataModule for action segmentation tasks.
-    
+
     This DataModule handles loading, splitting, and serving behavioral data
     for training action segmentation models. It wraps the FeatureDataset
     and provides train/validation DataLoaders.
@@ -41,7 +41,7 @@ class DataModule(pl.LightningDataModule):
         seed: int = 42,
     ):
         """Initialize DataModule.
-        
+
         Args:
             data_config: configuration dictionary with keys:
                 - 'ids': list of dataset identifiers
@@ -57,17 +57,17 @@ class DataModule(pl.LightningDataModule):
             pin_memory: whether to use pinned memory for faster GPU transfer
             persistent_workers: whether to keep workers alive between epochs
             seed: random seed for weight initialization
-            
+
         Raises:
             ValueError: if data_config is missing required keys
         """
         super().__init__()
-        
+
         # validate data config
         required_keys = ['ids', 'signals', 'transforms', 'paths']
         if not all(key in data_config for key in required_keys):
             raise ValueError(f'data_config must contain keys: {required_keys}')
-        
+
         # store configuration
         self.data_config = data_config
         self.sequence_length = sequence_length
@@ -103,14 +103,14 @@ class DataModule(pl.LightningDataModule):
 
     def setup(self, stage: str | None = None):
         """Set up datasets for training and validation.
-        
+
         Args:
             stage: training stage ('fit', 'validate', 'test', or None)
         """
         if stage in ['test', 'predict']:
             # no test data support as requested
             return
-        
+
         # split into train/val if not already split
         if self.dataset_train is None or self.dataset_val is None:
             total_size = len(self.dataset)
@@ -119,7 +119,7 @@ class DataModule(pl.LightningDataModule):
                 self.train_probability,
                 self.val_probability,
             )
-            
+
             logger.info(f'Splitting dataset: {train_size} train, {val_size} val sequences')
             np.random.seed(self.seed)
             self.dataset_train, self.dataset_val = random_split(
@@ -129,7 +129,7 @@ class DataModule(pl.LightningDataModule):
 
     def train_dataloader(self) -> DataLoader:
         """Create training DataLoader.
-        
+
         Returns:
             DataLoader for training data
         """
@@ -144,7 +144,7 @@ class DataModule(pl.LightningDataModule):
 
     def val_dataloader(self) -> DataLoader:
         """Create validation DataLoader.
-        
+
         Returns:
             DataLoader for validation data
         """
@@ -172,10 +172,10 @@ class DataModule(pl.LightningDataModule):
 
     def get_feature_names(self) -> list[str]:
         """Get feature names from the dataset.
-        
+
         Returns:
             list of feature names
-            
+
         Raises:
             RuntimeError: if dataset has not been set up yet
         """
@@ -183,10 +183,10 @@ class DataModule(pl.LightningDataModule):
 
     def get_label_names(self) -> list[str]:
         """Get label names from the dataset.
-        
+
         Returns:
             list of label names
-            
+
         Raises:
             RuntimeError: if dataset has not been set up yet
         """
@@ -194,10 +194,10 @@ class DataModule(pl.LightningDataModule):
 
     def get_dataset_ids(self) -> list[str]:
         """Get dataset IDs from the dataset.
-        
+
         Returns:
             list of dataset identifiers
-            
+
         Raises:
             RuntimeError: if dataset has not been set up yet
         """
@@ -206,10 +206,10 @@ class DataModule(pl.LightningDataModule):
     @property
     def input_size(self) -> int:
         """Get input size from the dataset.
-        
+
         Returns:
             dimensionality of input features
-            
+
         Raises:
             RuntimeError: if dataset has not been set up yet
         """
@@ -218,10 +218,10 @@ class DataModule(pl.LightningDataModule):
     @property
     def num_classes(self) -> int:
         """Get number of classes from the dataset.
-        
+
         Returns:
             number of label classes
-            
+
         Raises:
             RuntimeError: if dataset has not been set up yet
         """

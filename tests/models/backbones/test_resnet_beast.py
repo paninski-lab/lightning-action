@@ -159,4 +159,3 @@ class TestResNetBeastComponents:
         output = block(x)
 
         assert output.shape == (1, 256, 28, 28)
-

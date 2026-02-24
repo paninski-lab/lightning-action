@@ -13,7 +13,7 @@ from typeguard import typechecked
 
 class RNN(nn.Module):
     """RNN head for temporal sequence modeling.
-    
+
     Encoder-only implementation supporting LSTM and GRU architectures with
     optional bidirectional processing.
     """
@@ -30,7 +30,7 @@ class RNN(nn.Module):
         seed: int = 42,
     ):
         """Initialize RNN head.
-        
+
         Args:
             input_size: number of input features
             num_hid_units: number of hidden units per RNN layer
@@ -39,12 +39,12 @@ class RNN(nn.Module):
             bidirectional: True for bidirectional RNN
             dropout_rate: dropout probability (applied between RNN layers)
             seed: random seed for weight initialization
-            
+
         Raises:
             ValueError: if rnn_type is not 'lstm' or 'gru'
         """
         super().__init__()
-        
+
         self.input_size = input_size
         self.num_hid_units = num_hid_units
         self.num_layers = num_layers
@@ -52,14 +52,14 @@ class RNN(nn.Module):
         self.bidirectional = bidirectional
         self.dropout_rate = dropout_rate
         self.seed = seed
-        
+
         # validate rnn type
         if self.rnn_type not in ['lstm', 'gru']:
             raise ValueError(f'Invalid rnn_type "{rnn_type}"; must be "lstm" or "gru"')
-        
+
         # set random seed
         torch.manual_seed(seed)
-        
+
         # build model
         self._build_model()
 
@@ -84,7 +84,7 @@ class RNN(nn.Module):
                 bidirectional=self.bidirectional,
                 dropout=self.dropout_rate if self.num_layers > 1 else 0.0,
             )
-        
+
         # output projection layer
         # bidirectional doubles the hidden size
         rnn_output_size = self.num_hid_units * (2 if self.bidirectional else 1)
@@ -96,10 +96,10 @@ class RNN(nn.Module):
         x: Float[torch.Tensor, 'batch sequence features']
     ) -> Float[torch.Tensor, 'batch sequence n_hid_units']:
         """Forward pass through RNN head.
-        
+
         Args:
             x: input tensor of shape (batch_size, sequence_length, input_size)
-            
+
         Returns:
             output tensor of shape (batch_size, sequence_length, num_hid_units)
         """
@@ -107,11 +107,11 @@ class RNN(nn.Module):
         # rnn_output: (batch, sequence, hidden_size * num_directions)
         # hidden states are not returned as we only need the outputs
         rnn_output, _ = self.rnn(x)
-        
+
         # project to desired output size
         # output: (batch, sequence, num_hid_units)
         output = self.output_projection(rnn_output)
-        
+
         return output
 
     def __repr__(self) -> str:
