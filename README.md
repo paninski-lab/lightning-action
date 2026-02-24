@@ -18,7 +18,7 @@ A modern action segmentation framework built with PyTorch Lightning for behavior
 ### Prerequisites
 
 - Python 3.10+ 
-- PyTorch with CUDA support (optional, for GPU training)
+- PyTorch with CUDA support (for GPU training; optional for keypoint models, required for video models)
 
 ### Install from Source
 

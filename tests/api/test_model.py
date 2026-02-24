@@ -1033,10 +1033,7 @@ class TestModelIntegration:
 
             # Verify that all expected experiments have predictions
             for expected_expt in expected_experiments:
-                assert (
-                    expected_expt in found_experiments,
-                    f'Missing predictions for {expected_expt}',
-                )
+                assert expected_expt in found_experiments, f'Missing preds for {expected_expt}'
 
     def test_model_predict_with_data_length_padding(self, data_dir, fast_config):
         """Test prediction with various sequence lengths to verify padding behavior."""

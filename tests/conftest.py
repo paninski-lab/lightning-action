@@ -110,9 +110,7 @@ def pytest_collection_modifyitems(config, items):
         # Skip GPU tests if no GPU available
         if item.get_closest_marker('gpu'):
             if not torch.cuda.is_available():
-                item.add_marker(pytest.mark.skip(
-                    reason="GPU not available"
-                ))
+                item.add_marker(pytest.mark.skip(reason="GPU not available"))
 
 
 def pytest_runtest_setup(item):

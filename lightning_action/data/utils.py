@@ -10,7 +10,7 @@ from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
-from jaxtyping import Float
+from jaxtyping import Float, Int
 from typeguard import typechecked
 
 logger = logging.getLogger(__name__)

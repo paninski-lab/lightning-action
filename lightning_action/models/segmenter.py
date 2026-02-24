@@ -12,7 +12,7 @@ import lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from jaxtyping import Float, Int
+from jaxtyping import Float
 from torchmetrics import Accuracy, F1Score
 from typeguard import typechecked
 
