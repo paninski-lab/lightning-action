@@ -38,14 +38,15 @@ class TestResNetBackbone:
         with pytest.raises(ValueError, match="Unsupported backbone"):
             ResNetBackbone({'backbone': 'resnet999'})
 
-    def test_properties(self, default_config):
-        """Test backbone properties."""
-        backbone = ResNetBackbone(default_config)
-        assert backbone.hidden_size == 512
+    @pytest.mark.parametrize("backbone_name,expected_hidden_size", RESNET_HIDDEN_SIZES.items())
+    def test_properties(self, backbone_name, expected_hidden_size):
+        """Test backbone properties for all variants."""
+        backbone = ResNetBackbone({'backbone': backbone_name})
+        assert backbone.hidden_size == expected_hidden_size
         assert backbone.num_channels == 3
         assert backbone.image_size == 224
         assert backbone.patch_size == 32
-        assert backbone.backbone_name == 'resnet18'
+        assert backbone.backbone_name == backbone_name
         assert backbone.backbone_type == 'resnet'
 
     def test_hidden_size_mapping(self):
@@ -60,13 +61,14 @@ class TestResNetBackbone:
             backbone = ResNetBackbone({'backbone': name})
             assert backbone.hidden_size == 2048
 
-    def test_forward_pass_shape(self, default_config):
-        """Test forward pass produces correct output shape."""
-        backbone = ResNetBackbone(default_config)
+    @pytest.mark.parametrize("backbone_name,expected_hidden_size", RESNET_HIDDEN_SIZES.items())
+    def test_forward_pass_shape(self, backbone_name, expected_hidden_size):
+        """Test forward pass produces correct output shape for all variants."""
+        backbone = ResNetBackbone({'backbone': backbone_name})
         x = torch.randn(2, 3, 224, 224)
         output = backbone(x)
 
-        assert output.shape == (2, 512, 7, 7)
+        assert output.shape == (2, expected_hidden_size, 7, 7)
         assert torch.isfinite(output).all()
 
     def test_forward_channel_validation(self, default_config):
@@ -77,18 +79,10 @@ class TestResNetBackbone:
         with pytest.raises(ValueError, match="Input has 1 channels"):
             backbone(x)
 
-    def test_forward_resnet50(self):
-        """Test forward pass with resnet50 (bottleneck variant)."""
-        backbone = ResNetBackbone({'backbone': 'resnet50'})
-        x = torch.randn(2, 3, 224, 224)
-        output = backbone(x)
-
-        assert output.shape == (2, 2048, 7, 7)
-        assert torch.isfinite(output).all()
-
-    def test_gradient_flow(self, default_config):
-        """Test that gradients flow through the model."""
-        backbone = ResNetBackbone(default_config)
+    @pytest.mark.parametrize("backbone_name", RESNET_HIDDEN_SIZES.keys())
+    def test_gradient_flow(self, backbone_name):
+        """Test that gradients flow through all variants."""
+        backbone = ResNetBackbone({'backbone': backbone_name})
         x = torch.randn(1, 3, 224, 224, requires_grad=True)
         output = backbone(x)
 
