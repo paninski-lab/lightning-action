@@ -30,10 +30,13 @@ dependencies = [
     "jaxtyping",
     "lightning",
     "numpy (>=2.0.0)",
+    "nvidia-dali-cuda110",
+    "opencv-python-headless",
     "scikit-learn",
     "tensorboard",
     "torch",
     "torchvision",
+    "transformers",
     "typeguard (<3.0.0)",
     "pandas",
     "pyyaml",
@@ -52,11 +55,6 @@ python = ">=3.10,<3.13"
 litaction = "lightning_action.cli.main:main"
 
 [project.optional-dependencies]
-video = [
-    "nvidia-dali-cuda110",
-    "opencv-python-headless",
-    "transformers",
-]
 dev = [
     "autopep8",
     "flake8-pyproject",
