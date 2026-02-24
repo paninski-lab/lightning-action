@@ -33,6 +33,7 @@ dependencies = [
     "scikit-learn",
     "tensorboard",
     "torch",
+    "torchvision",
     "typeguard (<3.0.0)",
     "pandas",
     "pyyaml",
@@ -54,7 +55,6 @@ litaction = "lightning_action.cli.main:main"
 video = [
     "nvidia-dali-cuda110",
     "opencv-python-headless",
-    "torchvision",
     "transformers",
 ]
 dev = [
