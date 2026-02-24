@@ -1,4 +1,4 @@
-"""Temporal Convolution Network (TCN) backbone for action segmentation.
+"""Temporal Convolution Network (TCN) head for action segmentation.
 
 This module implements a temporal convolutional network with dilated convolutions and
 residual connections for temporal modeling.
@@ -11,7 +11,7 @@ from typeguard import typechecked
 
 
 class DilatedTCN(nn.Module):
-    """Dilated Temporal Convolutional Network backbone.
+    """Dilated Temporal Convolutional Network head.
     
     Encoder-only implementation of a dilated TCN with residual connections.
     """
@@ -27,7 +27,7 @@ class DilatedTCN(nn.Module):
         dropout_rate: float = 0.2,
         seed: int = 42,
     ):
-        """Initialize DilatedTCN backbone.
+        """Initialize DilatedTCN head.
         
         Args:
             input_size: number of input features
@@ -96,7 +96,7 @@ class DilatedTCN(nn.Module):
         self,
         x: Float[torch.Tensor, 'batch sequence features']
     ) -> Float[torch.Tensor, 'batch sequence n_hid_units']:
-        """Forward pass through TCN backbone.
+        """Forward pass through TCN head.
         
         Args:
             x: input tensor of shape (batch_size, sequence_length, input_size)

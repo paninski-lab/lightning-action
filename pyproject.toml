@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "lightning-action"
-version = "0.2.4"
+version = "1.0.0"
 description = "Action segmentation framework built with PyTorch Lightning"
 license = "MIT"
 readme = "README.md"
@@ -57,11 +57,8 @@ dev = [
     "pytest",
     "pytest-html",
     "requests",
-    "sphinx",
-    "sphinx_rtd_theme",
-    "sphinx-rtd-dark-mode",
-    "sphinx-automodapi",
-    "sphinx-copybutton",
+    "torchvision",
+    "transformers",
 ]
 
 [tool.isort]

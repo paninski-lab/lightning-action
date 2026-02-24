@@ -1,13 +1,13 @@
-"""Tests for TemporalMLP backbone."""
+"""Tests for TemporalMLP head."""
 
 import pytest
 import torch
 
-from lightning_action.models import TemporalMLP
+from lightning_action.models.heads import TemporalMLP
 
 
 class TestTemporalMLP:
-    """Test the TemporalMLP backbone class."""
+    """Test the TemporalMLP head class."""
 
     def test_basic_initialization(self):
         """Test basic model initialization."""

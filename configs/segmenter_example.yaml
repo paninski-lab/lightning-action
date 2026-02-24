@@ -25,8 +25,8 @@ model:
   input_size: 10
   output_size: 4
 
-  # Backbone architecture [temporalmlp | lstm | gru | dtcn]
-  backbone: temporalmlp
+  # Head architecture [temporalmlp | lstm | gru | dtcn]
+  head: temporalmlp
   
   # Backbone parameters
   num_hid_units: 64

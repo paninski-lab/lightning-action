@@ -1,11 +1,11 @@
 """Backbone architectures for action segmentation models."""
 
-from .rnn import RNN
-from .tcn import DilatedTCN
-from .temporalmlp import TemporalMLP
+from lightning_action.models.backbones.resnet import ResNetBackbone
+from lightning_action.models.backbones.resnet_beast import ResNetBeastBackbone
+from lightning_action.models.backbones.vitmae import ViTMAEBackbone
 
 __all__ = [
-    'DilatedTCN',
-    'RNN',
-    'TemporalMLP',
+    'ResNetBackbone',
+    'ResNetBeastBackbone',
+    'ViTMAEBackbone',
 ]
