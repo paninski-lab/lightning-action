@@ -13,38 +13,24 @@ from lightning_action.models.backbones.resnet_beast import (
 )
 
 
+EXPECTED_CONFIGS = {
+    'resnet18': ([2, 2, 2, 2], False),
+    'resnet34': ([3, 4, 6, 3], False),
+    'resnet50': ([3, 4, 6, 3], True),
+    'resnet101': ([3, 4, 23, 3], True),
+    'resnet152': ([3, 8, 36, 3], True),
+}
+
+
 class TestGetConfigs:
     """Test the get_configs function."""
 
-    def test_resnet18(self):
-        """Test resnet18 config."""
-        layers, bottleneck = get_configs('resnet18')
-        assert layers == [2, 2, 2, 2]
-        assert bottleneck is False
-
-    def test_resnet34(self):
-        """Test resnet34 config."""
-        layers, bottleneck = get_configs('resnet34')
-        assert layers == [3, 4, 6, 3]
-        assert bottleneck is False
-
-    def test_resnet50(self):
-        """Test resnet50 config."""
-        layers, bottleneck = get_configs('resnet50')
-        assert layers == [3, 4, 6, 3]
-        assert bottleneck is True
-
-    def test_resnet101(self):
-        """Test resnet101 config."""
-        layers, bottleneck = get_configs('resnet101')
-        assert layers == [3, 4, 23, 3]
-        assert bottleneck is True
-
-    def test_resnet152(self):
-        """Test resnet152 config."""
-        layers, bottleneck = get_configs('resnet152')
-        assert layers == [3, 8, 36, 3]
-        assert bottleneck is True
+    @pytest.mark.parametrize("arch,expected", EXPECTED_CONFIGS.items())
+    def test_configs(self, arch, expected):
+        """Test config for each architecture variant."""
+        layers, bottleneck = get_configs(arch)
+        assert layers == expected[0]
+        assert bottleneck == expected[1]
 
     def test_invalid_arch(self):
         """Test that invalid architecture raises ValueError."""
@@ -77,46 +63,34 @@ class TestResNetBeastBackbone:
         with pytest.raises(ValueError, match="Unsupported backbone"):
             ResNetBeastBackbone({'backbone': 'resnet999'})
 
-    def test_properties(self, default_config):
-        """Test backbone properties."""
-        backbone = ResNetBeastBackbone(default_config)
-        assert backbone.hidden_size == 512
+    @pytest.mark.parametrize(
+        "backbone_name,expected_hidden_size", BEAST_RESNET_HIDDEN_SIZES.items(),
+    )
+    def test_properties(self, backbone_name, expected_hidden_size):
+        """Test backbone properties for each variant."""
+        backbone = ResNetBeastBackbone({'backbone': backbone_name})
+        assert backbone.hidden_size == expected_hidden_size
         assert backbone.num_channels == 3
         assert backbone.image_size == 224
         assert backbone.patch_size == 32
         assert backbone.backbone_type == 'resnet-beast'
 
-    def test_hidden_size_mapping(self):
-        """Test hidden size mapping for different variants."""
-        for name in ['resnet18', 'resnet34']:
-            backbone = ResNetBeastBackbone({'backbone': name})
-            assert backbone.hidden_size == 512
-
-        for name in ['resnet50']:
-            backbone = ResNetBeastBackbone({'backbone': name})
-            assert backbone.hidden_size == 2048
-
-    def test_forward_pass_shape(self, default_config):
-        """Test forward pass produces correct output shape."""
-        backbone = ResNetBeastBackbone(default_config)
+    @pytest.mark.parametrize(
+        "backbone_name,expected_hidden_size", BEAST_RESNET_HIDDEN_SIZES.items(),
+    )
+    def test_forward_pass_shape(self, backbone_name, expected_hidden_size):
+        """Test forward pass produces correct output shape for each variant."""
+        backbone = ResNetBeastBackbone({'backbone': backbone_name})
         x = torch.randn(2, 3, 224, 224)
         output = backbone(x)
 
-        assert output.shape == (2, 512, 7, 7)
+        assert output.shape == (2, expected_hidden_size, 7, 7)
         assert torch.isfinite(output).all()
 
-    def test_forward_bottleneck_variant(self):
-        """Test forward pass with bottleneck variant (resnet50)."""
-        backbone = ResNetBeastBackbone({'backbone': 'resnet50'})
-        x = torch.randn(2, 3, 224, 224)
-        output = backbone(x)
-
-        assert output.shape == (2, 2048, 7, 7)
-        assert torch.isfinite(output).all()
-
-    def test_gradient_flow(self, default_config):
-        """Test that gradients flow through the model."""
-        backbone = ResNetBeastBackbone(default_config)
+    @pytest.mark.parametrize("backbone_name", BEAST_RESNET_HIDDEN_SIZES.keys())
+    def test_gradient_flow(self, backbone_name):
+        """Test that gradients flow through the model for each variant."""
+        backbone = ResNetBeastBackbone({'backbone': backbone_name})
         x = torch.randn(1, 3, 224, 224, requires_grad=True)
         output = backbone(x)
 
@@ -186,3 +160,4 @@ class TestResNetBeastComponents:
         output = block(x)
 
         assert output.shape == (1, 256, 28, 28)
+
