@@ -12,15 +12,15 @@ from typeguard import typechecked
 
 class TemporalMLP(nn.Module):
     """Temporal Multi-Layer Perceptron for sequence encoding.
-    
+
     This head uses 1D convolution to capture temporal dependencies
     followed by dense layers for feature extraction.
-    
+
     Architecture:
     1. 1D Conv layer with temporal window (2*n_lags + 1)
     2. n_hid_layers dense layers with activations
     3. Final dense layer (no activation)
-    
+
     Input shape: (batch, sequence, features)
     Output shape: (batch, sequence, n_hid_units)
     """
@@ -37,7 +37,7 @@ class TemporalMLP(nn.Module):
         seed: int = 42,
     ):
         """Initialize TemporalMLP head.
-        
+
         Args:
             input_size: number of input features per timestep
             num_hid_units: number of hidden units in dense layers
@@ -48,7 +48,7 @@ class TemporalMLP(nn.Module):
             seed: random seed for weight initialization
         """
         super().__init__()
-        
+
         self.input_size = input_size
         self.num_hid_units = num_hid_units
         self.num_layers = num_layers
@@ -74,35 +74,35 @@ class TemporalMLP(nn.Module):
             padding=self.num_lags,  # maintains sequence length
         )
         self.layers.append(conv_layer)
-        
+
         # add activation after conv layer
         if self.activation != 'linear':
             self.layers.append(self._get_activation())
-        
+
         # add dropout if specified
         if self.dropout_rate > 0.0:
             self.layers.append(nn.Dropout(self.dropout_rate))
-        
+
         # dense layers
         for i in range(self.num_layers):
             # linear layer
             linear_layer = nn.Linear(self.num_hid_units, self.num_hid_units)
             self.layers.append(linear_layer)
-            
+
             # activation (except for final layer)
             if i < self.num_layers - 1 and self.activation != 'linear':
                 self.layers.append(self._get_activation())
-            
+
             # dropout (except for final layer)
             if i < self.num_layers - 1 and self.dropout_rate > 0.0:
                 self.layers.append(nn.Dropout(self.dropout_rate))
 
     def _get_activation(self) -> nn.Module:
         """Get activation function module.
-        
+
         Returns:
             activation function module
-            
+
         Raises:
             ValueError: if activation type is not supported
         """
@@ -125,18 +125,18 @@ class TemporalMLP(nn.Module):
         x: Float[torch.Tensor, 'batch sequence features'],
     ) -> Float[torch.Tensor, 'batch sequence n_hid_units']:
         """Forward pass through TemporalMLP.
-        
+
         Args:
             x: input tensor with shape (batch, sequence, features)
-            
+
         Returns:
             encoded features with shape (batch, sequence, n_hid_units)
         """
         batch_size, sequence_length, features = x.shape
-        
+
         # start with input
         output = x
-        
+
         # apply layers sequentially
         for i, layer in enumerate(self.layers):
             if isinstance(layer, nn.Conv1d):
@@ -147,7 +147,7 @@ class TemporalMLP(nn.Module):
             else:
                 # dense layers and activations work on last dimension
                 output = layer(output)
-        
+
         return output
 
     def __repr__(self) -> str:

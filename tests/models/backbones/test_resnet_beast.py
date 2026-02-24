@@ -12,7 +12,6 @@ from lightning_action.models.backbones.resnet_beast import (
     get_configs,
 )
 
-
 EXPECTED_CONFIGS = {
     'resnet18': ([2, 2, 2, 2], False),
     'resnet34': ([3, 4, 6, 3], False),
@@ -160,4 +159,3 @@ class TestResNetBeastComponents:
         output = block(x)
 
         assert output.shape == (1, 256, 28, 28)
-

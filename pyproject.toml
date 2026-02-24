@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "lightning-action"
-version = "1.0.0"
+version = "1.0.1"
 description = "Action segmentation framework built with PyTorch Lightning"
 license = "MIT"
 readme = "README.md"
@@ -30,9 +30,13 @@ dependencies = [
     "jaxtyping",
     "lightning",
     "numpy (>=2.0.0)",
+    "nvidia-dali-cuda110",
+    "opencv-python-headless",
     "scikit-learn",
     "tensorboard",
     "torch",
+    "torchvision",
+    "transformers",
     "typeguard (<3.0.0)",
     "pandas",
     "pyyaml",
@@ -52,13 +56,12 @@ litaction = "lightning_action.cli.main:main"
 
 [project.optional-dependencies]
 dev = [
+    "autopep8",
     "flake8-pyproject",
     "isort",
     "pytest",
     "pytest-html",
     "requests",
-    "torchvision",
-    "transformers",
 ]
 
 [tool.isort]

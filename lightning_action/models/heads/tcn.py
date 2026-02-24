@@ -12,7 +12,7 @@ from typeguard import typechecked
 
 class DilatedTCN(nn.Module):
     """Dilated Temporal Convolutional Network head.
-    
+
     Encoder-only implementation of a dilated TCN with residual connections.
     """
 
@@ -28,7 +28,7 @@ class DilatedTCN(nn.Module):
         seed: int = 42,
     ):
         """Initialize DilatedTCN head.
-        
+
         Args:
             input_size: number of input features
             num_hid_units: number of hidden units per layer
@@ -37,12 +37,12 @@ class DilatedTCN(nn.Module):
             activation: activation function name
             dropout_rate: dropout probability
             seed: random seed for weight initialization
-            
+
         Raises:
             ValueError: if activation function is not supported
         """
         super().__init__()
-        
+
         self.input_size = input_size
         self.num_hid_units = num_hid_units
         self.num_layers = num_layers
@@ -50,10 +50,10 @@ class DilatedTCN(nn.Module):
         self.activation = activation
         self.dropout_rate = dropout_rate
         self.seed = seed
-        
+
         # set random seed
         torch.manual_seed(seed)
-        
+
         # build model
         self.model = nn.Sequential()
         self._build_model()
@@ -63,18 +63,18 @@ class DilatedTCN(nn.Module):
         for i_layer in range(self.num_layers):
             # dilation increases exponentially
             dilation = 2 ** i_layer
-            
+
             # determine layer sizes
             in_size = self.input_size if i_layer == 0 else self.num_hid_units
             hid_size = self.num_hid_units
-            
+
             if i_layer == (self.num_layers - 1):
                 # final layer
                 out_size = self.num_hid_units
             else:
                 # intermediate layer
                 out_size = self.num_hid_units
-            
+
             # create TCN block
             tcn_block = DilationBlock(
                 input_size=in_size,
@@ -86,7 +86,7 @@ class DilatedTCN(nn.Module):
                 activation=self.activation,
                 dropout=self.dropout_rate,
             )
-            
+
             # add to model
             block_name = f'tcn_block_{i_layer:02d}'
             self.model.add_module(block_name, tcn_block)
@@ -97,24 +97,24 @@ class DilatedTCN(nn.Module):
         x: Float[torch.Tensor, 'batch sequence features']
     ) -> Float[torch.Tensor, 'batch sequence n_hid_units']:
         """Forward pass through TCN head.
-        
+
         Args:
             x: input tensor of shape (batch_size, sequence_length, input_size)
-            
+
         Returns:
             output tensor of shape (batch_size, sequence_length, num_hid_units)
         """
         # TCN expects (batch, channels, time) format
         # input: (batch, sequence, features) -> (batch, features, sequence)
         x_transposed = x.transpose(1, 2)
-        
+
         # pass through TCN layers
         output_transposed = self.model(x_transposed)
-        
+
         # convert back to (batch, sequence, features) format
         # output: (batch, features, sequence) -> (batch, sequence, features)
         output = output_transposed.transpose(1, 2)
-        
+
         return output
 
     def __repr__(self) -> str:

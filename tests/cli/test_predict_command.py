@@ -27,9 +27,9 @@ class TestHandle:
         with patch('lightning_action.api.model.Model.from_dir') as mock_from_dir:
             mock_model = MagicMock()
             mock_from_dir.return_value = mock_model
-            
+
             handle(mock_args)
-            
+
             # check that default output was set
             expected_output = mock_args.model / 'predictions'
             assert mock_args.output_dir == expected_output
@@ -38,13 +38,13 @@ class TestHandle:
         """Test that handle uses custom output directory when provided."""
         custom_output = Path('/custom/output')
         mock_args.output_dir = custom_output
-        
+
         with patch('lightning_action.api.model.Model.from_dir') as mock_from_dir:
             mock_model = MagicMock()
             mock_from_dir.return_value = mock_model
-            
+
             handle(mock_args)
-            
+
             # check that custom output was preserved
             assert mock_args.output_dir == custom_output
 
@@ -53,9 +53,9 @@ class TestHandle:
         with patch('lightning_action.api.model.Model.from_dir') as mock_from_dir:
             mock_model = MagicMock()
             mock_from_dir.return_value = mock_model
-            
+
             handle(mock_args)
-            
+
             # check that Model.from_dir was called with correct path
             mock_from_dir.assert_called_once_with(mock_args.model)
 
@@ -64,9 +64,9 @@ class TestHandle:
         with patch('lightning_action.api.model.Model.from_dir') as mock_from_dir:
             mock_model = MagicMock()
             mock_from_dir.return_value = mock_model
-            
+
             handle(mock_args)
-            
+
             # check that predict was called with correct arguments
             mock_model.predict.assert_called_once_with(
                 data_path=mock_args.data_dir,
@@ -78,13 +78,13 @@ class TestHandle:
     def test_handle_with_custom_input_dir(self, mock_args):
         """Test that handle respects custom input directory."""
         mock_args.input_dir = 'features'
-        
+
         with patch('lightning_action.api.model.Model.from_dir') as mock_from_dir:
             mock_model = MagicMock()
             mock_from_dir.return_value = mock_model
-            
+
             handle(mock_args)
-            
+
             # check that predict was called with custom input_dir
             predict_call = mock_model.predict.call_args
             assert predict_call[1]['input_dir'] == 'features'
@@ -92,13 +92,13 @@ class TestHandle:
     def test_handle_with_specific_experiments(self, mock_args):
         """Test that handle respects specific experiment IDs."""
         mock_args.expt_ids = ['exp1', 'exp2']
-        
+
         with patch('lightning_action.api.model.Model.from_dir') as mock_from_dir:
             mock_model = MagicMock()
             mock_from_dir.return_value = mock_model
-            
+
             handle(mock_args)
-            
+
             # check that predict was called with specific experiment IDs
             predict_call = mock_model.predict.call_args
             assert predict_call[1]['expt_ids'] == ['exp1', 'exp2']
@@ -107,7 +107,7 @@ class TestHandle:
         """Test error handling when model loading fails."""
         with patch('lightning_action.api.model.Model.from_dir') as mock_from_dir:
             mock_from_dir.side_effect = Exception('Model loading failed')
-            
+
             with pytest.raises(Exception, match='Model loading failed'):
                 handle(mock_args)
 
@@ -117,6 +117,6 @@ class TestHandle:
             mock_model = MagicMock()
             mock_model.predict.side_effect = Exception('Prediction failed')
             mock_from_dir.return_value = mock_model
-            
+
             with pytest.raises(Exception, match='Prediction failed'):
                 handle(mock_args)

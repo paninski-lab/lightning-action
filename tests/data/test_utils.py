@@ -1,7 +1,6 @@
 import os
 import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -13,9 +12,9 @@ from lightning_action.data import (
     split_sizes_from_probabilities,
 )
 from lightning_action.data.utils import (
-    compute_class_weights,
-    collect_labels_from_files,
     collect_labels_from_datamodule,
+    collect_labels_from_files,
+    compute_class_weights,
 )
 
 
@@ -89,7 +88,7 @@ class TestComputeSequencePad:
         """Test that unknown model type returns default when provided."""
         result = compute_sequence_pad('unknown-model', default=0)
         assert result == 0
-        
+
         result = compute_sequence_pad('transformer', default=10)
         assert result == 10
 
@@ -136,7 +135,7 @@ class TestSplitSizesFromProbabilities:
         # minimum viable case
         result = split_sizes_from_probabilities(2, 0.5, 0.5)
         assert result == [1, 1]
-        
+
         # slightly larger
         result = split_sizes_from_probabilities(3, 0.67, 0.33)
         assert sum(result) == 3
@@ -150,7 +149,7 @@ class TestComputeClassWeights:
         """Test basic class weight computation with balanced classes."""
         labels = np.array([0, 0, 1, 1, 2, 2])
         weights = compute_class_weights(labels, num_classes=3)
-        
+
         # All classes have equal counts, so weights should all be 1.0
         assert len(weights) == 3
         assert all(abs(w - 1.0) < 1e-6 for w in weights)
@@ -160,7 +159,7 @@ class TestComputeClassWeights:
         # Class 0: 10 samples, Class 1: 5 samples, Class 2: 2 samples
         labels = np.array([0]*10 + [1]*5 + [2]*2)
         weights = compute_class_weights(labels, num_classes=3)
-        
+
         assert len(weights) == 3
         # Most frequent class (0) should have lowest weight (1.0)
         assert abs(weights[0] - 1.0) < 1e-6
@@ -173,7 +172,7 @@ class TestComputeClassWeights:
         """Test that ignore_index values are excluded from weight computation."""
         labels = np.array([0, 0, 1, 1, -100, -100, -100])  # -100 is ignore_index
         weights = compute_class_weights(labels, num_classes=2, ignore_index=-100)
-        
+
         assert len(weights) == 2
         # Both classes have equal counts (2 each)
         assert all(abs(w - 1.0) < 1e-6 for w in weights)
@@ -182,21 +181,21 @@ class TestComputeClassWeights:
         """Test with custom ignore_index value."""
         labels = np.array([0, 0, 1, 1, 99, 99])  # 99 is ignore
         weights = compute_class_weights(labels, num_classes=2, ignore_index=99)
-        
+
         assert len(weights) == 2
         assert all(abs(w - 1.0) < 1e-6 for w in weights)
 
     def test_sqrt_dampening(self):
         """Test that sqrt_dampening reduces weight magnitude for rare classes."""
         labels = np.array([0]*100 + [1])  # Highly imbalanced
-        
+
         weights_no_sqrt = compute_class_weights(
             labels, num_classes=2, sqrt_dampening=False
         )
         weights_sqrt = compute_class_weights(
             labels, num_classes=2, sqrt_dampening=True
         )
-        
+
         # Weight for rare class should be lower with sqrt dampening
         assert weights_sqrt[1] < weights_no_sqrt[1]
         # sqrt(100) = 10 for class 1 with dampening vs 100 without
@@ -206,7 +205,7 @@ class TestComputeClassWeights:
         """Test that num_classes is inferred from labels when not provided."""
         labels = np.array([0, 1, 2, 3, 4])
         weights = compute_class_weights(labels, num_classes=None)
-        
+
         # Should infer 5 classes (0-4)
         assert len(weights) == 5
 
@@ -214,7 +213,7 @@ class TestComputeClassWeights:
         """Test that classes with no samples get weight 0.0."""
         labels = np.array([0, 0, 2, 2])  # Class 1 is missing
         weights = compute_class_weights(labels, num_classes=3)
-        
+
         assert weights[0] > 0
         assert weights[1] == 0.0  # Missing class
         assert weights[2] > 0
@@ -223,7 +222,7 @@ class TestComputeClassWeights:
         """Test handling of empty label array."""
         labels = np.array([])
         weights = compute_class_weights(labels, num_classes=3)
-        
+
         # Should return uniform weights
         assert len(weights) == 3
         assert all(w == 1.0 for w in weights)
@@ -232,7 +231,7 @@ class TestComputeClassWeights:
         """Test when all labels are ignore_index."""
         labels = np.array([-100, -100, -100])
         weights = compute_class_weights(labels, num_classes=3, ignore_index=-100)
-        
+
         # Should return uniform weights
         assert len(weights) == 3
         assert all(w == 1.0 for w in weights)
@@ -241,14 +240,14 @@ class TestComputeClassWeights:
         """Test that multi-dimensional input is flattened."""
         labels = np.array([[0, 1], [2, 0], [1, 2]])
         weights = compute_class_weights(labels, num_classes=3)
-        
+
         assert len(weights) == 3
 
     def test_single_class(self):
         """Test with only one class present."""
         labels = np.array([0, 0, 0, 0, 0])
         weights = compute_class_weights(labels, num_classes=1)
-        
+
         assert len(weights) == 1
         assert abs(weights[0] - 1.0) < 1e-6
 
@@ -256,7 +255,7 @@ class TestComputeClassWeights:
         """Test with one class present but multiple declared."""
         labels = np.array([0, 0, 0, 0, 0])
         weights = compute_class_weights(labels, num_classes=3)
-        
+
         assert len(weights) == 3
         assert weights[0] > 0
         assert weights[1] == 0.0  # No samples
@@ -272,17 +271,17 @@ class TestCollectLabelsFromFiles:
             # Create test label files
             labels1 = np.array([0, 1, 2, 0, 1])
             labels2 = np.array([2, 2, 1, 0])
-            
+
             path1 = os.path.join(tmpdir, 'video1.npy')
             path2 = os.path.join(tmpdir, 'video2.npy')
-            
+
             np.save(path1, labels1)
             np.save(path2, labels2)
-            
+
             all_labels, num_classes = collect_labels_from_files(
                 [path1, path2], show_progress=False
             )
-            
+
             assert len(all_labels) == 9  # 5 + 4
             assert num_classes == 3  # Classes 0, 1, 2
             assert set(all_labels.tolist()) == {0, 1, 2}
@@ -300,17 +299,17 @@ class TestCollectLabelsFromFiles:
                 [0, 1, 0],  # Class 1
                 [0, 0, 1],  # Class 2
             ])
-            
+
             path1 = os.path.join(tmpdir, 'video1.npy')
             path2 = os.path.join(tmpdir, 'video2.npy')
-            
+
             np.save(path1, labels1)
             np.save(path2, labels2)
-            
+
             all_labels, num_classes = collect_labels_from_files(
                 [path1, path2], show_progress=False
             )
-            
+
             assert len(all_labels) == 5  # 3 + 2
             assert num_classes == 3  # Inferred from shape
             # Labels should be converted to class indices
@@ -324,11 +323,11 @@ class TestCollectLabelsFromFiles:
             labels = np.array([0, 1, -100, 2, -100])
             path = os.path.join(tmpdir, 'video.npy')
             np.save(path, labels)
-            
+
             all_labels, num_classes = collect_labels_from_files(
                 [path], ignore_index=-100, show_progress=False
             )
-            
+
             # All labels are returned, but num_classes is computed ignoring -100
             assert len(all_labels) == 5
             assert num_classes == 3  # max(0, 1, 2) + 1
@@ -338,7 +337,7 @@ class TestCollectLabelsFromFiles:
         all_labels, num_classes = collect_labels_from_files(
             [], show_progress=False
         )
-        
+
         assert len(all_labels) == 0
         assert num_classes == 0
 
@@ -348,11 +347,11 @@ class TestCollectLabelsFromFiles:
             labels = np.array([0, 1, 1, 0])
             path = os.path.join(tmpdir, 'video.npy')
             np.save(path, labels)
-            
+
             all_labels, num_classes = collect_labels_from_files(
                 [path], show_progress=False
             )
-            
+
             assert len(all_labels) == 4
             assert num_classes == 2
 
@@ -362,16 +361,16 @@ class TestCollectLabelsFromFiles:
             labels = np.array([-100, -100, -100])
             path = os.path.join(tmpdir, 'video.npy')
             np.save(path, labels)
-            
+
             # Also add a normal file to get num_classes
             labels2 = np.array([0, 1])
             path2 = os.path.join(tmpdir, 'video2.npy')
             np.save(path2, labels2)
-            
+
             all_labels, num_classes = collect_labels_from_files(
                 [path, path2], ignore_index=-100, show_progress=False
             )
-            
+
             assert len(all_labels) == 5  # 3 + 2
             assert num_classes == 2
 
@@ -382,11 +381,11 @@ class TestCollectLabelsFromFiles:
             labels = np.array([[0], [1], [2], [1]])
             path = os.path.join(tmpdir, 'video.npy')
             np.save(path, labels)
-            
+
             all_labels, num_classes = collect_labels_from_files(
                 [path], show_progress=False
             )
-            
+
             assert all_labels.shape == (4,)  # Should be squeezed
             assert num_classes == 3
 
@@ -404,11 +403,11 @@ class TestCollectLabelsFromDatamodule:
             {'labels': np.array([1, 2, 0])},
             {'labels': np.array([2, 0, 1])},
         ])
-        
+
         all_labels, num_classes = collect_labels_from_datamodule(
             mock_dataset, show_progress=False
         )
-        
+
         assert len(all_labels) == 9  # 3 * 3
         assert num_classes == 3
 
@@ -420,11 +419,11 @@ class TestCollectLabelsFromDatamodule:
             {'labels': torch.tensor([0, 1, 2])},
             {'labels': torch.tensor([3, 4])},
         ])
-        
+
         all_labels, num_classes = collect_labels_from_datamodule(
             mock_dataset, show_progress=False
         )
-        
+
         assert len(all_labels) == 5
         assert num_classes == 5  # 0-4
 
@@ -436,11 +435,11 @@ class TestCollectLabelsFromDatamodule:
             {'labels': np.array([[1, 0, 0], [0, 1, 0]])},  # Classes 0, 1
             {'labels': np.array([[0, 0, 1]])},  # Class 2
         ])
-        
+
         all_labels, num_classes = collect_labels_from_datamodule(
             mock_dataset, show_progress=False
         )
-        
+
         assert len(all_labels) == 3
         assert num_classes == 3
         assert list(all_labels) == [0, 1, 2]
@@ -453,11 +452,11 @@ class TestCollectLabelsFromDatamodule:
             {'labels': np.array([0, -100, 1])},
             {'labels': np.array([-100, 2])},
         ])
-        
+
         all_labels, num_classes = collect_labels_from_datamodule(
             mock_dataset, ignore_index=-100, show_progress=False
         )
-        
+
         assert len(all_labels) == 5  # All labels returned
         assert num_classes == 3  # But num_classes computed ignoring -100
 
@@ -466,11 +465,11 @@ class TestCollectLabelsFromDatamodule:
         mock_dataset = MagicMock()
         mock_dataset.__len__ = MagicMock(return_value=0)
         mock_dataset.label_names = ['class_0', 'class_1', 'class_2']
-        
+
         all_labels, num_classes = collect_labels_from_datamodule(
             mock_dataset, show_progress=False
         )
-        
+
         assert len(all_labels) == 0
         assert num_classes == 3  # From label_names
 
@@ -483,11 +482,11 @@ class TestCollectLabelsFromDatamodule:
             {'labels': np.array([0, 1])},
         ])
         mock_dataset.label_names = ['a', 'b']
-        
+
         all_labels, num_classes = collect_labels_from_datamodule(
             mock_dataset, show_progress=False
         )
-        
+
         # Should only get labels from second item
         assert len(all_labels) == 2
         assert num_classes == 2
@@ -498,11 +497,11 @@ class TestCollectLabelsFromDatamodule:
         mock_dataset.__len__ = MagicMock(return_value=1)
         mock_dataset.__getitem__ = MagicMock(return_value={'input': np.array([1])})
         mock_dataset.label_names = ['behavior_a', 'behavior_b', 'behavior_c']
-        
+
         all_labels, num_classes = collect_labels_from_datamodule(
             mock_dataset, show_progress=False
         )
-        
+
         assert len(all_labels) == 0
         assert num_classes == 3
 
@@ -519,28 +518,28 @@ class TestComputeClassWeightsIntegration:
                 np.zeros(80),  # 80 frames of class 0
                 np.ones(20),   # 20 frames of class 1
             ]).astype(np.int64)
-            
+
             # Video 2: balanced
             labels2 = np.concatenate([
                 np.zeros(50),
                 np.ones(50),
             ]).astype(np.int64)
-            
+
             path1 = os.path.join(tmpdir, 'video1.npy')
             path2 = os.path.join(tmpdir, 'video2.npy')
             np.save(path1, labels1)
             np.save(path2, labels2)
-            
+
             # Collect labels
             all_labels, num_classes = collect_labels_from_files(
                 [path1, path2], show_progress=False
             )
-            
+
             # Compute weights (video pipeline uses sqrt_dampening=True)
             weights = compute_class_weights(
                 all_labels, num_classes=num_classes, sqrt_dampening=True
             )
-            
+
             # Class 0: 130 samples, Class 1: 70 samples
             # Weight for class 0 should be 1.0 (most frequent)
             # Weight for class 1 should be sqrt(130/70) ≈ 1.36
@@ -553,7 +552,7 @@ class TestComputeClassWeightsIntegration:
         # Create mock dataset mimicking FeatureDataset behavior
         mock_dataset = MagicMock()
         mock_dataset.__len__ = MagicMock(return_value=5)
-        
+
         # Simulate sequences with one-hot labels
         # Create imbalanced data: more class 0 than class 1
         mock_dataset.__getitem__ = MagicMock(side_effect=[
@@ -563,17 +562,17 @@ class TestComputeClassWeightsIntegration:
             {'labels': np.array([[0, 1]] * 50)},  # 50 frames of class 1
             {'labels': np.array([[0, 1]] * 30)},  # 30 frames of class 1
         ])
-        
+
         # Collect labels
         all_labels, num_classes = collect_labels_from_datamodule(
             mock_dataset, show_progress=False
         )
-        
+
         # Compute weights (CSV pipeline uses sqrt_dampening=False)
         weights = compute_class_weights(
             all_labels, num_classes=num_classes, sqrt_dampening=False
         )
-        
+
         # Class 0: 280 samples, Class 1: 100 samples
         # Weight for class 0 should be 1.0
         # Weight for class 1 should be 280/100 = 2.8
@@ -588,14 +587,14 @@ class TestComputeClassWeightsIntegration:
             labels = np.array([0]*1000 + [1]*500 + [2]*250 + [3]*100)
             path = os.path.join(tmpdir, 'video.npy')
             np.save(path, labels)
-            
+
             all_labels, num_classes = collect_labels_from_files(
                 [path], show_progress=False
             )
             weights = compute_class_weights(
                 all_labels, num_classes=num_classes, sqrt_dampening=False
             )
-            
+
             assert len(weights) == 4
             # Weights should be in increasing order (class 0 lowest, class 3 highest)
             assert weights[0] < weights[1] < weights[2] < weights[3]
@@ -616,14 +615,14 @@ class TestComputeClassWeightsIntegration:
             )
             path = os.path.join(tmpdir, 'video.npy')
             np.save(path, labels)
-            
+
             all_labels, num_classes = collect_labels_from_files(
                 [path], ignore_index=-100, show_progress=False
             )
             weights = compute_class_weights(
                 all_labels, num_classes=num_classes, ignore_index=-100
             )
-            
+
             # Only valid labels (0 and 1) should be counted
             assert len(weights) == 2
             assert abs(weights[0] - 1.0) < 1e-6  # Class 0 is most frequent

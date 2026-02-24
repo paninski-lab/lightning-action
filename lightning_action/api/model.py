@@ -46,7 +46,7 @@ class Model(BaseModelAPI[Segmenter]):
     This class manages both the Lightning model and the training/inference
     processes, providing a convenient interface for action segmentation
     tasks using tabular data (markers, features, etc.).
-    
+
     Inherits from BaseModelAPI and provides CSV-specific implementations
     for model creation, training, and prediction.
     """
@@ -64,13 +64,13 @@ class Model(BaseModelAPI[Segmenter]):
     @classmethod
     def _create_model_from_config(cls, config: dict[str, Any]) -> Segmenter:
         """Create a Segmenter model from configuration.
-        
+
         Handles CSV-specific config preprocessing:
         - Doubles input_size if VelocityConcat transform is used
-        
+
         Args:
             config: Configuration dictionary.
-        
+
         Returns:
             Initialized Segmenter model.
         """
@@ -78,21 +78,21 @@ class Model(BaseModelAPI[Segmenter]):
         if config['data'].get('transforms'):
             if 'VelocityConcat' in config['data']['transforms']:
                 config['model']['input_size'] *= 2
-        
+
         return Segmenter(config)
 
     def _setup_trainer(self) -> pl.Trainer:
         """Set up a Lightning Trainer for prediction.
-        
+
         Configures trainer based on the device setting in the training config.
         Supports both CPU and GPU prediction.
-        
+
         Returns:
             Configured Trainer instance for prediction.
         """
         training_config = self.config.get('training', {})
         device = training_config.get('device', 'cpu')
-        
+
         trainer_config = {
             'accelerator': 'gpu' if device == 'gpu' and torch.cuda.is_available() else 'cpu',
             'devices': 1,
@@ -100,26 +100,26 @@ class Model(BaseModelAPI[Segmenter]):
             'enable_checkpointing': False,
             'enable_progress_bar': False,
         }
-        
+
         return pl.Trainer(**trainer_config)
 
     def _run_post_training_inference(self) -> None:
         """Run inference on all training experiment IDs after training.
-        
+
         Extracts experiment IDs from the training configuration and runs
         predictions, saving results to model_dir/predictions/.
         """
         if self.model is None:
             print('Warning: No trained model found, skipping post-training inference')
             return
-            
+
         if self.model_dir is None:
             print('Warning: No model directory found, skipping post-training inference')
             return
-            
+
         # Extract data configuration
         data_config = self.config.get('data', {})
-        
+
         # Check for simplified data_path format
         if 'data_path' in data_config:
             data_path = data_config['data_path']
@@ -137,17 +137,17 @@ class Model(BaseModelAPI[Segmenter]):
                 print('Warning: No data path found in configuration, skipping '
                       'post-training inference')
                 return
-        
+
         # Create predictions directory
         predictions_dir = self.model_dir / 'predictions'
         predictions_dir.mkdir(exist_ok=True)
-        
-        print(f'Running post-training inference on all training experiments...')
+
+        print('Running post-training inference on all training experiments...')
         print(f'Data path: {data_path}')
         print(f'Input directory: {input_dir}')
         print(f'Experiment IDs: {expt_ids if expt_ids else "all"}')
         print(f'Predictions will be saved to: {predictions_dir}')
-        
+
         try:
             self.predict(
                 data_path=data_path,
@@ -181,7 +181,7 @@ class Model(BaseModelAPI[Segmenter]):
             output_file: Full path to save prediction file; overwrites output_dir
                 if not None. Only valid with a single experiment.
             expt_ids: List of experiment IDs to predict on (None for all).
-            
+
         Raises:
             ValueError: If model is not trained.
             RuntimeError: If output_file specified with multiple experiments.
@@ -199,7 +199,7 @@ class Model(BaseModelAPI[Segmenter]):
 
         # Build data configuration
         from lightning_action.train import build_data_config_from_path
-        
+
         data_config = build_data_config_from_path(
             data_path=data_path,
             expt_ids=expt_ids,
@@ -210,7 +210,7 @@ class Model(BaseModelAPI[Segmenter]):
         experiment_ids = data_config['ids']
 
         trainer = self._setup_trainer()
-        
+
         for expt_id in experiment_ids:
             print(f'Generating predictions for experiment: {expt_id}')
 
@@ -235,40 +235,40 @@ class Model(BaseModelAPI[Segmenter]):
             )
 
             datamodule.setup('predict')
-            
+
             # Generate predictions
             predictions = trainer.predict(self.model, datamodule=datamodule)
-            
+
             # Concatenate predictions from all batches
             all_probs = []
             for batch_preds in predictions:
                 probs = batch_preds['probabilities'][0]  # Remove batch dim
                 all_probs.append(probs.cpu().numpy())
-            
+
             final_probs = np.vstack(all_probs)
-            
+
             # Pad with NaNs if needed to match original data length
             original_length = datamodule.dataset.data_lengths[0]
             current_length = final_probs.shape[0]
-            
+
             if current_length < original_length:
                 num_classes = final_probs.shape[1]
                 padding_rows = original_length - current_length
                 nan_padding = np.full((padding_rows, num_classes), np.nan)
                 final_probs = np.vstack([final_probs, nan_padding])
                 print(f'Padded predictions from {current_length} to {original_length} rows')
-            
+
             # Save predictions
             df = pd.DataFrame(
                 data=final_probs,
                 columns=self.model.config['data']['label_names']
             )
-            
+
             if output_file is not None:
                 output_file_ = Path(output_file)
             else:
                 output_file_ = output_dir / f'{expt_id}_predictions.csv'
-            
+
             output_file_.parent.mkdir(exist_ok=True, parents=True)
             df.to_csv(output_file_)
             print(f'Saved predictions to {output_file_}')

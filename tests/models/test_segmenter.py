@@ -2,6 +2,7 @@
 
 import copy
 from unittest.mock import patch
+
 import pytest
 import torch
 
@@ -121,19 +122,19 @@ class TestSegmenter:
         """Test model initialization with different heads."""
         for head_config in head_configs:
             config = head_config['config']
-            
+
             # create model
             model = Segmenter(config)
-            
+
             # check basic attributes
             assert model.input_size == config['model']['input_size']
             assert model.output_size == config['model']['output_size']
             assert model.sequence_length == config['model']['sequence_length']
-            
+
             # check head exists
             assert hasattr(model, 'head')
             assert hasattr(model, 'classifier')
-            
+
             # check metrics are initialized
             assert hasattr(model, 'train_accuracy')
             assert hasattr(model, 'train_f1')
@@ -163,19 +164,19 @@ class TestSegmenter:
         for head_config in head_configs:
             config = head_config['config']
             model = Segmenter(config)
-            
+
             x = sample_batch['input']
             batch_size, sequence_length, features = x.shape
-            
+
             # forward pass
             outputs = model(x)
-            
+
             # check output dictionary structure
             assert isinstance(outputs, dict)
             assert 'logits' in outputs
             assert 'probabilities' in outputs
             assert 'features' in outputs
-            
+
             # check output shapes
             expected_logits_shape = (
                 batch_size, sequence_length, config['model']['output_size']
@@ -186,11 +187,11 @@ class TestSegmenter:
             expected_features_shape = (
                 batch_size, sequence_length, config['model']['num_hid_units']
             )
-            
+
             assert outputs['logits'].shape == expected_logits_shape
             assert outputs['probabilities'].shape == expected_probs_shape
             assert outputs['features'].shape == expected_features_shape
-            
+
             # check probabilities sum to 1
             prob_sums = outputs['probabilities'].sum(dim=-1)
             expected_sums = torch.ones_like(prob_sums)
@@ -201,28 +202,28 @@ class TestSegmenter:
         for head_config in head_configs:
             config = head_config['config']
             model = Segmenter(config)
-            
+
             x = sample_batch['input']
             targets = sample_batch['labels']
-            
+
             # forward pass
             outputs = model(x)
-            
+
             # compute loss
             loss, metrics = model.compute_loss(outputs, targets, stage='train')
-            
+
             # check loss
             assert isinstance(loss, torch.Tensor)
             assert loss.ndim == 0  # scalar
             assert loss.item() >= 0  # cross entropy is non-negative
-            
+
             # check metrics
             assert isinstance(metrics, dict)
             expected_metrics = ['train_loss', 'train_accuracy', 'train_f1']
             for metric in expected_metrics:
                 assert metric in metrics
                 assert isinstance(metrics[metric], float)
-                
+
             # check metric ranges
             assert 0.0 <= metrics['train_accuracy'] <= 1.0
             assert 0.0 <= metrics['train_f1'] <= 1.0
@@ -231,29 +232,29 @@ class TestSegmenter:
         """Test compute_loss accepts one-hot encoded targets."""
         config = head_configs[0]['config']
         model = Segmenter(config)
-        
+
         batch_size = 2
         sequence_length = 100
         output_size = config['model']['output_size']
-        
+
         # Create input and run forward pass
         x = torch.randn(batch_size, sequence_length, config['model']['input_size'])
         outputs = model(x)
-        
+
         # Create one-hot encoded targets: shape (batch, sequence, num_classes)
         class_indices = torch.randint(0, output_size, (batch_size, sequence_length))
         one_hot_targets = torch.zeros(batch_size, sequence_length, output_size)
         one_hot_targets.scatter_(2, class_indices.unsqueeze(-1), 1.0)
-        
+
         # Compute loss with one-hot targets
         loss, metrics = model.compute_loss(outputs, one_hot_targets, stage='train')
-        
+
         # Verify loss is valid
         assert isinstance(loss, torch.Tensor)
         assert loss.ndim == 0
         assert loss.item() >= 0
         assert not torch.isnan(loss)
-        
+
         # Verify metrics
         assert 'train_loss' in metrics
         assert 'train_accuracy' in metrics
@@ -263,27 +264,27 @@ class TestSegmenter:
         """Test compute_loss accepts class index targets."""
         config = head_configs[0]['config']
         model = Segmenter(config)
-        
+
         batch_size = 2
         sequence_length = 100
         output_size = config['model']['output_size']
-        
+
         # Create input and run forward pass
         x = torch.randn(batch_size, sequence_length, config['model']['input_size'])
         outputs = model(x)
-        
+
         # Create class index targets: shape (batch, sequence)
         class_index_targets = torch.randint(0, output_size, (batch_size, sequence_length))
-        
+
         # Compute loss with class index targets
         loss, metrics = model.compute_loss(outputs, class_index_targets, stage='train')
-        
+
         # Verify loss is valid
         assert isinstance(loss, torch.Tensor)
         assert loss.ndim == 0
         assert loss.item() >= 0
         assert not torch.isnan(loss)
-        
+
         # Verify metrics
         assert 'train_loss' in metrics
         assert 'train_accuracy' in metrics
@@ -294,32 +295,32 @@ class TestSegmenter:
         config = head_configs[0]['config']
         model = Segmenter(config)
         model.eval()  # Ensure deterministic behavior
-        
+
         batch_size = 2
         sequence_length = 100
         output_size = config['model']['output_size']
-        
+
         # Create input and run forward pass
         torch.manual_seed(42)
         x = torch.randn(batch_size, sequence_length, config['model']['input_size'])
         outputs = model(x)
-        
+
         # Create class index targets
         class_indices = torch.randint(0, output_size, (batch_size, sequence_length))
-        
+
         # Create equivalent one-hot targets
         one_hot_targets = torch.zeros(batch_size, sequence_length, output_size)
         one_hot_targets.scatter_(2, class_indices.unsqueeze(-1), 1.0)
-        
+
         # Compute loss with both target formats
         loss_class_idx, _ = model.compute_loss(outputs, class_indices, stage='train')
-        
+
         # Reset metrics to avoid accumulation effects
         model.train_accuracy.reset()
         model.train_f1.reset()
-        
+
         loss_one_hot, _ = model.compute_loss(outputs, one_hot_targets, stage='train')
-        
+
         # Losses should be identical
         assert torch.allclose(loss_class_idx, loss_one_hot, atol=1e-6)
 
@@ -328,32 +329,34 @@ class TestSegmenter:
         config = head_configs[0]['config']
         config['data'] = {'ignore_index': -100}
         model = Segmenter(config)
-        
+
         batch_size = 2
         sequence_length = 100
-        
+
         # Create input and run forward pass
         x = torch.randn(batch_size, sequence_length, config['model']['input_size'])
         outputs = model(x)
-        
+
         # Create targets where ALL values are ignore_index
         ignore_index = model.ignore_index
         all_ignored_targets = torch.full(
-            (batch_size, sequence_length), 
-            ignore_index, 
+            (batch_size, sequence_length),
+            ignore_index,
             dtype=torch.long
         )
-        
+
         # Compute loss
         loss, metrics = model.compute_loss(outputs, all_ignored_targets, stage='train')
-        
+
         # Loss should be 0 (no valid targets to compute loss on)
         assert loss.item() == 0.0
-        
+
         # Metrics should indicate the special case
         assert metrics['train_loss'] == 0.0
         # Accuracy and F1 should be NaN when all ignored
-        assert 'train_accuracy' not in metrics or metrics['train_accuracy'] != metrics['train_accuracy']  # NaN check
+        # NaN check
+        assert 'train_accuracy' not in metrics \
+               or metrics['train_accuracy'] != metrics['train_accuracy']
         assert 'train_f1' not in metrics or metrics['train_f1'] != metrics['train_f1']  # NaN check
 
     def test_compute_loss_partial_ignore_index(self, head_configs):
@@ -361,29 +364,29 @@ class TestSegmenter:
         config = head_configs[0]['config']
         config['data'] = {'ignore_index': -100}
         model = Segmenter(config)
-        
+
         batch_size = 2
         sequence_length = 100
         output_size = config['model']['output_size']
-        
+
         # Create input and run forward pass
         x = torch.randn(batch_size, sequence_length, config['model']['input_size'])
         outputs = model(x)
-        
+
         # Create targets with mix of valid and ignored values
         targets = torch.randint(0, output_size, (batch_size, sequence_length))
         # Set first 10 and last 10 positions to ignore_index
         targets[:, :10] = model.ignore_index
         targets[:, -10:] = model.ignore_index
-        
+
         # Compute loss
         loss, metrics = model.compute_loss(outputs, targets, stage='train')
-        
+
         # Loss should be valid (computed on non-ignored targets)
         assert isinstance(loss, torch.Tensor)
         assert loss.item() >= 0
         assert not torch.isnan(loss)
-        
+
         # Metrics should be present
         assert 'train_loss' in metrics
         assert 'train_accuracy' in metrics
@@ -393,26 +396,26 @@ class TestSegmenter:
         """Test compute_loss with class weights."""
         config = head_configs[0]['config']
         output_size = config['model']['output_size']
-        
+
         # Add class weights to config
         class_weights = [1.0, 2.0, 0.5, 1.5]  # 4 classes
         config['model']['class_weights'] = class_weights
-        
+
         model = Segmenter(config)
-        
+
         batch_size = 2
         sequence_length = 100
-        
+
         # Create input and run forward pass
         x = torch.randn(batch_size, sequence_length, config['model']['input_size'])
         outputs = model(x)
-        
+
         # Create targets
         targets = torch.randint(0, output_size, (batch_size, sequence_length))
-        
+
         # Compute loss with class weights
         loss, metrics = model.compute_loss(outputs, targets, stage='train')
-        
+
         # Loss should be valid
         assert isinstance(loss, torch.Tensor)
         assert loss.item() >= 0
@@ -422,24 +425,24 @@ class TestSegmenter:
         """Test compute_loss with validation stage."""
         config = head_configs[0]['config']
         model = Segmenter(config)
-        
+
         batch_size = 2
         sequence_length = 100
         output_size = config['model']['output_size']
-        
+
         # Create input and run forward pass
         x = torch.randn(batch_size, sequence_length, config['model']['input_size'])
         outputs = model(x)
         targets = torch.randint(0, output_size, (batch_size, sequence_length))
-        
+
         # Compute loss with val stage
         loss, metrics = model.compute_loss(outputs, targets, stage='val')
-        
+
         # Check metrics have val_ prefix
         assert 'val_loss' in metrics
         assert 'val_accuracy' in metrics
         assert 'val_f1' in metrics
-        
+
         # Ensure train_ metrics are not present
         assert 'train_loss' not in metrics
         assert 'train_accuracy' not in metrics
@@ -450,10 +453,10 @@ class TestSegmenter:
         for head_config in head_configs:
             config = head_config['config']
             model = Segmenter(config)
-            
+
             # training step
             loss = model.training_step(sample_batch, batch_idx=0)
-            
+
             # check loss
             assert isinstance(loss, torch.Tensor)
             assert loss.ndim == 0  # scalar
@@ -464,7 +467,7 @@ class TestSegmenter:
         for head_config in head_configs:
             config = head_config['config']
             model = Segmenter(config)
-            
+
             # validation step (should not raise error)
             result = model.validation_step(sample_batch, batch_idx=0)
 
@@ -605,20 +608,20 @@ class TestSegmenter:
         for head_config in head_configs:
             config = head_config['config']
             model = Segmenter(config)
-            
+
             # predict step
             predictions = model.predict_step(sample_batch, batch_idx=0)
-            
+
             # check predictions structure
             assert isinstance(predictions, dict)
             assert 'logits' in predictions
             assert 'probabilities' in predictions
             assert 'predictions' in predictions
-            
+
             x = sample_batch['input']
             batch_size, sequence_length = x.shape[:2]
             output_size = config['model']['output_size']
-            
+
             # check prediction shapes
             seq_len_no_pad = sequence_length - 2 * model.sequence_pad
             assert predictions['logits'].shape == (batch_size, seq_len_no_pad, output_size)
@@ -634,10 +637,10 @@ class TestSegmenter:
         for head_config in head_configs:
             config = head_config['config']
             model = Segmenter(config)
-            
+
             # test basic optimizer
             optimizer_config = model.configure_optimizers()
-            
+
             if isinstance(optimizer_config, dict):
                 assert 'optimizer' in optimizer_config
                 # lr_scheduler is optional - only check if present
@@ -647,14 +650,14 @@ class TestSegmenter:
             else:
                 # just optimizer
                 optimizer = optimizer_config
-            
+
             # check optimizer type
             expected_type = config['optimizer']['type']
             if expected_type.lower() == 'adam':
                 assert isinstance(optimizer, torch.optim.Adam)
             elif expected_type.lower() == 'adamw':
                 assert isinstance(optimizer, torch.optim.AdamW)
-            
+
             # check learning rate
             expected_lr = config['optimizer']['lr']
             assert optimizer.param_groups[0]['lr'] == expected_lr
@@ -662,29 +665,29 @@ class TestSegmenter:
     def test_different_optimizer_types(self, head_configs):
         """Test different optimizer configurations."""
         base_config = copy.deepcopy(head_configs[0]['config'])
-        
+
         optimizer_types = [
             ('Adam', torch.optim.Adam),
             ('AdamW', torch.optim.AdamW),
             ('SGD', torch.optim.SGD),
         ]
-        
+
         for opt_type, expected_class in optimizer_types:
             config = copy.deepcopy(base_config)
             config['optimizer']['type'] = opt_type
-            
+
             # Add momentum for SGD
             if opt_type == 'SGD':
                 config['optimizer']['momentum'] = 0.9
-            
+
             model = Segmenter(config)
             optimizer_config = model.configure_optimizers()
-            
+
             if isinstance(optimizer_config, dict):
                 optimizer = optimizer_config['optimizer']
             else:
                 optimizer = optimizer_config
-            
+
             assert isinstance(optimizer, expected_class), \
                 f"Expected {expected_class.__name__} but got {type(optimizer).__name__}"
 
@@ -694,11 +697,11 @@ class TestSegmenter:
         config['optimizer']['type'] = 'SGD'
         config['optimizer']['momentum'] = 0.95
         config['optimizer']['lr'] = 0.01
-        
+
         model = Segmenter(config)
         optimizer_config = model.configure_optimizers()
         optimizer = optimizer_config['optimizer']
-        
+
         assert isinstance(optimizer, torch.optim.SGD)
         # Check momentum is set correctly
         assert optimizer.param_groups[0]['momentum'] == 0.95
@@ -709,11 +712,11 @@ class TestSegmenter:
         config = copy.deepcopy(head_configs[0]['config'])
         config['optimizer']['type'] = 'SGD'
         # Don't specify momentum - should use default of 0.9
-        
+
         model = Segmenter(config)
         optimizer_config = model.configure_optimizers()
         optimizer = optimizer_config['optimizer']
-        
+
         assert isinstance(optimizer, torch.optim.SGD)
         assert optimizer.param_groups[0]['momentum'] == 0.9  # default value
 
@@ -721,16 +724,16 @@ class TestSegmenter:
         """Test invalid optimizer type raises error."""
         config = copy.deepcopy(head_configs[0]['config'])
         config['optimizer']['type'] = 'invalid_optimizer'
-        
+
         model = Segmenter(config)
-        
+
         with pytest.raises(ValueError, match='Unsupported optimizer type'):
             model.configure_optimizers()
 
     # =========================================================================
     # Scheduler Tests
     # =========================================================================
-    
+
     def test_scheduler_step_lr(self, head_configs):
         """Test StepLR scheduler configuration."""
         config = copy.deepcopy(head_configs[0]['config'])
@@ -740,14 +743,14 @@ class TestSegmenter:
             'step_size': 10,
             'gamma': 0.5,
         }
-        
+
         model = Segmenter(config)
         optimizer_config = model.configure_optimizers()
-        
+
         assert 'lr_scheduler' in optimizer_config
         scheduler_config = optimizer_config['lr_scheduler']
         scheduler = scheduler_config['scheduler']
-        
+
         assert isinstance(scheduler, torch.optim.lr_scheduler.StepLR)
         assert scheduler.step_size == 10
         assert scheduler.gamma == 0.5
@@ -761,13 +764,13 @@ class TestSegmenter:
             'T_max': 50,
             'eta_min_factor': 10,
         }
-        
+
         model = Segmenter(config)
         optimizer_config = model.configure_optimizers()
-        
+
         assert 'lr_scheduler' in optimizer_config
         scheduler = optimizer_config['lr_scheduler']['scheduler']
-        
+
         assert isinstance(scheduler, torch.optim.lr_scheduler.CosineAnnealingLR)
         assert scheduler.T_max == 50
         # eta_min should be lr / eta_min_factor
@@ -784,13 +787,13 @@ class TestSegmenter:
             'T_mult': 2,
             'eta_min_factor': 20,
         }
-        
+
         model = Segmenter(config)
         optimizer_config = model.configure_optimizers()
-        
+
         assert 'lr_scheduler' in optimizer_config
         scheduler = optimizer_config['lr_scheduler']['scheduler']
-        
+
         assert isinstance(scheduler, torch.optim.lr_scheduler.CosineAnnealingWarmRestarts)
         assert scheduler.T_0 == 20
         assert scheduler.T_mult == 2
@@ -804,10 +807,10 @@ class TestSegmenter:
             'T_0': 15,
             'T_mult': 3,
         }
-        
+
         model = Segmenter(config)
         optimizer_config = model.configure_optimizers()
-        
+
         scheduler = optimizer_config['lr_scheduler']['scheduler']
         assert isinstance(scheduler, torch.optim.lr_scheduler.CosineAnnealingWarmRestarts)
 
@@ -820,14 +823,14 @@ class TestSegmenter:
             'factor': 0.25,
             'patience': 5,
         }
-        
+
         model = Segmenter(config)
         optimizer_config = model.configure_optimizers()
-        
+
         assert 'lr_scheduler' in optimizer_config
         scheduler_config = optimizer_config['lr_scheduler']
         scheduler = scheduler_config['scheduler']
-        
+
         assert isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
         assert scheduler.factor == 0.25
         assert scheduler.patience == 5
@@ -843,10 +846,10 @@ class TestSegmenter:
             'factor': 0.5,
             'patience': 10,
         }
-        
+
         model = Segmenter(config)
         optimizer_config = model.configure_optimizers()
-        
+
         scheduler = optimizer_config['lr_scheduler']['scheduler']
         assert isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
 
@@ -857,10 +860,10 @@ class TestSegmenter:
             'use_scheduler': False,
             'type': 'cosine',
         }
-        
+
         model = Segmenter(config)
         optimizer_config = model.configure_optimizers()
-        
+
         # Should only have optimizer, no scheduler
         assert 'optimizer' in optimizer_config
         assert 'lr_scheduler' not in optimizer_config
@@ -871,10 +874,10 @@ class TestSegmenter:
         # Ensure no scheduler key
         if 'scheduler' in config['optimizer']:
             del config['optimizer']['scheduler']
-        
+
         model = Segmenter(config)
         optimizer_config = model.configure_optimizers()
-        
+
         assert 'optimizer' in optimizer_config
         assert 'lr_scheduler' not in optimizer_config
 
@@ -883,10 +886,10 @@ class TestSegmenter:
         config = copy.deepcopy(head_configs[0]['config'])
         # Use flat specification instead of nested dict
         config['optimizer']['scheduler'] = 'cosine'
-        
+
         model = Segmenter(config)
         optimizer_config = model.configure_optimizers()
-        
+
         assert 'lr_scheduler' in optimizer_config
         scheduler = optimizer_config['lr_scheduler']['scheduler']
         assert isinstance(scheduler, torch.optim.lr_scheduler.CosineAnnealingLR)
@@ -895,10 +898,10 @@ class TestSegmenter:
         """Test scheduler with flat string specification for StepLR."""
         config = copy.deepcopy(head_configs[0]['config'])
         config['optimizer']['scheduler'] = 'step'
-        
+
         model = Segmenter(config)
         optimizer_config = model.configure_optimizers()
-        
+
         scheduler = optimizer_config['lr_scheduler']['scheduler']
         assert isinstance(scheduler, torch.optim.lr_scheduler.StepLR)
         # Should use default values
@@ -912,9 +915,9 @@ class TestSegmenter:
             'use_scheduler': True,
             'type': 'invalid_scheduler',
         }
-        
+
         model = Segmenter(config)
-        
+
         with pytest.raises(ValueError, match='Unsupported scheduler type'):
             model.configure_optimizers()
 
@@ -927,10 +930,10 @@ class TestSegmenter:
             'type': 'cosine',
             # T_max not specified here, should use from optimizer level
         }
-        
+
         model = Segmenter(config)
         optimizer_config = model.configure_optimizers()
-        
+
         scheduler = optimizer_config['lr_scheduler']['scheduler']
         assert isinstance(scheduler, torch.optim.lr_scheduler.CosineAnnealingLR)
         assert scheduler.T_max == 200
@@ -943,10 +946,10 @@ class TestSegmenter:
             'type': 'step',
             # No step_size or gamma specified
         }
-        
+
         model = Segmenter(config)
         optimizer_config = model.configure_optimizers()
-        
+
         scheduler = optimizer_config['lr_scheduler']['scheduler']
         # Should use defaults
         assert scheduler.step_size == 30
@@ -960,20 +963,20 @@ class TestSegmenter:
             'type': 'cosine',
             'T_max': 100,
         }
-        
+
         model = Segmenter(config)
         optimizer_config = model.configure_optimizers()
-        
+
         # Check structure expected by Lightning
         assert 'optimizer' in optimizer_config
         assert 'lr_scheduler' in optimizer_config
-        
+
         lr_scheduler_config = optimizer_config['lr_scheduler']
         assert 'scheduler' in lr_scheduler_config
         assert 'monitor' in lr_scheduler_config
         assert 'interval' in lr_scheduler_config
         assert 'frequency' in lr_scheduler_config
-        
+
         assert lr_scheduler_config['interval'] == 'epoch'
         assert lr_scheduler_config['frequency'] == 1
 
@@ -982,17 +985,17 @@ class TestSegmenter:
         for head_config in head_configs:
             config = head_config['config']
             model = Segmenter(config)
-            
+
             x = sample_batch['input']
             targets = sample_batch['labels']
-            
+
             # forward pass
             outputs = model(x)
             loss, _ = model.compute_loss(outputs, targets)
-            
+
             # backward pass
             loss.backward()
-            
+
             # check that model parameters have gradients
             for name, param in model.named_parameters():
                 assert param.grad is not None, f'No gradient for parameter {name}'
@@ -1003,15 +1006,15 @@ class TestSegmenter:
         for head_config in head_configs:
             config = head_config['config']
             model = Segmenter(config)
-            
+
             sequence_length = config['model']['sequence_length']
             input_size = config['model']['input_size']
             output_size = config['model']['output_size']
-            
+
             for batch_size in [1, 2, 4, 8]:
                 x = torch.randn(batch_size, sequence_length, input_size)
                 outputs = model(x)
-                
+
                 expected_shape = (batch_size, sequence_length, output_size)
                 assert outputs['logits'].shape == expected_shape
                 assert outputs['probabilities'].shape == expected_shape
@@ -1021,15 +1024,15 @@ class TestSegmenter:
         for head_config in head_configs:
             config = head_config['config']
             model = Segmenter(config)
-            
+
             batch_size = 2
             input_size = config['model']['input_size']
             output_size = config['model']['output_size']
-            
+
             for seq_len in [50, 100, 200, 500]:
                 x = torch.randn(batch_size, seq_len, input_size)
                 outputs = model(x)
-                
+
                 expected_shape = (batch_size, seq_len, output_size)
                 assert outputs['logits'].shape == expected_shape
                 assert outputs['probabilities'].shape == expected_shape
@@ -1039,16 +1042,16 @@ class TestSegmenter:
         for head_config in head_configs:
             config = head_config['config']
             model = Segmenter(config)
-            
+
             x = sample_batch['input']
-            
+
             # test in eval mode
             model.eval()
-            
+
             with torch.no_grad():
                 outputs1 = model(x)
                 outputs2 = model(x)
-            
+
             # outputs should be identical in eval mode (no dropout)
             assert torch.allclose(outputs1['logits'], outputs2['logits'])
             assert torch.allclose(outputs1['probabilities'], outputs2['probabilities'])
@@ -1060,16 +1063,16 @@ class TestSegmenter:
             # ensure dropout is enabled
             if 'dropout_rate' in config['model']:
                 config['model']['dropout_rate'] = 0.5
-            
+
             model = Segmenter(config)
             x = sample_batch['input']
-            
+
             # test in train mode
             model.train()
-            
+
             outputs1 = model(x)
             outputs2 = model(x)
-            
+
             # outputs might be different due to dropout (depending on implementation)
             # just check that they have the right shape and are finite
             assert torch.isfinite(outputs1['logits']).all()
@@ -1090,7 +1093,7 @@ class TestSegmenter:
                 'lr': 1e-3,
             }
         }
-        
+
         with pytest.raises(ValueError, match='Unsupported head type'):
             Segmenter(config)
 
@@ -1098,47 +1101,47 @@ class TestSegmenter:
         """Test train_accuracy metric computation."""
         config = head_configs[0]['config']
         model = Segmenter(config)
-        
+
         # create sample predictions and targets
         predictions = torch.tensor([
             [0, 1, 2, 3, 0, 1, 2, 3, 0, 1],  # batch 1
             [1, 2, 3, 0, 1, 2, 3, 0, 1, 2],  # batch 2
         ])
-        
+
         targets = torch.tensor([
             [0, 1, 2, 3, 0, 1, 1, 3, 0, 1],  # batch 1 - 1 wrong (index 6)
             [1, 2, 3, 0, 1, 2, 3, 0, 1, 2],  # batch 2 - all correct
         ])
-        
+
         # compute accuracy
         accuracy = model.train_accuracy(predictions, targets)
-        
+
         # manually calculate expected accuracy
         # batch 1: 9/10 correct, batch 2: 10/10 correct
         # total: 19/20 = 0.95
         expected_accuracy = 19.0 / 20.0
-        
+
         assert torch.allclose(accuracy, torch.tensor(expected_accuracy))
 
     def test_train_f1_metric(self, head_configs):
         """Test train_f1 metric computation."""
         config = head_configs[0]['config']
         model = Segmenter(config)
-        
+
         # create sample predictions and targets with known F1 characteristics
         predictions = torch.tensor([
             [0, 0, 1, 1, 2, 2, 3, 3, 0, 1, 2, 3],  # batch 1
             [0, 1, 1, 2, 2, 3, 3, 0, 1, 2, 3, 0],  # batch 2
         ])
-        
+
         targets = torch.tensor([
             [0, 0, 1, 1, 2, 2, 3, 3, 0, 1, 2, 3],  # batch 1 - all correct
             [0, 1, 2, 2, 2, 3, 3, 0, 1, 2, 3, 0],  # batch 2 - some wrong
         ])
-        
+
         # compute F1 score
         f1 = model.train_f1(predictions, targets)
-        
+
         # F1 should be between 0 and 1, and should be high since most predictions are correct
         assert 0.0 <= f1 <= 1.0
         assert f1 > 0.8  # should be quite high given the mostly correct predictions
@@ -1149,27 +1152,27 @@ class TestSegmenter:
         # set ignore_index in data config
         config['data'] = {'ignore_index': 0}
         model = Segmenter(config)
-        
+
         # create predictions and targets where class 0 should be ignored
         predictions = torch.tensor([
             [0, 1, 2, 3, 0, 1, 2, 3],  # batch 1
             [1, 2, 3, 0, 1, 2, 3, 0],  # batch 2
         ])
-        
+
         targets = torch.tensor([
             [0, 1, 2, 3, 0, 1, 1, 3],  # batch 1 - class 0 ignored, 1 wrong at index 6
             [1, 2, 3, 0, 1, 2, 3, 0],  # batch 2 - class 0 ignored, all non-ignored correct
         ])
-        
+
         # compute accuracy
         accuracy = model.train_accuracy(predictions, targets)
-        
+
         # class 0 should be ignored, so we only count non-zero predictions
         # batch 1: positions 1,2,3,5,6,7 -> 5/6 correct (position 6 is wrong)
         # batch 2: positions 0,1,2,4,5,6 -> 6/6 correct
         # total: 11/12 ≈ 0.9167
         expected_accuracy = 11.0 / 12.0
-        
+
         assert torch.allclose(accuracy, torch.tensor(expected_accuracy), atol=1e-3)
 
     def test_train_f1_with_ignore_index(self, head_configs):
@@ -1178,21 +1181,21 @@ class TestSegmenter:
         # set ignore_index in data config
         config['data'] = {'ignore_index': 0}
         model = Segmenter(config)
-        
+
         # create predictions and targets where class 0 should be ignored
         predictions = torch.tensor([
             [0, 1, 2, 3, 0, 1, 2, 3],  # batch 1
             [1, 2, 3, 0, 1, 2, 3, 0],  # batch 2
         ])
-        
+
         targets = torch.tensor([
             [0, 1, 2, 3, 0, 1, 1, 3],  # batch 1 - class 0 ignored, 1 wrong at index 6
             [1, 2, 3, 0, 1, 2, 3, 0],  # batch 2 - class 0 ignored, all non-ignored correct
         ])
-        
+
         # compute F1 score
         f1 = model.train_f1(predictions, targets)
-        
+
         # F1 should be in [0, 1], should be high since most non-ignored predictions are correct
         assert 0.0 <= f1 <= 1.0
         assert f1 > 0.8  # should be quite high given the mostly correct predictions

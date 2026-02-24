@@ -27,7 +27,7 @@ class TestDilationBlock:
     def test_initialization(self, basic_block_config):
         """Test DilationBlock initialization."""
         block = DilationBlock(**basic_block_config)
-        
+
         # check attributes
         assert block.input_size == basic_block_config['input_size']
         assert block.int_size == basic_block_config['int_size']
@@ -36,7 +36,7 @@ class TestDilationBlock:
         assert block.dilation == basic_block_config['dilation']
         assert block.activation_str == basic_block_config['activation']
         assert block.dropout_rate == basic_block_config['dropout']
-        
+
         # check components exist
         assert hasattr(block, 'conv0')
         assert hasattr(block, 'conv1')
@@ -65,12 +65,12 @@ class TestDilationBlock:
     def test_forward_pass_shape(self, basic_block_config):
         """Test forward pass produces correct output shapes."""
         block = DilationBlock(**basic_block_config)
-        
+
         batch_size, channels, time_steps = 2, basic_block_config['input_size'], 100
         x = torch.randn(batch_size, channels, time_steps)
-        
+
         output = block(x)
-        
+
         expected_shape = (batch_size, basic_block_config['output_size'], time_steps)
         assert output.shape == expected_shape
         assert torch.isfinite(output).all()
@@ -85,14 +85,14 @@ class TestDilationBlock:
             'dilation': 2,
             'dropout': 0.1,
         }
-        
+
         activations = ['relu', 'lrelu', 'sigmoid', 'tanh', 'linear']
-        
+
         for activation in activations:
             block = DilationBlock(activation=activation, **base_config)
             x = torch.randn(2, 6, 100)
             output = block(x)
-            
+
             assert output.shape == (2, 32, 100)
             assert torch.isfinite(output).all()
 
@@ -103,10 +103,10 @@ class TestDilationBlock:
             kernel_size=3, dilation=2,
             activation='relu', final_activation='tanh'
         )
-        
+
         x = torch.randn(2, 6, 100)
         output = block(x)
-        
+
         assert output.shape == (2, 32, 100)
         assert torch.isfinite(output).all()
         # tanh output should be in [-1, 1] range
@@ -116,17 +116,17 @@ class TestDilationBlock:
     def test_gradient_flow(self, basic_block_config):
         """Test gradient flow through the block."""
         block = DilationBlock(**basic_block_config)
-        
+
         x = torch.randn(2, 6, 100, requires_grad=True)
         output = block(x)
-        
+
         loss = output.sum()
         loss.backward()
-        
+
         # check gradients exist
         assert x.grad is not None
         assert not torch.isnan(x.grad).any()
-        
+
         # check block parameters have gradients
         for name, param in block.named_parameters():
             assert param.grad is not None, f"No gradient for parameter {name}"
@@ -136,7 +136,7 @@ class TestDilationBlock:
         """Test string representation of DilationBlock."""
         block = DilationBlock(**basic_block_config)
         repr_str = repr(block)
-        
+
         assert 'DilationBlock' in repr_str
         assert str(basic_block_config['input_size']) in repr_str
         assert str(basic_block_config['output_size']) in repr_str
@@ -185,7 +185,7 @@ class TestDilatedTCN:
         """Test DilatedTCN initialization with different configurations."""
         for config in tcn_configs:
             model = DilatedTCN(**config)
-            
+
             # check basic attributes
             assert model.input_size == config['input_size']
             assert model.num_hid_units == config['num_hid_units']
@@ -194,14 +194,14 @@ class TestDilatedTCN:
             assert model.activation == config['activation']
             assert model.dropout_rate == config['dropout_rate']
             assert model.seed == config['seed']
-            
+
             # check model structure
             assert hasattr(model, 'model')
             assert isinstance(model.model, torch.nn.Sequential)
-            
+
             # check number of blocks
             assert len(model.model) == config['num_layers']
-            
+
             # check each block is a DilationBlock
             for i, block in enumerate(model.model):
                 assert isinstance(block, DilationBlock)
@@ -213,17 +213,17 @@ class TestDilatedTCN:
         """Test forward pass produces correct output shapes."""
         for config in tcn_configs:
             model = DilatedTCN(**config)
-            
+
             batch_size, sequence_length = 2, 100
             x = torch.randn(batch_size, sequence_length, config['input_size'])
-            
+
             # forward pass
             output = model(x)
-            
+
             # check output shape
             expected_shape = (batch_size, sequence_length, config['num_hid_units'])
             assert output.shape == expected_shape
-            
+
             # check output is finite
             assert torch.isfinite(output).all()
 
@@ -362,14 +362,14 @@ class TestDilatedTCN:
         """Test TCN with different sequence lengths."""
         config = tcn_configs[0]  # use first config
         model = DilatedTCN(**config)
-        
+
         batch_size = 2
         input_size = config['input_size']
-        
+
         for seq_len in [10, 50, 100, 200, 500]:
             x = torch.randn(batch_size, seq_len, input_size)
             output = model(x)
-            
+
             expected_shape = (batch_size, seq_len, config['num_hid_units'])
             assert output.shape == expected_shape
 
@@ -378,7 +378,7 @@ class TestDilatedTCN:
         config = tcn_configs[0]
         model = DilatedTCN(**config)
         repr_str = repr(model)
-        
+
         assert 'DilatedTCN' in repr_str
         assert str(config['input_size']) in repr_str
         assert str(config['num_hid_units']) in repr_str

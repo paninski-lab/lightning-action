@@ -36,10 +36,10 @@ logger = logging.getLogger(__name__)
 @typechecked
 def reset_seeds(seed: int = 0) -> None:
     """Reset all random seeds for reproducibility.
-    
+
     Sets seeds for Python's random, NumPy, and PyTorch. Also configures
     cuDNN for deterministic behavior (at the cost of some performance).
-    
+
     Args:
         seed: Random seed value (default: 0).
     """
@@ -65,7 +65,7 @@ def get_callbacks(
     monitor: Optional[str] = 'val_loss',  # New parameter
 ) -> list[pl.Callback]:
     """Get Lightning callbacks for training.
-    
+
     Args:
         checkpointing: Whether to enable model checkpointing (saves best model).
         lr_monitor: Whether to monitor and log learning rate.
@@ -74,17 +74,17 @@ def get_callbacks(
         early_stopping_patience: Patience for early stopping (epochs without improvement).
         monitor: Metric to monitor for checkpointing. Use None to save last model,
             'val_loss' (default) for best validation, or 'train_loss' if no validation.
-        
+
     Returns:
         List of configured Lightning callbacks.
     """
     callbacks = []
-    
+
     # Learning rate monitoring
     if lr_monitor:
         lr_monitor_cb = pl.callbacks.LearningRateMonitor(logging_interval='epoch')
         callbacks.append(lr_monitor_cb)
-    
+
     # Model checkpointing - save best model based on monitored metric
     if checkpointing:
         ckpt_best_callback = pl.callbacks.ModelCheckpoint(
@@ -95,7 +95,7 @@ def get_callbacks(
             save_last=True if monitor is None else False,  # Save last if no monitor
         )
         callbacks.append(ckpt_best_callback)
-    
+
     # Periodic checkpointing (save every N epochs regardless of performance)
     if ckpt_every_n_epochs is not None:
         ckpt_callback = pl.callbacks.ModelCheckpoint(
@@ -105,17 +105,17 @@ def get_callbacks(
             filename='{epoch}-{step}',
         )
         callbacks.append(ckpt_callback)
-    
+
     # Early stopping
     if early_stopping:
         early_stop_callback = pl.callbacks.EarlyStopping(
-            monitor=monitor,  
+            monitor=monitor,
             mode='min',
             patience=early_stopping_patience,
             verbose=True,
         )
         callbacks.append(early_stop_callback)
-    
+
     return callbacks
 
 
@@ -126,11 +126,11 @@ def get_callbacks(
 @typechecked
 def validate_config(config: dict[str, Any], required_sections: list[str]) -> None:
     """Validate that required configuration sections are present.
-    
+
     Args:
         config: Configuration dictionary to validate.
         required_sections: List of required top-level section names.
-    
+
     Raises:
         ValueError: If any required section is missing.
     """
@@ -146,11 +146,11 @@ def update_config_with_class_weights(
     class_weights: Optional[list[float]],
 ) -> None:
     """Update config and model with computed class weights.
-    
+
     This function handles the common pattern of storing class weights in both
     the config dictionary (for persistence) and the model's config (for use
     during training).
-    
+
     Args:
         config: Main configuration dictionary.
         model: Lightning model with an optional 'config' attribute.
@@ -159,10 +159,10 @@ def update_config_with_class_weights(
     # Ensure model section exists in config
     if 'model' not in config:
         config['model'] = {}
-    
+
     # Store in main config
     config['model']['class_weights'] = class_weights
-    
+
     # Store in model's config if it has one
     if hasattr(model, 'config'):
         if 'model' not in model.config:
@@ -177,10 +177,10 @@ def update_config_with_label_names(
     label_names: list[str],
 ) -> None:
     """Update config and model with label names.
-    
+
     Stores label names in both the config dictionary and the model's config
     if the label_names list is non-empty.
-    
+
     Args:
         config: Main configuration dictionary.
         model: Lightning model with an optional 'config' attribute.
@@ -190,9 +190,9 @@ def update_config_with_label_names(
         # Ensure data section exists
         if 'data' not in config:
             config['data'] = {}
-        
+
         config['data']['label_names'] = label_names
-        
+
         if hasattr(model, 'config'):
             if 'data' not in model.config:
                 model.config['data'] = {}
@@ -207,25 +207,25 @@ def save_config(
     filename: str = 'config.yaml',
 ) -> Path:
     """Save configuration to YAML file.
-    
+
     Only executes on rank 0 to avoid conflicts in distributed training.
     Creates parent directories if they don't exist.
-    
+
     Args:
         config: Configuration dictionary to save.
         output_dir: Directory where config file will be saved.
         filename: Name of the config file (default: 'config.yaml').
-    
+
     Returns:
         Path to the saved config file.
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     config_path = output_dir / filename
     with open(config_path, 'w') as f:
         yaml.dump(config, f, default_flow_style=False)
-    
+
     logger.info(f"Saved configuration to: {config_path}")
     return config_path
 
@@ -238,17 +238,17 @@ def save_config(
 @typechecked
 def pretty_print_config(config: dict[str, Any]) -> None:
     """Pretty print configuration dictionary.
-    
+
     Prints each section of the configuration in a readable format.
     Only executes on rank 0 in distributed training.
-    
+
     Args:
         config: Configuration dictionary to print.
     """
     print("\n" + "=" * 60)
     print("Configuration:")
     print("=" * 60)
-    
+
     for section, params in config.items():
         if isinstance(params, dict):
             print(f"\n  {section} parameters:")
@@ -256,7 +256,7 @@ def pretty_print_config(config: dict[str, Any]) -> None:
                 print(f"    {key}: {value}")
         else:
             print(f"\n  {section}: {params}")
-    
+
     print("\n" + "=" * 60 + "\n")
 
 
@@ -270,10 +270,10 @@ def get_callbacks_from_config(
     monitor: str = 'val_loss',
 ) -> list[pl.Callback]:
     """Create callbacks based on training configuration.
-    
+
     Convenience function that extracts callback parameters from a training
     config dictionary and creates the appropriate callbacks.
-    
+
     Args:
         training_config: Training configuration dictionary with optional keys:
             - checkpointing: bool (default: True)
@@ -282,7 +282,7 @@ def get_callbacks_from_config(
             - early_stopping: bool (default: False)
             - early_stopping_patience: int (default: 10)
         monitor: Metric to monitor for checkpointing and early stopping.
-    
+
     Returns:
         List of configured Lightning callbacks.
     """

@@ -28,16 +28,17 @@ import torch
 import torch.nn as nn
 from typeguard import typechecked
 
+
 @typechecked
 def get_configs(arch: str = 'resnet50') -> tuple:
     """Get number and type of layers for resnet models.
-    
+
     Args:
         arch: ResNet architecture name.
-    
+
     Returns:
         Tuple of (layer_configs, use_bottleneck).
-    
+
     Raises:
         ValueError: If architecture is not supported.
     """
@@ -67,101 +68,101 @@ BEAST_RESNET_HIDDEN_SIZES = {
 
 class ResNetBeastBackbone(nn.Module):
     """Image backbone using beast's custom ResNet implementation.
-    
+
     This backbone is compatible with checkpoints trained using beast's
     ResnetAutoEncoder. It extracts only the backbone portion.
-    
+
     Attributes:
         backbone: The ResNetBeast module.
-    
+
     Properties:
         hidden_size: Output feature dimension.
         num_channels: Number of input channels (3 for RGB).
         image_size: Expected input image size (224).
         patch_size: Effective patch size (32, due to total stride).
         backbone_type: Returns 'resnet-beast'.
-    
+
     Example:
         config = {'backbone': 'resnet50'}
         backbone = ResNetBeastBackbone(config)
-        
+
         images = torch.randn(4, 3, 224, 224)
         features = backbone(images)  # (4, 2048, 7, 7)
     """
-    
+
     @typechecked
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize the beast ResNet backbone.
-        
+
         Args:
             config: Configuration dictionary with optional keys:
                 - backbone: ResNet variant ('resnet18', 'resnet34', 'resnet50',
                     'resnet101', 'resnet152'). Default: 'resnet50'.
                 - image_size: Expected input image size. Default: 224.
-        
+
         Raises:
             ValueError: If backbone name is not supported.
         """
         super().__init__()
-        
+
         config = config or {}
-        
+
         # Parse configuration
         self._backbone_name = config.get('backbone', 'resnet50')
         self._image_size = config.get('image_size', 224)
-        
+
         # Validate and get architecture config
         if self._backbone_name not in BEAST_RESNET_HIDDEN_SIZES:
             raise ValueError(
                 f"Unsupported backbone: {self._backbone_name}. "
                 f"Supported: {list(BEAST_RESNET_HIDDEN_SIZES.keys())}"
             )
-        
+
         self._hidden_size = BEAST_RESNET_HIDDEN_SIZES[self._backbone_name]
         self._config = config
-        
+
         # Build backbone
         resnet_config, bottleneck = get_configs(self._backbone_name)
         self.backbone = ResNetBeast(configs=resnet_config, bottleneck=bottleneck)
-    
+
     @property
     def hidden_size(self) -> int:
         """Output feature dimension."""
         return self._hidden_size
-    
+
     @property
     def num_channels(self) -> int:
         """Number of input image channels."""
         return 3
-    
+
     @property
     def image_size(self) -> int:
         """Expected input image size."""
         return self._image_size
-    
+
     @property
     def patch_size(self) -> int:
         """Effective patch size (total stride of the network)."""
         return 32  # 224 -> 7 means stride of 32
-    
+
     @property
     def backbone_type(self) -> str:
         """Return backbone type identifier."""
         return 'resnet-beast'
-    
+
     @typechecked
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through the backbone.
-        
+
         Args:
             x: Input images, shape (B, C, H, W).
-        
+
         Returns:
             Spatial features, shape (B, hidden_size, H', W').
             For 224x224 input: (B, hidden_size, 7, 7).
         """
         return self.backbone(x)
-    
+
     @typechecked
     def load_pretrained_weights(
         self,
@@ -169,22 +170,22 @@ class ResNetBeastBackbone(nn.Module):
         strict: bool = False,
     ) -> None:
         """Load pretrained weights from a beast checkpoint.
-        
+
         Handles beast's ResnetAutoEncoder checkpoint format, extracting
         only the encoder weights.
-        
+
         Args:
             checkpoint_path: Path to checkpoint file (.ckpt or .pt).
             strict: If True, raise error on missing/extra keys.
-        
+
         Raises:
             FileNotFoundError: If checkpoint file doesn't exist.
         """
         if not Path(checkpoint_path).exists():
             raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
-        
+
         checkpoint = torch.load(checkpoint_path, map_location='cpu')
-        
+
         # Handle different checkpoint formats
         if 'state_dict' in checkpoint:
             state_dict = checkpoint['state_dict']
@@ -192,22 +193,22 @@ class ResNetBeastBackbone(nn.Module):
             state_dict = checkpoint['model_state_dict']
         else:
             state_dict = checkpoint
-        
+
         # Extract encoder weights with various possible prefixes
         encoder_state_dict = {}
         current_state_dict = self.backbone.state_dict()
-        
+
         prefixes_to_try = [
             'encoder.',           # Direct encoder save
             'model.encoder.',     # Wrapped in model
             '',                   # No prefix
         ]
-        
+
         for ckpt_key, value in state_dict.items():
             # Skip decoder and latent mapping weights
             if 'decoder' in ckpt_key or 'latent' in ckpt_key.lower():
                 continue
-            
+
             for prefix in prefixes_to_try:
                 if prefix and ckpt_key.startswith(prefix):
                     model_key = ckpt_key[len(prefix):]
@@ -215,21 +216,21 @@ class ResNetBeastBackbone(nn.Module):
                     model_key = ckpt_key
                 else:
                     continue
-                
+
                 if model_key in current_state_dict:
                     if current_state_dict[model_key].shape == value.shape:
                         encoder_state_dict[model_key] = value
                         break
-        
+
         if encoder_state_dict:
             self.backbone.load_state_dict(encoder_state_dict, strict=strict)
             print(f"Loaded {len(encoder_state_dict)} weights from checkpoint")
         else:
             print("Warning: No matching weights found in checkpoint")
-    
+
     def get_last_layer_params(self) -> Iterator[nn.Parameter]:
         """Get parameters of the last encoder block for fine-tuning.
-        
+
         Returns:
             Iterator over parameters of conv5 (last residual block).
         """

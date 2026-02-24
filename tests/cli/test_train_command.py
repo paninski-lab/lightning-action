@@ -62,7 +62,7 @@ class TestApplyConfigOverrides:
         """Test simple key-value override."""
         config = {'key1': 'old_value'}
         overrides = ['key1=new_value']
-        
+
         result = apply_config_overrides(config, overrides)
         assert result['key1'] == 'new_value'
 
@@ -70,7 +70,7 @@ class TestApplyConfigOverrides:
         """Test nested key override with dot notation."""
         config = {'section': {'key': 'old_value'}}
         overrides = ['section.key=new_value']
-        
+
         result = apply_config_overrides(config, overrides)
         assert result['section']['key'] == 'new_value'
 
@@ -78,7 +78,7 @@ class TestApplyConfigOverrides:
         """Test creating new nested keys."""
         config = {}
         overrides = ['new_section.new_key=value']
-        
+
         result = apply_config_overrides(config, overrides)
         assert result['new_section']['new_key'] == 'value'
 
@@ -86,7 +86,7 @@ class TestApplyConfigOverrides:
         """Test multiple overrides."""
         config = {'a': 1, 'b': {'c': 2}}
         overrides = ['a=10', 'b.c=20', 'b.d=30']
-        
+
         result = apply_config_overrides(config, overrides)
         assert result['a'] == 10
         assert result['b']['c'] == 20
@@ -96,7 +96,7 @@ class TestApplyConfigOverrides:
         """Test error handling for invalid override format."""
         config = {}
         overrides = ['invalid_format']
-        
+
         with pytest.raises(ValueError, match="Override must be in format 'key=value'"):
             apply_config_overrides(config, overrides)
 
@@ -115,7 +115,7 @@ class TestApplyOverrides:
         args.lr = None
         args.seed = None
         args.overrides = None
-        
+
         result = apply_overrides(config, args)
         assert result['data']['data_path'] == '/new/path'
 
@@ -130,7 +130,7 @@ class TestApplyOverrides:
         args.lr = 0.001
         args.seed = 42
         args.overrides = None
-        
+
         result = apply_overrides(config, args)
         assert result['training']['device'] == 'gpu'
         assert result['training']['num_epochs'] == 100
@@ -149,7 +149,7 @@ class TestApplyOverrides:
         args.lr = None
         args.seed = None
         args.overrides = ['model.num_layers=5', 'training.device=cpu']
-        
+
         result = apply_overrides(config, args)
         assert result['model']['num_layers'] == 5
         assert result['training']['device'] == 'cpu'
@@ -193,9 +193,9 @@ class TestHandle:
         with patch('lightning_action.api.model.Model.from_config') as mock_model_class:
             mock_model = MagicMock()
             mock_model_class.return_value = mock_model
-            
+
             handle(mock_args)
-            
+
             # check that Model.from_config was called
             mock_model_class.assert_called_once()
             config_arg = mock_model_class.call_args[0][0]
@@ -216,9 +216,9 @@ class TestHandle:
         with patch('lightning_action.api.model.Model.from_config') as mock_model_class:
             mock_model = MagicMock()
             mock_model_class.return_value = mock_model
-            
+
             handle(mock_args)
-            
+
             # check that train was called
             mock_model.train.assert_called_once()
             train_args = mock_model.train.call_args
@@ -240,9 +240,9 @@ class TestHandle:
         with patch('lightning_action.api.model.Model.from_config') as mock_model_class:
             mock_model = MagicMock()
             mock_model_class.return_value = mock_model
-            
+
             handle(mock_args)
-            
+
             # check that overrides were applied
             config_arg = mock_model_class.call_args[0][0]
             assert config_arg['training']['num_epochs'] == 50
@@ -263,7 +263,7 @@ class TestHandle:
             mock_model = MagicMock()
             mock_model.train.side_effect = Exception('Training failed')
             mock_model_class.return_value = mock_model
-            
+
             with pytest.raises(Exception, match='Training failed'):
                 handle(mock_args)
 

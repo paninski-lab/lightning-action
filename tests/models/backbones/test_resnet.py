@@ -3,7 +3,7 @@
 import pytest
 import torch
 
-from lightning_action.models.backbones.resnet import ResNetBackbone, RESNET_HIDDEN_SIZES
+from lightning_action.models.backbones.resnet import RESNET_HIDDEN_SIZES, ResNetBackbone
 
 
 class TestResNetBackbone:
