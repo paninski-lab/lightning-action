@@ -33,6 +33,8 @@ dependencies = [
     "scikit-learn",
     "tensorboard",
     "torch",
+    "torchvision",
+    "transformers",
     "typeguard (<3.0.0)",
     "pandas",
     "pyyaml",
@@ -52,13 +54,12 @@ litaction = "lightning_action.cli.main:main"
 
 [project.optional-dependencies]
 dev = [
+    "autopep8",
     "flake8-pyproject",
     "isort",
     "pytest",
     "pytest-html",
     "requests",
-    "torchvision",
-    "transformers",
 ]
 
 [tool.isort]
