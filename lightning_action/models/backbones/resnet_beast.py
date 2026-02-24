@@ -323,7 +323,7 @@ class ResidualBlock(nn.Module):
                         hidden_channels=hidden_channels,
                         downsample=False,
                     )
-                self.add_module(f'{i} Layer', layer)
+                self.add_module(f'{i} EncoderLayer', layer)
 
         elif downsample_method == 'pool':
             maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -342,7 +342,7 @@ class ResidualBlock(nn.Module):
                         hidden_channels=hidden_channels,
                         downsample=False,
                     )
-                self.add_module(f'{i + 1} Layer', layer)
+                self.add_module(f'{i + 1} EncoderLayer', layer)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         for name, layer in self.named_children():
@@ -375,7 +375,7 @@ class BottleneckBlock(nn.Module):
                         in_channels=up_channels, hidden_channels=hidden_channels,
                         up_channels=up_channels, downsample=False,
                     )
-                self.add_module(f'{i} Layer', layer)
+                self.add_module(f'{i} EncoderLayer', layer)
 
         elif downsample_method == 'pool':
             maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -392,7 +392,7 @@ class BottleneckBlock(nn.Module):
                         in_channels=up_channels, hidden_channels=hidden_channels,
                         up_channels=up_channels, downsample=False,
                     )
-                self.add_module(f'{i + 1} Layer', layer)
+                self.add_module(f'{i + 1} EncoderLayer', layer)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         for name, layer in self.named_children():

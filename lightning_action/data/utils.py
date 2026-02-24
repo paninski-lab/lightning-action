@@ -301,13 +301,6 @@ def split_sizes_from_probabilities(
     train_number = int(np.ceil(train_probability * total_number))
     val_number = total_number - train_number
 
-    # make sure that we have at least one validation sample
-    if val_number == 0:
-        train_number -= 1
-        val_number += 1
-        if train_number < 1:
-            raise ValueError('Must have at least two sequences, one train and one validation')
-
     # assert that we're using all datapoints
     assert train_number + val_number == total_number
 

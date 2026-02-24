@@ -276,4 +276,3 @@ class TestRNN:
             assert config['rnn_type'] in repr_str
             assert str(config['bidirectional']) in repr_str
             assert str(config['dropout_rate']) in repr_str
-

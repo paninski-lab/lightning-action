@@ -113,15 +113,15 @@ class TestSplitSizesFromProbabilities:
             split_sizes_from_probabilities(100, 0.6, 0.5)
 
     def test_minimum_validation_samples(self):
-        """Test that at least one validation sample is guaranteed."""
-        # case where val_probability would give 0 samples
+        """Test that 0 validation samples is valid when val_probability is 0."""
+        # case where val_probability is 0 — all samples go to training
         result = split_sizes_from_probabilities(10, 1.0, 0.0)
-        assert result == [9, 1]  # should adjust to ensure 1 val sample
+        assert result == [10, 0]
 
     def test_too_few_total_samples(self):
-        """Test error when not enough samples for train and val."""
-        with pytest.raises(ValueError, match='Must have at least two sequences'):
-            split_sizes_from_probabilities(1, 1.0, 0.0)
+        """Test that a single sample with 0 val probability returns [1, 0]."""
+        result = split_sizes_from_probabilities(1, 1.0, 0.0)
+        assert result == [1, 0]
 
     def test_fractional_results(self):
         """Test handling of fractional results."""
@@ -140,7 +140,7 @@ class TestSplitSizesFromProbabilities:
         # slightly larger
         result = split_sizes_from_probabilities(3, 0.67, 0.33)
         assert sum(result) == 3
-        assert result[1] >= 1  # ensure at least 1 val
+        assert result[1] >= 0  # val can be 0 when val_probability rounds down
 
 
 class TestComputeClassWeights:
