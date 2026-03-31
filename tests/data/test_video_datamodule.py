@@ -2169,11 +2169,13 @@ class TestAugmentationGPU:
 
     def test_pipeline_with_default_augmentation(self, create_test_video, cleanup_gpu):
         """Test pipeline builds and runs with 'default' augmentation preset."""
-        from lightning_action.data.video_datamodule import (
-            VideoPipeline, AUGMENTATION_PRESETS,
-        )
-        import tempfile as tf
         import gc
+        import tempfile as tf
+
+        from lightning_action.data.video_datamodule import (
+            AUGMENTATION_PRESETS,
+            VideoPipeline,
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             videos_dir = os.path.join(tmpdir, 'videos')
@@ -2211,11 +2213,13 @@ class TestAugmentationGPU:
 
     def test_pipeline_with_strong_augmentation(self, create_test_video, cleanup_gpu):
         """Test pipeline builds and runs with 'strong' augmentation (includes rotation)."""
-        from lightning_action.data.video_datamodule import (
-            VideoPipeline, AUGMENTATION_PRESETS,
-        )
-        import tempfile as tf
         import gc
+        import tempfile as tf
+
+        from lightning_action.data.video_datamodule import (
+            AUGMENTATION_PRESETS,
+            VideoPipeline,
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             videos_dir = os.path.join(tmpdir, 'videos')
@@ -2254,9 +2258,10 @@ class TestAugmentationGPU:
         self, create_test_video, cleanup_gpu
     ):
         """Test that 'none' preset produces same output as no augmentation."""
-        from lightning_action.data.video_datamodule import VideoPipeline
-        import tempfile as tf
         import gc
+        import tempfile as tf
+
+        from lightning_action.data.video_datamodule import VideoPipeline
 
         with tempfile.TemporaryDirectory() as tmpdir:
             videos_dir = os.path.join(tmpdir, 'videos')
@@ -2312,11 +2317,13 @@ class TestAugmentationGPU:
         self, create_test_video, cleanup_gpu
     ):
         """Test that augmented output differs from unaugmented (statistical check)."""
-        from lightning_action.data.video_datamodule import (
-            VideoPipeline, AUGMENTATION_PRESETS,
-        )
-        import tempfile as tf
         import gc
+        import tempfile as tf
+
+        from lightning_action.data.video_datamodule import (
+            AUGMENTATION_PRESETS,
+            VideoPipeline,
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             videos_dir = os.path.join(tmpdir, 'videos')
