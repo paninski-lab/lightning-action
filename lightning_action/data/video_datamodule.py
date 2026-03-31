@@ -63,6 +63,7 @@ except ImportError:
     Pipeline = object
     DALIGenericIterator = object
 
+
 def _check_dali_available():
     """Raise informative error if DALI is not available."""
     if not DALI_AVAILABLE:
@@ -217,19 +218,19 @@ def _resolve_augmentation_config(config) -> dict:
 
 class VideoPipeline(Pipeline):
     """DALI pipeline for GPU-accelerated video decoding and preprocessing.
-    
+
     This pipeline:
     1. Reads video files using GPU-accelerated decoding
     2. Extracts sequences of frames with configurable step size
     3. Resizes frames to target resolution
     4. Normalizes using ImageNet statistics
-    
+
     The pipeline outputs:
     - frames: Preprocessed video frames (FCHW format)
     - frame_idx: Video index in the file list
     - start_frame: Starting frame number within the video
     """
-    
+
     def __init__(
         self,
         batch_size: int,
@@ -380,7 +381,7 @@ class VideoPipeline(Pipeline):
             pad_sequences=self.pad_sequences,
             pad_last_batch=self.pad_sequences,
         )
-        
+
         # Optional grayscale conversion (RGB -> GRAY -> RGB) to match
         # backbones pretrained on grayscale images converted to 3-channel RGB
         if self._transform_preset["grayscale"]:
@@ -406,16 +407,15 @@ class VideoPipeline(Pipeline):
         return frames, frame_idx, start_frame
 
 
-
 class DALIIterator(DALIGenericIterator):
     """Custom DALI iterator that pairs video frames with labels.
-    
+
     This iterator wraps DALI's generic iterator to:
     1. Extract frames, video indices, and start frames from DALI batches
     2. Look up corresponding labels from a preloaded 2D label tensor
     3. Track metadata about each sample (video index, position, boundaries)
     """
-    
+
     def __init__(
         self,
         pipe: Pipeline,
@@ -543,10 +543,10 @@ class DALIIterator(DALIGenericIterator):
 
 def _get_video_frame_count_cv2(video_path: str) -> int:
     """Get frame count from video file using OpenCV.
-    
+
     Args:
         video_path: Path to video file.
-    
+
     Returns:
         Number of frames, or 0 if video cannot be opened.
     """
@@ -589,29 +589,29 @@ def _label_path_from_video(video_path: str, labels_dir: str) -> str:
 
 
 def load_labels_for_videos(
-    video_paths: list[str], 
-    labels_dir: Optional[str], 
-    max_frames: int, 
+    video_paths: list[str],
+    labels_dir: Optional[str],
+    max_frames: int,
     ignore_index: int = -100,
 ) -> Optional[torch.Tensor]:
     """Load labels into a 2D tensor for efficient batched lookup.
-    
+
     Args:
         video_paths: List of video file paths (order matches DALI file_list).
         labels_dir: Directory containing .npy label files, or None.
         max_frames: Maximum frame count across all videos.
         ignore_index: Value for padding/missing frames.
-    
+
     Returns:
         Tensor of shape (num_videos, max_frames) with class labels,
         or None if labels_dir is not provided.
     """
     if labels_dir is None:
         return None
-    
+
     num_videos = len(video_paths)
     all_labels = np.full((num_videos, max_frames), ignore_index, dtype=np.int64)
-    
+
     for idx, video_path in enumerate(video_paths):
         label_path = _label_path_from_video(video_path, labels_dir)
         labels = _load_label_file(label_path)
@@ -619,41 +619,41 @@ def load_labels_for_videos(
             continue
         n_frames = min(len(labels), max_frames)
         all_labels[idx, :n_frames] = labels[:n_frames]
-    
+
     return torch.from_numpy(all_labels)
 
 
 def get_video_lengths(
-    video_paths: list[str], 
+    video_paths: list[str],
     labels_dir: Optional[str] = None,
     precomputed_lengths: Optional[dict[str, int]] = None,
 ) -> dict[int, int]:
     """Get video lengths (frame counts) for each video index.
-    
+
     Attempts to get lengths from:
     1. Precomputed lengths dict (if provided)
     2. Label files (if labels_dir provided)
     3. OpenCV as fallback
-    
+
     Args:
         video_paths: List of video file paths.
         labels_dir: Directory containing .npy label files, or None.
         precomputed_lengths: Optional dict mapping video stem -> frame count.
-    
+
     Returns:
         Dict mapping video index -> frame count.
     """
     lengths = {}
-    
+
     for idx, video_path in enumerate(video_paths):
         video_name = os.path.basename(video_path)
         video_stem = video_name.replace('.mp4', '')
-        
+
         # Try precomputed lengths first
         if precomputed_lengths and video_stem in precomputed_lengths:
             lengths[idx] = precomputed_lengths[video_stem]
             continue
-        
+
         # Try label files
         if labels_dir:
             label_path = os.path.join(labels_dir, video_name.replace('.mp4', '.npy'))
@@ -661,41 +661,41 @@ def get_video_lengths(
                 labels = np.load(label_path, mmap_mode='r')
                 lengths[idx] = len(labels)
                 continue
-        
+
         # Fall back to OpenCV
         frame_count = _get_video_frame_count_cv2(video_path)
         if frame_count > 0:
             lengths[idx] = frame_count
-    
+
     return lengths
 
 
 def get_max_frames(
-    video_paths: list[str], 
+    video_paths: list[str],
     labels_dir: Optional[str] = None,
     precomputed_lengths: Optional[dict[str, int]] = None,
 ) -> int:
     """Get maximum frame count across a list of videos.
-    
+
     Args:
         video_paths: List of video file paths.
         labels_dir: Directory containing .npy label files, or None.
         precomputed_lengths: Optional dict mapping video stem -> frame count.
-    
+
     Returns:
         Maximum frame count across all videos.
     """
     max_frames = 0
-    
+
     for video_path in video_paths:
         video_name = os.path.basename(video_path)
         video_stem = video_name.replace('.mp4', '')
-        
+
         # Try precomputed lengths first
         if precomputed_lengths and video_stem in precomputed_lengths:
             max_frames = max(max_frames, precomputed_lengths[video_stem])
             continue
-        
+
         # Try label files
         if labels_dir:
             label_path = os.path.join(labels_dir, video_name.replace('.mp4', '.npy'))
@@ -703,27 +703,26 @@ def get_max_frames(
                 labels = np.load(label_path, mmap_mode='r')
                 max_frames = max(max_frames, len(labels))
                 continue
-        
+
         # Fall back to OpenCV
         frame_count = _get_video_frame_count_cv2(video_path)
         if frame_count > 0:
             max_frames = max(max_frames, frame_count)
-    
-    return max_frames
 
+    return max_frames
 
 
 class VideoDataModule(pl.LightningDataModule):
     """Lightning DataModule for video action segmentation.
-    
+
     This DataModule orchestrates the entire data pipeline:
     1. Creates a VideoDataset to discover videos and compute class weights
     2. Splits VIDEOS into train/val sets (video-level, not chunk-level)
     3. Creates DALI-based dataloaders for efficient GPU video processing
-    
+
     The train/val split is done at the VIDEO level to prevent data leakage.
     DALI handles chunking independently at runtime.
-    
+
     Attributes:
         data_config: Configuration dict with videos_dir, labels_dir, etc.
         sequence_length: Number of frames per chunk (excluding padding).
@@ -774,7 +773,7 @@ class VideoDataModule(pl.LightningDataModule):
         self.val_probability = val_probability
         self.seed = seed
         self.model_config = model_config or {}
-        
+
         self.videos_dir = data_config['videos_dir']
         self.labels_dir = data_config.get('labels_dir')  # Now optional
         self.precomputed_lengths = data_config.get('video_lengths')  # Optional precomputed
@@ -791,7 +790,7 @@ class VideoDataModule(pl.LightningDataModule):
         self._augmentation_config = _resolve_augmentation_config(
             data_config.get('augmentations')
         )
-        
+
         # Validate probabilities
         if not 0 <= train_probability <= 1:
             raise ValueError('train_probability must be in [0, 1]')
@@ -799,14 +798,14 @@ class VideoDataModule(pl.LightningDataModule):
             raise ValueError('val_probability must be in [0, 1]')
         if train_probability + val_probability > 1:
             raise ValueError('train_probability + val_probability must be <= 1')
-        
+
         # State variables - will be set in setup()
         self.train_video_paths: Optional[list[str]] = None
         self.val_video_paths: Optional[list[str]] = None
         self.current_epoch: int = 0
         self.validation_enabled: bool = True
         self._predict_video_paths: Optional[list[str]] = None
-        
+
         # Adjust threads for distributed training
         if torch.distributed.is_available() and torch.distributed.is_initialized():
             world_size = torch.distributed.get_world_size()
@@ -819,7 +818,7 @@ class VideoDataModule(pl.LightningDataModule):
             num_lags = self.model_config.get('num_lags', 2)
         else:
             num_lags = (
-                0 if not self.model_config.get('bidirectional', False) 
+                0 if not self.model_config.get('bidirectional', False)
                 else self.model_config.get('num_lags', 2)
             )
 
@@ -840,12 +839,11 @@ class VideoDataModule(pl.LightningDataModule):
             label_names=self.data_config.get('label_names'),
         )
 
-
     def setup(self, stage: Optional[str] = None) -> None:
         """Set up train/val/predict video splits.
-        
+
         Splits are done at the VIDEO level for clean separation.
-        
+
         Args:
             stage: One of 'fit', 'validate', 'test', 'predict', or None.
         """
@@ -858,26 +856,26 @@ class VideoDataModule(pl.LightningDataModule):
                     self.train_probability,
                     self.val_probability,
                 )
-                
+
                 # Reproducible shuffle and split
                 np.random.seed(self.seed)
                 indices = np.random.permutation(num_videos)
-                
+
                 train_indices = indices[:train_size]
                 val_indices = indices[train_size:train_size + val_size]
-                
+
                 self.train_video_paths = [self.dataset.video_paths[i] for i in train_indices]
                 self.val_video_paths = [self.dataset.video_paths[i] for i in val_indices]
-                
+
                 # Determine if validation is possible
                 if val_size == 0 or len(self.val_video_paths) == 0:
                     self.validation_enabled = False
                 else:
                     self.validation_enabled = True
-        
+
         if stage == 'predict':
             all_videos = self.dataset.video_paths
-            
+
             # Distribute videos across GPUs for multi-GPU prediction
             if torch.distributed.is_available() and torch.distributed.is_initialized():
                 rank = torch.distributed.get_rank()
@@ -927,28 +925,28 @@ class VideoDataModule(pl.LightningDataModule):
 
         if not video_list or len(video_list) == 0:
             return None
-        
+
         last_batch_policy = (
-            LastBatchPolicy.DROP if last_batch_policy_str.lower() == 'drop' 
+            LastBatchPolicy.DROP if last_batch_policy_str.lower() == 'drop'
             else LastBatchPolicy.PARTIAL
         )
-        
+
         # Vary seed by epoch for training shuffles
         epoch_seed = self.seed + self.current_epoch if shuffle else self.seed
-        
+
         # Create DALI file list
         file_list_entries = []
         for idx, video_path in enumerate(video_list):
             file_list_entries.append(f"{video_path} {idx}\n")
-        
+
         with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as tmp:
             tmp.writelines(file_list_entries)
             file_list = tmp.name
-        
+
         # Calculate sequence length including TCN padding
         extended_sequence = self.sequence_length + 2 * self.dataset.tcn_padding
         device_id = torch.cuda.current_device() if torch.cuda.is_available() else 0
-        
+
         # Set up distributed sharding
         if use_dali_sharding and torch.distributed.is_available() and torch.distributed.is_initialized():
             shard_id = torch.distributed.get_rank()
@@ -956,9 +954,9 @@ class VideoDataModule(pl.LightningDataModule):
         else:
             shard_id = 0
             num_shards = 1
-        
+
         step_size = self.sequence_length
-        
+
         try:
             pipe = VideoPipeline(
                 batch_size=self.batch_size,
@@ -986,7 +984,7 @@ class VideoDataModule(pl.LightningDataModule):
             labels_2d = labels_2d.to(device_id)
 
         video_lengths = get_video_lengths(
-            video_list, 
+            video_list,
             self.labels_dir,
             self.precomputed_lengths,
         )
@@ -1011,22 +1009,22 @@ class VideoDataModule(pl.LightningDataModule):
 
         if hasattr(self, 'trainer') and self.trainer is not None:
             self.current_epoch = self.trainer.current_epoch
-        
+
         # Compute max frames and load labels for training videos
         max_frames = get_max_frames(
-            self.train_video_paths, 
+            self.train_video_paths,
             self.labels_dir,
             self.precomputed_lengths,
         )
         max_frames += self.sequence_length + 2 * self.dataset.tcn_padding
-        
+
         labels_2d = load_labels_for_videos(
-            self.train_video_paths, 
-            self.labels_dir, 
-            max_frames, 
+            self.train_video_paths,
+            self.labels_dir,
+            max_frames,
             self.dataset.ignore_index,
         )
-        
+
         return self._create_dataloader(
             self.train_video_paths,
             labels_2d,
@@ -1046,29 +1044,29 @@ class VideoDataModule(pl.LightningDataModule):
 
         if not self.validation_enabled or not self.val_video_paths:
             return DataLoader(TensorDataset(torch.empty(0)), batch_size=1)
-        
+
         max_frames = get_max_frames(
-            self.val_video_paths, 
+            self.val_video_paths,
             self.labels_dir,
             self.precomputed_lengths,
         )
         max_frames += self.sequence_length + 2 * self.dataset.tcn_padding
-        
+
         labels_2d = load_labels_for_videos(
-            self.val_video_paths, 
-            self.labels_dir, 
-            max_frames, 
+            self.val_video_paths,
+            self.labels_dir,
+            max_frames,
             self.dataset.ignore_index,
         )
-        
+
         return self._create_dataloader(
-            self.val_video_paths, 
+            self.val_video_paths,
             labels_2d,
-            include_labels=True, 
-            include_lengths=False, 
+            include_labels=True,
+            include_lengths=False,
             shuffle=False,
             last_batch_policy_str='drop',
-            use_dali_sharding=True, 
+            use_dali_sharding=True,
             for_prediction=False,
         )
 
@@ -1076,27 +1074,27 @@ class VideoDataModule(pl.LightningDataModule):
         """Create prediction dataloader."""
 
         _check_dali_available()
-        
+
         if self._predict_video_paths is None:
             self._predict_video_paths = self.dataset.video_paths
-        
+
         if not self._predict_video_paths or len(self._predict_video_paths) == 0:
             return DataLoader(TensorDataset(torch.empty(0)), batch_size=1)
-        
+
         dataloader = self._create_dataloader(
-            self._predict_video_paths, 
+            self._predict_video_paths,
             labels_2d=None,
-            include_labels=False, 
+            include_labels=False,
             include_lengths=True,
             shuffle=False,
             last_batch_policy_str='partial',
             use_dali_sharding=False,
             for_prediction=True,
         )
-        
+
         if dataloader is None:
             return DataLoader(TensorDataset(torch.empty(0)), batch_size=1)
-        
+
         return dataloader
 
     def get_label_names(self) -> list[str]:
