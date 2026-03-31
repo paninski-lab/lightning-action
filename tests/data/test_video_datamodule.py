@@ -2159,6 +2159,7 @@ class TestVideoPipelineConfig:
 # GPU integration tests for augmentations
 # =============================================================================
 
+
 @requires_gpu
 @pytest.mark.gpu
 class TestAugmentationGPU:
