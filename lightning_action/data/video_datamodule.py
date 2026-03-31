@@ -43,11 +43,12 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 from typeguard import typechecked
-from lightning_action.data.video_dataset import VideoDataset
+
 from lightning_action.data.utils import (
     compute_class_weights,
     split_sizes_from_probabilities,
 )
+from lightning_action.data.video_dataset import VideoDataset
 
 logger = logging.getLogger(__name__)
 
