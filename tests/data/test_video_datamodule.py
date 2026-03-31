@@ -2154,3 +2154,233 @@ class TestVideoPipelineConfig:
 
         except ImportError:
             pytest.skip("DALI not installed")
+
+# =============================================================================
+# GPU integration tests for augmentations
+# =============================================================================
+
+@requires_gpu
+@pytest.mark.gpu
+class TestAugmentationGPU:
+    """GPU integration tests for data augmentation in the video pipeline.
+
+    These tests require NVIDIA DALI and a CUDA GPU.
+    """
+
+    def test_pipeline_with_default_augmentation(self, create_test_video, cleanup_gpu):
+        """Test pipeline builds and runs with 'default' augmentation preset."""
+        from lightning_action.data.video_datamodule import (
+            VideoPipeline, AUGMENTATION_PRESETS,
+        )
+        import tempfile as tf
+        import gc
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            videos_dir = os.path.join(tmpdir, 'videos')
+            os.makedirs(videos_dir)
+
+            video_path = create_test_video(
+                num_frames=100, height=224, width=224,
+                directory=videos_dir, filename='test.mp4',
+            )
+
+            with tf.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+                f.write(f"{video_path} 0\n")
+                file_list = f.name
+
+            pipe = None
+            try:
+                pipe = VideoPipeline(
+                    batch_size=1, num_threads=1, device_id=0, seed=42,
+                    file_list=file_list, sequence_length=32, resolution=224,
+                    random_shuffle=False,
+                    augmentations=AUGMENTATION_PRESETS["default"],
+                )
+                pipe.build()
+                pipe_out = pipe.run()
+                frames = pipe_out[0].as_cpu().as_array()
+
+                # Output shape should still be (B, T, C, H, W) = (1, 32, 3, 224, 224)
+                assert frames.shape == (1, 32, 3, 224, 224)
+            finally:
+                del pipe
+                gc.collect()
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+                os.unlink(file_list)
+
+    def test_pipeline_with_strong_augmentation(self, create_test_video, cleanup_gpu):
+        """Test pipeline builds and runs with 'strong' augmentation (includes rotation)."""
+        from lightning_action.data.video_datamodule import (
+            VideoPipeline, AUGMENTATION_PRESETS,
+        )
+        import tempfile as tf
+        import gc
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            videos_dir = os.path.join(tmpdir, 'videos')
+            os.makedirs(videos_dir)
+
+            video_path = create_test_video(
+                num_frames=100, height=224, width=224,
+                directory=videos_dir, filename='test.mp4',
+            )
+
+            with tf.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+                f.write(f"{video_path} 0\n")
+                file_list = f.name
+
+            pipe = None
+            try:
+                pipe = VideoPipeline(
+                    batch_size=1, num_threads=1, device_id=0, seed=42,
+                    file_list=file_list, sequence_length=32, resolution=224,
+                    random_shuffle=False,
+                    augmentations=AUGMENTATION_PRESETS["strong"],
+                )
+                pipe.build()
+                pipe_out = pipe.run()
+                frames = pipe_out[0].as_cpu().as_array()
+
+                assert frames.shape == (1, 32, 3, 224, 224)
+            finally:
+                del pipe
+                gc.collect()
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+                os.unlink(file_list)
+
+    def test_none_augmentation_matches_no_augmentation(
+        self, create_test_video, cleanup_gpu
+    ):
+        """Test that 'none' preset produces same output as no augmentation."""
+        from lightning_action.data.video_datamodule import VideoPipeline
+        import tempfile as tf
+        import gc
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            videos_dir = os.path.join(tmpdir, 'videos')
+            os.makedirs(videos_dir)
+
+            video_path = create_test_video(
+                num_frames=100, height=224, width=224,
+                directory=videos_dir, filename='test.mp4',
+            )
+
+            with tf.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+                f.write(f"{video_path} 0\n")
+                file_list = f.name
+
+            pipe_no_aug = None
+            pipe_none = None
+            try:
+                # Pipeline with no augmentation
+                pipe_no_aug = VideoPipeline(
+                    batch_size=1, num_threads=1, device_id=0, seed=42,
+                    file_list=file_list, sequence_length=32, resolution=224,
+                    random_shuffle=False, augmentations=None,
+                )
+                pipe_no_aug.build()
+                out_no_aug = pipe_no_aug.run()
+                frames_no_aug = out_no_aug[0].as_cpu().as_array()
+
+                del pipe_no_aug
+                pipe_no_aug = None
+                gc.collect()
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+
+                # Pipeline with 'none' augmentation (empty dict)
+                pipe_none = VideoPipeline(
+                    batch_size=1, num_threads=1, device_id=0, seed=42,
+                    file_list=file_list, sequence_length=32, resolution=224,
+                    random_shuffle=False, augmentations={},
+                )
+                pipe_none.build()
+                out_none = pipe_none.run()
+                frames_none = out_none[0].as_cpu().as_array()
+
+                np.testing.assert_array_equal(frames_no_aug, frames_none)
+            finally:
+                del pipe_no_aug, pipe_none
+                gc.collect()
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+                os.unlink(file_list)
+
+    def test_augmented_output_differs_statistically(
+        self, create_test_video, cleanup_gpu
+    ):
+        """Test that augmented output differs from unaugmented (statistical check)."""
+        from lightning_action.data.video_datamodule import (
+            VideoPipeline, AUGMENTATION_PRESETS,
+        )
+        import tempfile as tf
+        import gc
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            videos_dir = os.path.join(tmpdir, 'videos')
+            os.makedirs(videos_dir)
+
+            video_path = create_test_video(
+                num_frames=100, height=224, width=224,
+                directory=videos_dir, filename='test.mp4',
+                frame_content='gradient',
+            )
+
+            with tf.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+                f.write(f"{video_path} 0\n")
+                file_list = f.name
+
+            pipe_plain = None
+            try:
+                # Run without augmentation
+                pipe_plain = VideoPipeline(
+                    batch_size=1, num_threads=1, device_id=0, seed=42,
+                    file_list=file_list, sequence_length=32, resolution=224,
+                    random_shuffle=False, augmentations=None,
+                )
+                pipe_plain.build()
+                out_plain = pipe_plain.run()
+                frames_plain = out_plain[0].as_cpu().as_array().copy()
+
+                del pipe_plain
+                pipe_plain = None
+                gc.collect()
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+
+                # Run multiple augmented passes - at least one should differ
+                any_different = False
+                for trial_seed in range(5):
+                    pipe_aug = VideoPipeline(
+                        batch_size=1, num_threads=1, device_id=0,
+                        seed=trial_seed + 100,
+                        file_list=file_list, sequence_length=32, resolution=224,
+                        random_shuffle=False,
+                        augmentations=AUGMENTATION_PRESETS["strong"],
+                    )
+                    pipe_aug.build()
+                    out_aug = pipe_aug.run()
+                    frames_aug = out_aug[0].as_cpu().as_array()
+
+                    if not np.array_equal(frames_plain, frames_aug):
+                        any_different = True
+
+                    del pipe_aug
+                    gc.collect()
+                    torch.cuda.empty_cache()
+                    torch.cuda.synchronize()
+
+                    if any_different:
+                        break
+
+                assert any_different, (
+                    "Augmented output was identical to plain output across all trials"
+                )
+            finally:
+                del pipe_plain
+                gc.collect()
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+                os.unlink(file_list)
