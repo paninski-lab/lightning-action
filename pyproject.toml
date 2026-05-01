@@ -28,7 +28,7 @@ classifiers = [
 
 dependencies = [
     "jaxtyping",
-    "lightning",
+    "lightning (~=2.5)",
     "numpy (>=2.0.0)",
     "nvidia-dali-cuda110",
     "opencv-python-headless",
