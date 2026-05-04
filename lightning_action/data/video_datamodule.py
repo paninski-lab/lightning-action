@@ -156,6 +156,7 @@ AUGMENTATION_PRESETS = {
     },
     "topdown": {
         "horizontal_flip": {"probability": 0.5},
+        "vertical_flip": {"probability": 0.5},
         "random_crop": {"scale_min": 0.85, "scale_max": 1.0},
         "brightness_contrast": {
             "brightness_range": 0.15,
@@ -316,7 +317,13 @@ class VideoPipeline(Pipeline):
             do_flip = fn.random.coin_flip(probability=prob)
             frames = fn.flip(frames, horizontal=do_flip)
 
-        # 2. Rotation
+        # 2. Vertical flip
+        if "vertical_flip" in aug:
+            prob = aug["vertical_flip"].get("probability", 0.5)
+            do_flip = fn.random.coin_flip(probability=prob)
+            frames = fn.flip(frames, vertical=do_flip)
+
+        # 3. Rotation
         if "rotation" in aug:
             rot_cfg = aug["rotation"]
             prob = rot_cfg.get("probability", 0.3)
@@ -327,7 +334,7 @@ class VideoPipeline(Pipeline):
             angle = angle * fn.cast(do_rotate, dtype=types.FLOAT)
             frames = fn.rotate(frames, angle=angle, keep_size=True, fill_value=0)
 
-        # 3. Random crop via fn.random_resized_crop (avoids GPU->CPU shape query)
+        # 4. Random crop via fn.random_resized_crop (avoids GPU->CPU shape query)
         # Outputs at (resolution, resolution) so the subsequent fn.resize is a no-op.
         # Scale range is converted to area range (area = scale^2).
         # No probability gate needed: randomness comes from scale/position sampling,
@@ -343,7 +350,7 @@ class VideoPipeline(Pipeline):
                 random_aspect_ratio=(1.0, 1.0),
             )
 
-        # 4. Brightness/contrast
+        # 5. Brightness/contrast
         if "brightness_contrast" in aug:
             bc_cfg = aug["brightness_contrast"]
             prob = bc_cfg.get("probability", 0.5)
