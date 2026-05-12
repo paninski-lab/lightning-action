@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "lightning-action"
-version = "1.0.1"
+version = "1.0.2"
 description = "Action segmentation framework built with PyTorch Lightning"
 license = "MIT"
 readme = "README.md"
@@ -28,7 +28,7 @@ classifiers = [
 
 dependencies = [
     "jaxtyping",
-    "lightning",
+    "lightning (~=2.5)",
     "numpy (>=2.0.0)",
     "nvidia-dali-cuda110",
     "opencv-python-headless",
