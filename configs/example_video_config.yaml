@@ -13,6 +13,17 @@ data:
   - 3.2.28L
   ignore_index: -100
   seed: 42
+  transform_mode: imagenet_gray  # Options: imagenet, imagenet_gray, imagenet_uniform, imagenet_uniform_gray, scale_01, scale_01_gray, scale_neg1_1, scale_neg1_1_gray, none
+  augmentations: default  # Options: none, default, strong, topdown
+  # Or use a dict for custom overrides:
+  #augmentations:
+  #   preset: default
+  #   horizontal_flip:
+  #     probability: 0.5
+  #   rotation:
+  #     probability: 0.3
+  #   random_crop:
+  #     scale_min: 0.9
 
 model:
   # Backbone configuration

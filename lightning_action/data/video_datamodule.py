@@ -27,11 +27,12 @@ Typical usage:
         batch_size=2,
     )
     datamodule.setup('fit')
-    
+
     trainer = pl.Trainer(...)
     trainer.fit(model, datamodule)
 """
 
+import logging
 import os
 import tempfile
 from typing import Any, Optional, Union
@@ -43,8 +44,13 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 from typeguard import typechecked
 
-from lightning_action.data.utils import split_sizes_from_probabilities
+from lightning_action.data.utils import (
+    compute_class_weights,
+    split_sizes_from_probabilities,
+)
 from lightning_action.data.video_dataset import VideoDataset
+
+logger = logging.getLogger(__name__)
 
 DALI_AVAILABLE = False
 try:
@@ -66,6 +72,149 @@ def _check_dali_available():
             "Install with: pip install nvidia-dali-cuda120  # (or appropriate CUDA version)\n"
             "See: https://docs.nvidia.com/deeplearning/dali/user-guide/docs/installation.html"
         )
+
+
+TRANSFORM_PRESETS = {
+    # Current default - standard ImageNet RGB normalization
+    "imagenet": {
+        "mean": [0.485 * 255, 0.456 * 255, 0.406 * 255],
+        "std": [0.229 * 255, 0.224 * 255, 0.225 * 255],
+        "grayscale": False,
+    },
+    # Convert to grayscale first, then ImageNet normalization
+    # (matches BEAST's training: grayscale -> 3ch RGB -> ImageNet norm)
+    "imagenet_gray": {
+        "mean": [0.485 * 255, 0.456 * 255, 0.406 * 255],
+        "std": [0.229 * 255, 0.224 * 255, 0.225 * 255],
+        "grayscale": True,
+    },
+    # Uniform mean/std across channels (luminance-weighted ImageNet average)
+    "imagenet_uniform": {
+        "mean": [0.449 * 255] * 3,
+        "std": [0.226 * 255] * 3,
+        "grayscale": False,
+    },
+    # Uniform ImageNet on grayscale-converted frames
+    "imagenet_uniform_gray": {
+        "mean": [0.449 * 255] * 3,
+        "std": [0.226 * 255] * 3,
+        "grayscale": True,
+    },
+    # Simple 0-1 scaling (no ImageNet stats)
+    "scale_01": {
+        "mean": [0.0, 0.0, 0.0],
+        "std": [255.0, 255.0, 255.0],
+        "grayscale": False,
+    },
+    # Grayscale + 0-1 scaling
+    "scale_01_gray": {
+        "mean": [0.0, 0.0, 0.0],
+        "std": [255.0, 255.0, 255.0],
+        "grayscale": True,
+    },
+    # Scale to [-1, 1]
+    "scale_neg1_1": {
+        "mean": [127.5, 127.5, 127.5],
+        "std": [127.5, 127.5, 127.5],
+        "grayscale": False,
+    },
+    # Grayscale + scale to [-1, 1]
+    "scale_neg1_1_gray": {
+        "mean": [127.5, 127.5, 127.5],
+        "std": [127.5, 127.5, 127.5],
+        "grayscale": True,
+    },
+    # No normalization - raw uint8 values as float
+    "none": {
+        "mean": [0.0, 0.0, 0.0],
+        "std": [1.0, 1.0, 1.0],
+        "grayscale": False,
+    },
+}
+
+
+AUGMENTATION_PRESETS = {
+    "none": {},
+    "default": {
+        "horizontal_flip": {"probability": 0.5},
+        "random_crop": {"scale_min": 0.9, "scale_max": 1.0},
+        "brightness_contrast": {
+            "brightness_range": 0.15,
+            "contrast_range": 0.15,
+            "probability": 0.5,
+        },
+    },
+    "strong": {
+        "horizontal_flip": {"probability": 0.5},
+        "random_crop": {"scale_min": 0.8, "scale_max": 1.0},
+        "brightness_contrast": {
+            "brightness_range": 0.25,
+            "contrast_range": 0.25,
+            "probability": 0.7,
+        },
+        "rotation": {"max_angle": 10.0, "probability": 0.3},
+    },
+    "topdown": {
+        "horizontal_flip": {"probability": 0.5},
+        "vertical_flip": {"probability": 0.5},
+        "random_crop": {"scale_min": 0.85, "scale_max": 1.0},
+        "brightness_contrast": {
+            "brightness_range": 0.15,
+            "contrast_range": 0.15,
+            "probability": 0.5,
+        },
+        "rotation": {"max_angle": 15.0, "probability": 0.5},
+    },
+}
+
+
+def _resolve_augmentation_config(config) -> dict:
+    """Resolve augmentation config from string preset, dict, or None.
+
+    Args:
+        config: One of:
+            - None -> no augmentation (empty dict)
+            - str -> preset name from AUGMENTATION_PRESETS
+            - dict with 'preset' key -> base preset with overrides
+            - dict without 'preset' key -> raw augmentation config
+
+    Returns:
+        Resolved augmentation config dict.
+
+    Raises:
+        ValueError: If string preset name is unknown.
+    """
+    if config is None:
+        return {}
+    if isinstance(config, str):
+        if config not in AUGMENTATION_PRESETS:
+            raise ValueError(
+                f"Unknown augmentation preset '{config}'. "
+                f"Available presets: {sorted(AUGMENTATION_PRESETS.keys())}"
+            )
+        return AUGMENTATION_PRESETS[config].copy()
+    if isinstance(config, dict):
+        if 'preset' in config:
+            preset_name = config['preset']
+            if preset_name not in AUGMENTATION_PRESETS:
+                raise ValueError(
+                    f"Unknown augmentation preset '{preset_name}'. "
+                    f"Available presets: {sorted(AUGMENTATION_PRESETS.keys())}"
+                )
+            resolved = {}
+            for key, value in AUGMENTATION_PRESETS[preset_name].items():
+                resolved[key] = value.copy() if isinstance(value, dict) else value
+            # Merge overrides
+            for key, value in config.items():
+                if key == 'preset':
+                    continue
+                if key in resolved and isinstance(resolved[key], dict) and isinstance(value, dict):
+                    resolved[key].update(value)
+                else:
+                    resolved[key] = value
+            return resolved
+        return config.copy()
+    return {}
 
 
 class VideoPipeline(Pipeline):
@@ -97,6 +246,8 @@ class VideoPipeline(Pipeline):
         shard_id: int = 0,
         num_shards: int = 1,
         pad_sequences: bool = False,
+        transform_mode: str = "imagenet",
+        augmentations: Optional[dict] = None,
     ):
         """Initialize the DALI video pipeline.
 
@@ -113,8 +264,16 @@ class VideoPipeline(Pipeline):
             shard_id: Shard index for distributed training.
             num_shards: Total number of shards for distributed training.
             pad_sequences: Whether to pad the last sequence of each video.
+            transform_mode: Transform preset name from TRANSFORM_PRESETS.
+            augmentations: Augmentation config dict (from _resolve_augmentation_config).
         """
         _check_dali_available()
+
+        if transform_mode not in TRANSFORM_PRESETS:
+            raise ValueError(
+                f"Unknown transform_mode '{transform_mode}'. "
+                f"Available presets: {sorted(TRANSFORM_PRESETS.keys())}"
+            )
 
         super().__init__(
             batch_size=batch_size,
@@ -134,6 +293,81 @@ class VideoPipeline(Pipeline):
         self.shard_id = shard_id
         self.num_shards = num_shards
         self.pad_sequences = pad_sequences
+        self.transform_mode = transform_mode
+        self._transform_preset = TRANSFORM_PRESETS[transform_mode]
+        self._augmentations = augmentations or {}
+
+    def _apply_augmentations(self, frames):
+        """Apply DALI-native augmentations to video frames.
+
+        All random parameters are generated per-sample (not per-frame) to
+        maintain temporal consistency across frames in each sequence.
+
+        Args:
+            frames: DALI tensor of video frames (FHWC layout from reader).
+
+        Returns:
+            Augmented frames tensor.
+        """
+        aug = self._augmentations
+
+        # 1. Horizontal flip
+        if "horizontal_flip" in aug:
+            prob = aug["horizontal_flip"].get("probability", 0.5)
+            do_flip = fn.random.coin_flip(probability=prob)
+            frames = fn.flip(frames, horizontal=do_flip)
+
+        # 2. Vertical flip
+        if "vertical_flip" in aug:
+            prob = aug["vertical_flip"].get("probability", 0.5)
+            do_flip = fn.random.coin_flip(probability=prob)
+            frames = fn.flip(frames, vertical=do_flip)
+
+        # 3. Rotation
+        if "rotation" in aug:
+            rot_cfg = aug["rotation"]
+            prob = rot_cfg.get("probability", 0.3)
+            max_angle = rot_cfg.get("max_angle", 10.0)
+            do_rotate = fn.random.coin_flip(probability=prob)
+            angle = fn.random.uniform(range=(-max_angle, max_angle))
+            # Multiply angle by coin flip to get 0 when not rotating
+            angle = angle * fn.cast(do_rotate, dtype=types.FLOAT)
+            frames = fn.rotate(frames, angle=angle, keep_size=True, fill_value=0)
+
+        # 4. Random crop via fn.random_resized_crop (avoids GPU->CPU shape query)
+        # Outputs at (resolution, resolution) so the subsequent fn.resize is a no-op.
+        # Scale range is converted to area range (area = scale^2).
+        # No probability gate needed: randomness comes from scale/position sampling,
+        # and crop degrades to a no-op when scale_min == scale_max == 1.0.
+        if "random_crop" in aug:
+            crop_cfg = aug["random_crop"]
+            scale_min = crop_cfg.get("scale_min", 0.9)
+            scale_max = crop_cfg.get("scale_max", 1.0)
+            frames = fn.random_resized_crop(
+                frames,
+                size=(self.resolution, self.resolution),
+                random_area=(scale_min ** 2, scale_max ** 2),
+                random_aspect_ratio=(1.0, 1.0),
+            )
+
+        # 5. Brightness/contrast
+        if "brightness_contrast" in aug:
+            bc_cfg = aug["brightness_contrast"]
+            prob = bc_cfg.get("probability", 0.5)
+            b_range = bc_cfg.get("brightness_range", 0.15)
+            c_range = bc_cfg.get("contrast_range", 0.15)
+            do_bc = fn.random.coin_flip(probability=prob)
+            brightness = fn.random.uniform(range=(-b_range, b_range))
+            contrast = fn.random.uniform(range=(1.0 - c_range, 1.0 + c_range))
+            # When not applying, use neutral values (brightness=0, contrast=1)
+            do_bc_f = fn.cast(do_bc, dtype=types.FLOAT)
+            brightness = brightness * do_bc_f
+            contrast = contrast * do_bc_f + (1.0 - do_bc_f)
+            frames = fn.brightness_contrast(
+                frames, brightness=brightness, contrast=contrast,
+            )
+
+        return frames
 
     def define_graph(self):
         """Define the DALI processing graph."""
@@ -155,14 +389,26 @@ class VideoPipeline(Pipeline):
             pad_last_batch=self.pad_sequences,
         )
 
+        # Optional grayscale conversion (RGB -> GRAY -> RGB) to match
+        # backbones pretrained on grayscale images converted to 3-channel RGB
+        if self._transform_preset["grayscale"]:
+            frames = fn.color_space_conversion(
+                frames, image_type=types.RGB, output_type=types.GRAY)
+            frames = fn.color_space_conversion(
+                frames, image_type=types.GRAY, output_type=types.RGB)
+
+        # Apply data augmentations (after grayscale, before resize)
+        if self._augmentations:
+            frames = self._apply_augmentations(frames)
+
         frames = fn.resize(frames, size=(224, 224))
 
         frames = fn.crop_mirror_normalize(
             frames,
             dtype=types.FLOAT,
             output_layout="FCHW",
-            mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
-            std=[0.229 * 255, 0.224 * 255, 0.225 * 255],
+            mean=self._transform_preset["mean"],
+            std=self._transform_preset["std"],
         )
 
         return frames, frame_idx, start_frame
@@ -228,10 +474,8 @@ class DALIIterator(DALIGenericIterator):
         self.all_labels_2d = all_labels_2d
         self.video_lengths = video_lengths
 
-    def __next__(self):
-        """Get the next batch with frames, labels, and metadata."""
-        batch = super().__next__()
-
+    def _process_batch(self, batch):
+        """Extract frames, labels, and metadata from a raw DALI batch."""
         frames = batch[0]['frames']
         frame_indices = batch[0]['frame_idx']
         start_frames = batch[0]['start_frame']
@@ -247,7 +491,6 @@ class DALIIterator(DALIGenericIterator):
         B, T = frames.shape[0], frames.shape[1]
         device = frames.device
 
-        # Build metadata for each sample
         metadata = []
         for i in range(B):
             video_idx = frame_indices[i].item()
@@ -270,6 +513,7 @@ class DALIIterator(DALIGenericIterator):
             }
             metadata.append(meta)
 
+        labels = None
         if self.include_labels and self.all_labels_2d is not None:
             seq_idxs = torch.arange(T, device=device)
             time_idx = start_frames.unsqueeze(1) + seq_idxs.unsqueeze(0)
@@ -280,13 +524,28 @@ class DALIIterator(DALIGenericIterator):
 
             labels = self.all_labels_2d[video_idx, time_idx]
 
-            return frames, labels, metadata
+        return frames, labels, metadata
 
-        if self.include_lengths:
-            actual_lengths = [self.sequence_length for _ in range(B)]
-            return frames, actual_lengths, metadata
+    def __next__(self):
+        """Get the next batch with frames, labels, and metadata."""
+        max_retries = 50
+        for attempt in range(max_retries + 1):
+            batch = super().__next__()
+            frames, labels, metadata = self._process_batch(batch)
 
-        return frames, None, metadata
+            if labels is not None:
+                return frames, labels, metadata
+
+            if self.include_lengths:
+                actual_lengths = [self.sequence_length for _ in range(frames.shape[0])]
+                return frames, actual_lengths, metadata
+
+            return frames, None, metadata
+
+        logger.warning(
+            "Sequence filter exhausted %d retries; returning unfiltered batch", max_retries
+        )
+        return frames, labels, metadata
 
 
 def _get_video_frame_count_cv2(video_path: str) -> int:
@@ -304,6 +563,36 @@ def _get_video_frame_count_cv2(video_path: str) -> int:
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     cap.release()
     return frame_count
+
+
+def _load_label_file(label_path: str) -> Optional[np.ndarray]:
+    """Load a single label file and convert to 1D class indices.
+
+    Handles both 1D integer arrays and 2D one-hot encoded arrays.
+
+    Args:
+        label_path: Path to a .npy label file.
+
+    Returns:
+        1D array of integer class indices, or None if the file doesn't exist.
+    """
+    try:
+        labels = np.load(label_path)
+    except FileNotFoundError:
+        return None
+
+    if labels.ndim > 1 and labels.shape[1] > 1:
+        labels = np.argmax(labels, axis=1)
+    elif labels.ndim > 1:
+        labels = labels.squeeze()
+
+    return labels
+
+
+def _label_path_from_video(video_path: str, labels_dir: str) -> str:
+    """Construct a label file path from a video file path."""
+    video_name = os.path.basename(video_path)
+    return os.path.join(labels_dir, video_name.replace('.mp4', '.npy'))
 
 
 def load_labels_for_videos(
@@ -331,19 +620,10 @@ def load_labels_for_videos(
     all_labels = np.full((num_videos, max_frames), ignore_index, dtype=np.int64)
 
     for idx, video_path in enumerate(video_paths):
-        video_name = os.path.basename(video_path)
-        label_path = os.path.join(labels_dir, video_name.replace('.mp4', '.npy'))
-
-        if not os.path.exists(label_path):
+        label_path = _label_path_from_video(video_path, labels_dir)
+        labels = _load_label_file(label_path)
+        if labels is None:
             continue
-
-        labels = np.load(label_path)
-
-        if labels.ndim > 1 and labels.shape[1] > 1:
-            labels = np.argmax(labels, axis=1)
-        elif labels.ndim > 1:
-            labels = labels.squeeze()
-
         n_frames = min(len(labels), max_frames)
         all_labels[idx, :n_frames] = labels[:n_frames]
 
@@ -505,6 +785,19 @@ class VideoDataModule(pl.LightningDataModule):
         self.labels_dir = data_config.get('labels_dir')  # Now optional
         self.precomputed_lengths = data_config.get('video_lengths')  # Optional precomputed
 
+        # Video transform preset for normalization/grayscale conversion
+        self.transform_mode = data_config.get('transform_mode', 'imagenet')
+        if self.transform_mode not in TRANSFORM_PRESETS:
+            raise ValueError(
+                f"Unknown transform_mode '{self.transform_mode}'. "
+                f"Available presets: {sorted(TRANSFORM_PRESETS.keys())}"
+            )
+
+        # Data augmentation config (only applied to training data)
+        self._augmentation_config = _resolve_augmentation_config(
+            data_config.get('augmentations')
+        )
+
         # Validate probabilities
         if not 0 <= train_probability <= 1:
             raise ValueError('train_probability must be in [0, 1]')
@@ -598,6 +891,14 @@ class VideoDataModule(pl.LightningDataModule):
             else:
                 self._predict_video_paths = all_videos
 
+    def compute_filtered_class_weights(self) -> list[float]:
+        """Compute class weights from training video labels.
+
+        Returns:
+            List of class weights, one per class.
+        """
+        return list(self.dataset.class_weights)
+
     def _create_dataloader(
         self,
         video_list: list[str],
@@ -608,6 +909,7 @@ class VideoDataModule(pl.LightningDataModule):
         last_batch_policy_str: str = 'drop',
         use_dali_sharding: bool = True,
         for_prediction: bool = False,
+        augment: bool = False,
     ) -> Optional[DALIIterator]:
         """Create a DALI-based dataloader for a list of videos.
 
@@ -620,6 +922,7 @@ class VideoDataModule(pl.LightningDataModule):
             last_batch_policy_str: 'drop' or 'partial' for final batch.
             use_dali_sharding: Whether to use DALI's built-in sharding.
             for_prediction: Whether this is for prediction (enables padding).
+            augment: Whether to apply data augmentations.
 
         Returns:
             DALIIterator instance, or None if video_list is empty.
@@ -652,11 +955,7 @@ class VideoDataModule(pl.LightningDataModule):
         device_id = torch.cuda.current_device() if torch.cuda.is_available() else 0
 
         # Set up distributed sharding
-        if (
-            use_dali_sharding
-            and torch.distributed.is_available()
-            and torch.distributed.is_initialized()
-        ):
+        if use_dali_sharding and torch.distributed.is_available() and torch.distributed.is_initialized():
             shard_id = torch.distributed.get_rank()
             num_shards = torch.distributed.get_world_size()
         else:
@@ -679,6 +978,8 @@ class VideoDataModule(pl.LightningDataModule):
                 shard_id=shard_id,
                 num_shards=num_shards,
                 pad_sequences=for_prediction,
+                transform_mode=self.transform_mode,
+                augmentations=self._augmentation_config if augment else None,
             )
             pipe.build()
         except RuntimeError as e:
@@ -740,6 +1041,7 @@ class VideoDataModule(pl.LightningDataModule):
             last_batch_policy_str='drop',
             use_dali_sharding=True,
             for_prediction=False,
+            augment=True,
         )
 
     def val_dataloader(self) -> Union[DALIIterator, DataLoader]:
