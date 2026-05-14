@@ -131,6 +131,7 @@ class DataModule(pl.LightningDataModule):
         Returns:
             DataLoader for training data
         """
+        assert self.dataset_train is not None, "setup() must be called before train_dataloader()"
         return DataLoader(
             self.dataset_train,
             batch_size=self.batch_size,
@@ -146,6 +147,7 @@ class DataModule(pl.LightningDataModule):
         Returns:
             DataLoader for validation data
         """
+        assert self.dataset_val is not None, "setup() must be called before val_dataloader()"
         return DataLoader(
             self.dataset_val,
             batch_size=self.batch_size,

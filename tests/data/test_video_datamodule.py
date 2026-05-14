@@ -1522,6 +1522,8 @@ class TestVideoDataModuleSetup:
             datamodule.setup('fit')
 
             # Should split at video level
+            assert datamodule.train_video_paths is not None
+            assert datamodule.val_video_paths is not None
             assert len(datamodule.train_video_paths) == 8
             assert len(datamodule.val_video_paths) == 2
             # No overlap
@@ -1558,6 +1560,7 @@ class TestVideoDataModuleSetup:
 
             datamodule.setup('predict')
 
+            assert datamodule._predict_video_paths is not None
             assert len(datamodule._predict_video_paths) == 3
 
     def test_invalid_probabilities(self, create_test_video, create_test_labels):
@@ -1973,6 +1976,7 @@ class TestDALIIntegration:
 
                 # Check validation is enabled
                 assert datamodule.validation_enabled
+                assert datamodule.val_video_paths is not None
                 assert len(datamodule.val_video_paths) >= 1
 
                 val_loader = datamodule.val_dataloader()

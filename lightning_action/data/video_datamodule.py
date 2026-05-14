@@ -1018,6 +1018,8 @@ class VideoDataModule(pl.LightningDataModule):
         if hasattr(self, 'trainer') and self.trainer is not None:
             self.current_epoch = self.trainer.current_epoch
 
+        assert self.train_video_paths is not None, \
+            "setup('fit') must be called before train_dataloader()"
         # Compute max frames and load labels for training videos
         max_frames = get_max_frames(
             self.train_video_paths,

@@ -196,6 +196,8 @@ class TestDataModule:
 
             # check split sizes
             total_size = len(datamodule.dataset)
+            assert datamodule.dataset_train is not None
+            assert datamodule.dataset_val is not None
             train_size = len(datamodule.dataset_train)
             val_size = len(datamodule.dataset_val)
 
