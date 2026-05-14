@@ -20,7 +20,7 @@ Subclasses must implement:
 import contextlib
 import os
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from pathlib import Path
 from typing import Any, Generic, TypeVar
 
@@ -33,7 +33,7 @@ ModelT = TypeVar('ModelT', bound=pl.LightningModule)
 
 
 @contextlib.contextmanager
-def chdir(path: Path):
+def chdir(path: Path) -> Generator[None, None, None]:
     """Context manager for temporarily changing working directory.
 
     Useful when training requires relative paths from the output directory.
@@ -156,7 +156,7 @@ class BaseModelAPI(ABC, Generic[ModelT]):
         pass
 
     @abstractmethod
-    def predict(self, *args, **kwargs) -> None:
+    def predict(self, *args: Any, **kwargs: Any) -> None:
         """Generate predictions using the trained model.
 
         Implementation differs between CSV and video pipelines.

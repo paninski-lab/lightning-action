@@ -24,6 +24,10 @@ jobs:
       - name: Install ruff
         run: pip install ruff pyright numpy
 
+      - name: Lint with ruff
+        id: ruff
+        run: ruff check lightning_action tests
+
       - name: Show fix instructions if linting failed
         if: always() && steps.ruff.outcome == 'failure'
         run: |
@@ -39,7 +43,7 @@ jobs:
 
       - name: Type check with pyright
         id: pyright
-        run: pyright lightning_action
+        run: pyright
 
       - name: Show fix instructions if type checking failed
         if: always() && steps.pyright.outcome == 'failure'
@@ -48,5 +52,5 @@ jobs:
           echo "Type checking failed!"
           echo ""
           echo "To reproduce locally, run:"
-          echo "  pyright lightning_action"
+          echo "  pyright"
           echo ""

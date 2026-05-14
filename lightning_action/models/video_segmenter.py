@@ -11,6 +11,7 @@ only the methods that need video-specific behavior.
 """
 
 import os
+from collections.abc import Iterator
 from typing import Any
 
 import torch
@@ -224,7 +225,7 @@ class VideoBaseModel(BaseModel):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    def _get_optimizer_params(self):
+    def _get_optimizer_params(self) -> Iterator[nn.Parameter] | list[dict[str, Any]]:
         """Get parameters to optimize.
 
         Override in subclasses for custom parameter groups.
@@ -273,7 +274,7 @@ class VideoSegmenter(VideoBaseModel):
         'resnet152-beast': 2048,
     }
 
-    def __init__(self, config: dict[str, Any]):
+    def __init__(self, config: dict[str, Any]) -> None:
         """Initialize VideoSegmenter with auto-computed input_size.
 
         Args:
@@ -481,7 +482,7 @@ class VideoSegmenter(VideoBaseModel):
                     if submodule.bias is not None:
                         nn.init.zeros_(submodule.bias)
 
-    def _get_optimizer_params(self):
+    def _get_optimizer_params(self) -> Iterator[nn.Parameter] | list[dict[str, Any]]:
         """Get parameters to optimize with specific groups.
 
         Returns parameters from pooling, head, and classifier.

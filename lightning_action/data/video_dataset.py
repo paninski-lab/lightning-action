@@ -69,7 +69,7 @@ class VideoDataset:
         require_labels: bool = True,
         num_classes: int | None = None,
         label_names: list[str] | None = None,
-    ):
+    ) -> None:
         """Initialize the VideoDataset.
 
         Args:

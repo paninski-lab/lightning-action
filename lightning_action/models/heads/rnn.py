@@ -26,7 +26,7 @@ class RNN(nn.Module):
         bidirectional: bool = False,
         dropout_rate: float = 0.0,
         seed: int = 42,
-    ):
+    ) -> None:
         """Initialize RNN head.
 
         Args:
@@ -61,7 +61,7 @@ class RNN(nn.Module):
         # build model
         self._build_model()
 
-    def _build_model(self):
+    def _build_model(self) -> None:
         """Build the RNN model layers."""
         # create RNN layer
         if self.rnn_type == 'lstm':

@@ -24,7 +24,7 @@ class DilatedTCN(nn.Module):
         activation: str = 'lrelu',
         dropout_rate: float = 0.2,
         seed: int = 42,
-    ):
+    ) -> None:
         """Initialize DilatedTCN head.
 
         Args:
@@ -56,7 +56,7 @@ class DilatedTCN(nn.Module):
         self.model = nn.Sequential()
         self._build_model()
 
-    def _build_model(self):
+    def _build_model(self) -> None:
         """Build the TCN model layers."""
         for i_layer in range(self.num_layers):
             # dilation increases exponentially
@@ -145,7 +145,7 @@ class DilationBlock(nn.Module):
         activation: str = 'lrelu',
         dropout: float = 0.2,
         final_activation: str | None = None,
-    ):
+    ) -> None:
         """Initialize DilationBlock.
 
         Args:
@@ -225,7 +225,7 @@ class DilationBlock(nn.Module):
         self._init_weights()
 
     @staticmethod
-    def _get_activation_func(activation) -> nn.Module:
+    def _get_activation_func(activation: str) -> nn.Module:
         """Get activation function module.
 
         Returns:
@@ -247,7 +247,7 @@ class DilationBlock(nn.Module):
         else:
             raise ValueError(f'Unsupported activation: {activation}')
 
-    def _init_weights(self):
+    def _init_weights(self) -> None:
         """Initialize weights with normal distribution."""
         nn.init.normal_(self.conv0.weight, 0, 0.01)  # type: ignore[arg-type]
         nn.init.normal_(self.conv1.weight, 0, 0.01)  # type: ignore[arg-type]

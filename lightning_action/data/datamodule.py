@@ -37,7 +37,7 @@ class DataModule(pl.LightningDataModule):
         pin_memory: bool = True,
         persistent_workers: bool = True,
         seed: int = 42,
-    ):
+    ) -> None:
         """Initialize DataModule.
 
         Args:
@@ -99,7 +99,7 @@ class DataModule(pl.LightningDataModule):
         self.dataset_val = None
         self.setup()
 
-    def setup(self, stage: str | None = None):
+    def setup(self, stage: str | None = None) -> None:
         """Set up datasets for training and validation.
 
         Args:

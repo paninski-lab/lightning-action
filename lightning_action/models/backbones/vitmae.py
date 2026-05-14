@@ -18,6 +18,7 @@ Reference:
 """
 
 import math
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -57,7 +58,7 @@ class ViTMAEBackbone(nn.Module):
         features = backbone(images)  # (4, 768, 14, 14)
     """
 
-    def __init__(self, config: dict[str, Any] | None = None):
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize the ViT-MAE backbone.
 
         Args:
@@ -238,7 +239,7 @@ class ViTMAEBackbone(nn.Module):
         else:
             print("Warning: No matching weights found in checkpoint")
 
-    def get_last_layer_params(self):
+    def get_last_layer_params(self) -> Iterator[nn.Parameter]:
         """Get parameters of the last transformer layer for fine-tuning.
 
         Returns:

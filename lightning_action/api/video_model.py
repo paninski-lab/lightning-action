@@ -28,6 +28,7 @@ Example usage:
     model.train(output_dir='runs/new_experiment')
 """
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -90,7 +91,7 @@ class VideoModel(BaseModelAPI[VideoSegmenter]):
         return VideoSegmenter
 
     @classmethod
-    def _get_train_function(cls):
+    def _get_train_function(cls) -> Callable[..., Any]:
         """Return the video pipeline training function."""
         return train_video
 

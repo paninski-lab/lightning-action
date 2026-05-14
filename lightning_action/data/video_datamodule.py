@@ -68,7 +68,7 @@ except ImportError:
     DALIGenericIterator = object
 
 
-def _check_dali_available():
+def _check_dali_available() -> None:
     """Raise informative error if DALI is not available."""
     if not DALI_AVAILABLE:
         raise ImportError(
@@ -172,7 +172,7 @@ AUGMENTATION_PRESETS = {
 }
 
 
-def _resolve_augmentation_config(config) -> dict:
+def _resolve_augmentation_config(config: str | dict | None) -> dict:
     """Resolve augmentation config from string preset, dict, or None.
 
     Args:
@@ -252,7 +252,7 @@ class VideoPipeline(Pipeline):  # type: ignore[misc]
         pad_sequences: bool = False,
         transform_mode: str = "imagenet",
         augmentations: dict | None = None,
-    ):
+    ) -> None:
         """Initialize the DALI video pipeline.
 
         Args:
@@ -301,7 +301,7 @@ class VideoPipeline(Pipeline):  # type: ignore[misc]
         self._transform_preset = TRANSFORM_PRESETS[transform_mode]
         self._augmentations = augmentations or {}
 
-    def _apply_augmentations(self, frames):
+    def _apply_augmentations(self, frames: Any) -> Any:
         """Apply DALI-native augmentations to video frames.
 
         All random parameters are generated per-sample (not per-frame) to
@@ -373,7 +373,7 @@ class VideoPipeline(Pipeline):  # type: ignore[misc]
 
         return frames
 
-    def define_graph(self):
+    def define_graph(self) -> tuple[Any, Any, Any]:
         """Define the DALI processing graph."""
         frames, frame_idx, start_frame = fn.readers.video(
             device="gpu",
@@ -439,7 +439,7 @@ class DALIIterator(DALIGenericIterator):  # type: ignore[misc]
         include_lengths: bool = False,
         video_lengths: dict[int, int] | None = None,
         last_batch_policy: Any | None = None,
-    ):
+    ) -> None:
         """Initialize the DALI iterator.
 
         Args:
@@ -478,7 +478,10 @@ class DALIIterator(DALIGenericIterator):  # type: ignore[misc]
         self.all_labels_2d = all_labels_2d
         self.video_lengths = video_lengths
 
-    def _process_batch(self, batch):
+    def _process_batch(
+        self,
+        batch: Any,
+    ) -> tuple[torch.Tensor, torch.Tensor | None, list[dict]]:
         """Extract frames, labels, and metadata from a raw DALI batch."""
         frames = batch[0]['frames']
         frame_indices = batch[0]['frame_idx']
@@ -530,7 +533,9 @@ class DALIIterator(DALIGenericIterator):  # type: ignore[misc]
 
         return frames, labels, metadata
 
-    def __next__(self):
+    def __next__(
+        self,
+    ) -> tuple[torch.Tensor | None, torch.Tensor | list[int] | None, list[dict] | None]:
         """Get the next batch with frames, labels, and metadata."""
         max_retries = 50
         frames, labels, metadata = None, None, None
@@ -756,7 +761,7 @@ class VideoDataModule(pl.LightningDataModule):
         val_probability: float = 0.05,
         seed: int = 0,
         model_config: dict[str, Any] | None = None,
-    ):
+    ) -> None:
         """Initialize the VideoDataModule.
 
         Args:

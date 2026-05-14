@@ -52,7 +52,7 @@ class Compose:
         >>> transformed_data = transform(data)
     """
 
-    def __init__(self, transforms: list[Transform]):
+    def __init__(self, transforms: list[Transform]) -> None:
         """Initialize Compose transform.
 
         Args:
@@ -94,7 +94,7 @@ class MotionEnergy(Transform):
     providing a measure of movement or change in the signal.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize MotionEnergy transform."""
         pass
 
@@ -135,7 +135,7 @@ class ZScore(Transform):
     by leaving them unchanged.
     """
 
-    def __init__(self, eps: float = 1e-8):
+    def __init__(self, eps: float = 1e-8) -> None:
         """Initialize ZScore transform.
 
         Args:
@@ -188,7 +188,7 @@ class VelocityConcat(Transform):
     velocity to the original signal along the feature dimension.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize VelocityConcat transform."""
         pass
 

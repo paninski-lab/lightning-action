@@ -445,7 +445,7 @@ def collect_labels_from_files(
 
 
 def collect_labels_from_datamodule(
-    dataset,
+    dataset: Any,
     ignore_index: int = -100,
     show_progress: bool = True,
 ) -> tuple[np.ndarray, int]:

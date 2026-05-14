@@ -33,7 +33,7 @@ class TemporalMLP(nn.Module):
         activation: str = 'lrelu',
         dropout_rate: float = 0.0,
         seed: int = 42,
-    ):
+    ) -> None:
         """Initialize TemporalMLP head.
 
         Args:
@@ -61,7 +61,7 @@ class TemporalMLP(nn.Module):
         self.layers = nn.ModuleList()
         self._build_model()
 
-    def _build_model(self):
+    def _build_model(self) -> None:
         """Build the TemporalMLP model layers."""
         # initial 1D convolution layer for temporal context
         conv_kernel_size = 2 * self.num_lags + 1

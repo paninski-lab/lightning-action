@@ -89,7 +89,7 @@ class ResNetBeastBackbone(nn.Module):
         features = backbone(images)  # (4, 2048, 7, 7)
     """
 
-    def __init__(self, config: dict[str, Any] | None = None):
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize the beast ResNet backbone.
 
         Args:

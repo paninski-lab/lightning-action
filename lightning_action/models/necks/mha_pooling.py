@@ -65,7 +65,7 @@ class MultiheadAttentionPooling(nn.Module):
         dropout: float = 0.0,
         use_ffn: bool = True,
         layer_norm: bool = False,
-    ):
+    ) -> None:
         """Initialize the attention pooling module.
 
         Args:

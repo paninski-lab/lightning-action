@@ -36,7 +36,7 @@ class FeatureDataset(Dataset):
         paths: list[list[str | Path | None]],
         sequence_length: int = 500,
         sequence_pad: int = 0,
-    ):
+    ) -> None:
         """Initialize FeatureDataset.
 
         Args:
@@ -73,7 +73,7 @@ class FeatureDataset(Dataset):
         # load and process all data
         self._load_all_data()
 
-    def _validate_inputs(self):
+    def _validate_inputs(self) -> None:
         """Validate that input lists have consistent lengths."""
         n_datasets = len(self.ids)
         if not all(len(lst) == n_datasets for lst in [self.signals, self.transforms, self.paths]):
@@ -86,7 +86,7 @@ class FeatureDataset(Dataset):
                     f'Dataset {i}: signals, transforms, and paths must have same length'
                 )
 
-    def _load_all_data(self):
+    def _load_all_data(self) -> None:
         """Load and process data from all datasets."""
         for dataset_idx, dataset_id in enumerate(self.ids):
             logger.debug(f'Loading dataset {dataset_id}')
