@@ -20,7 +20,6 @@ Test Categories:
 
 import os
 import tempfile
-from typing import Optional
 
 import cv2
 import numpy as np
@@ -100,12 +99,12 @@ def create_test_video(video_config):
     created_files = []
 
     def _create_video(
-        num_frames: Optional[int] = None,
-        height: Optional[int] = None,
-        width: Optional[int] = None,
-        fps: Optional[int] = None,
-        filename: Optional[str] = None,
-        directory: Optional[str] = None,
+        num_frames: int | None = None,
+        height: int | None = None,
+        width: int | None = None,
+        fps: int | None = None,
+        filename: str | None = None,
+        directory: str | None = None,
         frame_content: str = 'random',  # 'random', 'zeros', 'gradient', 'counter'
     ) -> str:
         """Create a test video file.
@@ -193,8 +192,8 @@ def create_test_labels():
     def _create_labels(
         num_frames: int,
         num_classes: int = 3,
-        filename: Optional[str] = None,
-        directory: Optional[str] = None,
+        filename: str | None = None,
+        directory: str | None = None,
         distribution: str = 'uniform',  # 'uniform', 'imbalanced', 'sequential'
         include_ignore: bool = False,
         ignore_index: int = -100,

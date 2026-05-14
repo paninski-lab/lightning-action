@@ -35,7 +35,7 @@ Typical usage:
 import logging
 import os
 import tempfile
-from typing import Any, Optional, Union
+from typing import Any
 
 import cv2
 import lightning as pl
@@ -45,7 +45,6 @@ from torch.utils.data import DataLoader, TensorDataset
 from typeguard import typechecked
 
 from lightning_action.data.utils import (
-    compute_class_weights,
     split_sizes_from_probabilities,
 )
 from lightning_action.data.video_dataset import VideoDataset
@@ -242,12 +241,12 @@ class VideoPipeline(Pipeline):
         sequence_length: int,
         resolution: int,
         random_shuffle: bool,
-        step: Optional[int] = None,
+        step: int | None = None,
         shard_id: int = 0,
         num_shards: int = 1,
         pad_sequences: bool = False,
         transform_mode: str = "imagenet",
-        augmentations: Optional[dict] = None,
+        augmentations: dict | None = None,
     ):
         """Initialize the DALI video pipeline.
 
@@ -430,11 +429,11 @@ class DALIIterator(DALIGenericIterator):
         sequence_length: int,
         tcn_padding: int,
         ignore_index: int,
-        all_labels_2d: Optional[torch.Tensor] = None,
+        all_labels_2d: torch.Tensor | None = None,
         include_labels: bool = False,
         include_lengths: bool = False,
-        video_lengths: Optional[dict[int, int]] = None,
-        last_batch_policy: Optional[Any] = None,
+        video_lengths: dict[int, int] | None = None,
+        last_batch_policy: Any | None = None,
     ):
         """Initialize the DALI iterator.
 
@@ -529,7 +528,7 @@ class DALIIterator(DALIGenericIterator):
     def __next__(self):
         """Get the next batch with frames, labels, and metadata."""
         max_retries = 50
-        for attempt in range(max_retries + 1):
+        for _attempt in range(max_retries + 1):
             batch = super().__next__()
             frames, labels, metadata = self._process_batch(batch)
 
@@ -565,7 +564,7 @@ def _get_video_frame_count_cv2(video_path: str) -> int:
     return frame_count
 
 
-def _load_label_file(label_path: str) -> Optional[np.ndarray]:
+def _load_label_file(label_path: str) -> np.ndarray | None:
     """Load a single label file and convert to 1D class indices.
 
     Handles both 1D integer arrays and 2D one-hot encoded arrays.
@@ -597,10 +596,10 @@ def _label_path_from_video(video_path: str, labels_dir: str) -> str:
 
 def load_labels_for_videos(
     video_paths: list[str],
-    labels_dir: Optional[str],
+    labels_dir: str | None,
     max_frames: int,
     ignore_index: int = -100,
-) -> Optional[torch.Tensor]:
+) -> torch.Tensor | None:
     """Load labels into a 2D tensor for efficient batched lookup.
 
     Args:
@@ -632,8 +631,8 @@ def load_labels_for_videos(
 
 def get_video_lengths(
     video_paths: list[str],
-    labels_dir: Optional[str] = None,
-    precomputed_lengths: Optional[dict[str, int]] = None,
+    labels_dir: str | None = None,
+    precomputed_lengths: dict[str, int] | None = None,
 ) -> dict[int, int]:
     """Get video lengths (frame counts) for each video index.
 
@@ -679,8 +678,8 @@ def get_video_lengths(
 
 def get_max_frames(
     video_paths: list[str],
-    labels_dir: Optional[str] = None,
-    precomputed_lengths: Optional[dict[str, int]] = None,
+    labels_dir: str | None = None,
+    precomputed_lengths: dict[str, int] | None = None,
 ) -> int:
     """Get maximum frame count across a list of videos.
 
@@ -751,7 +750,7 @@ class VideoDataModule(pl.LightningDataModule):
         train_probability: float = 0.95,
         val_probability: float = 0.05,
         seed: int = 0,
-        model_config: Optional[dict[str, Any]] = None,
+        model_config: dict[str, Any] | None = None,
     ):
         """Initialize the VideoDataModule.
 
@@ -807,11 +806,11 @@ class VideoDataModule(pl.LightningDataModule):
             raise ValueError('train_probability + val_probability must be <= 1')
 
         # State variables - will be set in setup()
-        self.train_video_paths: Optional[list[str]] = None
-        self.val_video_paths: Optional[list[str]] = None
+        self.train_video_paths: list[str] | None = None
+        self.val_video_paths: list[str] | None = None
         self.current_epoch: int = 0
         self.validation_enabled: bool = True
-        self._predict_video_paths: Optional[list[str]] = None
+        self._predict_video_paths: list[str] | None = None
 
         # Adjust threads for distributed training
         if torch.distributed.is_available() and torch.distributed.is_initialized():
@@ -846,7 +845,7 @@ class VideoDataModule(pl.LightningDataModule):
             label_names=self.data_config.get('label_names'),
         )
 
-    def setup(self, stage: Optional[str] = None) -> None:
+    def setup(self, stage: str | None = None) -> None:
         """Set up train/val/predict video splits.
 
         Splits are done at the VIDEO level for clean separation.
@@ -902,7 +901,7 @@ class VideoDataModule(pl.LightningDataModule):
     def _create_dataloader(
         self,
         video_list: list[str],
-        labels_2d: Optional[torch.Tensor],
+        labels_2d: torch.Tensor | None,
         include_labels: bool,
         include_lengths: bool,
         shuffle: bool = True,
@@ -910,7 +909,7 @@ class VideoDataModule(pl.LightningDataModule):
         use_dali_sharding: bool = True,
         for_prediction: bool = False,
         augment: bool = False,
-    ) -> Optional[DALIIterator]:
+    ) -> DALIIterator | None:
         """Create a DALI-based dataloader for a list of videos.
 
         Args:
@@ -955,7 +954,11 @@ class VideoDataModule(pl.LightningDataModule):
         device_id = torch.cuda.current_device() if torch.cuda.is_available() else 0
 
         # Set up distributed sharding
-        if use_dali_sharding and torch.distributed.is_available() and torch.distributed.is_initialized():
+        if (
+            use_dali_sharding
+            and torch.distributed.is_available()
+            and torch.distributed.is_initialized()
+        ):
             shard_id = torch.distributed.get_rank()
             num_shards = torch.distributed.get_world_size()
         else:
@@ -983,7 +986,7 @@ class VideoDataModule(pl.LightningDataModule):
             )
             pipe.build()
         except RuntimeError as e:
-            raise RuntimeError(f"DALI pipeline build failed: {e}")
+            raise RuntimeError(f"DALI pipeline build failed: {e}") from e
         finally:
             os.unlink(file_list)
 
@@ -1044,7 +1047,7 @@ class VideoDataModule(pl.LightningDataModule):
             augment=True,
         )
 
-    def val_dataloader(self) -> Union[DALIIterator, DataLoader]:
+    def val_dataloader(self) -> DALIIterator | DataLoader:
         """Create validation dataloader."""
 
         _check_dali_available()
@@ -1077,7 +1080,7 @@ class VideoDataModule(pl.LightningDataModule):
             for_prediction=False,
         )
 
-    def predict_dataloader(self) -> Union[DALIIterator, DataLoader]:
+    def predict_dataloader(self) -> DALIIterator | DataLoader:
         """Create prediction dataloader."""
 
         _check_dali_available()

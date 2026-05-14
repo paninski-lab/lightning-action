@@ -68,12 +68,12 @@ line-length = 99
 exclude = [
     ".git",
     "__pycache__",
-    "build",
-    "configs",
-    "data",
-    "dist",
-    "docs",
-    "scripts",
+    "/build",
+    "/configs",
+    "/data",
+    "/dist",
+    "/docs",
+    "/scripts",
 ]
 
 [tool.ruff.lint]
