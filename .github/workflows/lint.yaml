@@ -29,7 +29,7 @@ jobs:
           # skipped — the source handles its absence with a try/except already
           pip install "lightning~=2.5" jaxtyping "numpy>=2.0.0" opencv-python-headless \
             scikit-learn tensorboard transformers pandas pyyaml torchmetrics
-          pip install ruff pyright
+          pip install pytest ruff pyright
 
       - name: Lint with ruff
         id: ruff

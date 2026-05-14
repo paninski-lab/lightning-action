@@ -34,7 +34,7 @@ import torch
 def dali_available() -> bool:
     """Check if NVIDIA DALI is installed."""
     try:
-        from nvidia.dali import types  # noqa
+        from nvidia.dali import types  # type: ignore[import-not-found]  # noqa
         return True
     except ImportError:
         return False
@@ -1713,7 +1713,7 @@ class TestDALIIntegration:
         import gc
         import tempfile as tf
 
-        from nvidia.dali.plugin.pytorch import LastBatchPolicy
+        from nvidia.dali.plugin.pytorch import LastBatchPolicy  # type: ignore[import-not-found]
 
         from lightning_action.data.video_datamodule import (
             DALIIterator,
@@ -2133,7 +2133,9 @@ class TestVideoPipelineConfig:
     def test_last_batch_policy_selection(self):
         """Test last batch policy string to enum conversion."""
         try:
-            from nvidia.dali.plugin.pytorch import LastBatchPolicy
+            from nvidia.dali.plugin.pytorch import (
+                LastBatchPolicy,  # type: ignore[import-not-found]
+            )
 
             # Test 'drop' policy
             policy_str = 'drop'

@@ -52,9 +52,12 @@ logger = logging.getLogger(__name__)
 
 DALI_AVAILABLE = False
 try:
-    from nvidia.dali import fn, types
-    from nvidia.dali.pipeline import Pipeline
-    from nvidia.dali.plugin.pytorch import DALIGenericIterator, LastBatchPolicy
+    from nvidia.dali import fn, types  # type: ignore[import-not-found]
+    from nvidia.dali.pipeline import Pipeline  # type: ignore[import-not-found]
+    from nvidia.dali.plugin.pytorch import (  # type: ignore[import-not-found]
+        DALIGenericIterator,
+        LastBatchPolicy,
+    )
     DALI_AVAILABLE = True
 except ImportError:
     # typed as Any so pyright doesn't flag every fn.*/types.* call as an attribute
