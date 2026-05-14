@@ -22,6 +22,7 @@ from typing import Any
 import lightning.pytorch as pl
 import numpy as np
 import torch
+from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.utilities import rank_zero_only
 
 from lightning_action import __version__
@@ -191,7 +192,7 @@ def train(
     logger.info("Setting up trainer...")
 
     # Logger
-    tb_logger = pl.loggers.TensorBoardLogger(
+    tb_logger = TensorBoardLogger(
         save_dir=output_dir / 'tb_logs',
         name='',
         version='',

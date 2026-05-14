@@ -249,10 +249,10 @@ class DilationBlock(nn.Module):
 
     def _init_weights(self):
         """Initialize weights with normal distribution."""
-        self.conv0.weight.data.normal_(0, 0.01)
-        self.conv1.weight.data.normal_(0, 0.01)
+        nn.init.normal_(self.conv0.weight, 0, 0.01)  # type: ignore[arg-type]
+        nn.init.normal_(self.conv1.weight, 0, 0.01)  # type: ignore[arg-type]
         if self.downsample is not None:
-            self.downsample.weight.data.normal_(0, 0.01)
+            nn.init.normal_(self.downsample.weight, 0, 0.01)  # type: ignore[arg-type]
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through dilation block.
