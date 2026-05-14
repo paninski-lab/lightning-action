@@ -58,6 +58,7 @@ dev = [
     "pre-commit",
     "pyright",
     "pytest",
+    "pytest-cov",
     "pytest-html",
     "requests",
     "ruff",
@@ -109,6 +110,16 @@ include = ["lightning_action", "tests"]
 exclude = ["build", "configs", "data", "dist", "docs", "scripts"]
 # torch stubs don't re-export public functions at the top level (torch.tensor, torch.allclose, etc.)
 reportPrivateImportUsage = "none"
+
+[tool.coverage.run]
+source = ["lightning_action"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+]
 
 [tool.pytest.ini_options]
 testpaths = "tests"
