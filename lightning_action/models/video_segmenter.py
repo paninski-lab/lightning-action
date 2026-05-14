@@ -90,6 +90,7 @@ class VideoBaseModel(BaseModel):
             Loss tensor, or None if batch should be skipped.
         """
         frames, labels, metadata = self._get_inputs_and_targets(batch)
+        assert labels is not None, "training_step requires labels"
 
         # Removes the start and end chunks during training to prevent context corruption.
         if metadata is not None:
@@ -146,6 +147,7 @@ class VideoBaseModel(BaseModel):
             batch_idx: Index of this batch.
         """
         frames, labels, _ = self._get_inputs_and_targets(batch)
+        assert labels is not None, "validation_step requires labels"
 
         outputs = self.forward(frames)
         outputs_no_pad = self._remove_padding(outputs)
@@ -488,7 +490,7 @@ class VideoSegmenter(VideoBaseModel):
         Returns:
             List of parameter group dicts.
         """
-        param_groups = [
+        param_groups: list[dict[str, Any]] = [
             {'params': self.pooling.parameters()},
             {'params': self.head.parameters()},
             {'params': self.classifier.parameters()},

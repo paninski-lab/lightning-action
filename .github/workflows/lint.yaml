@@ -22,18 +22,31 @@ jobs:
           python-version: '3.10'
 
       - name: Install ruff
-        run: pip install ruff
-
-      - name: Lint with ruff
-        run: ruff check lightning_action tests
-        # Reads config from [tool.ruff.lint] in pyproject.toml
+        run: pip install ruff pyright numpy
 
       - name: Show fix instructions if linting failed
-        if: failure()
+        if: always() && steps.ruff.outcome == 'failure'
         run: |
           echo ""
           echo "Linting failed!"
           echo ""
-          echo "To fix issues locally, run:"
+          echo "To auto-fix issues locally, run:"
           echo "  ruff check --fix lightning_action tests"
+          echo ""
+          echo "To see all violations without fixing, run:"
+          echo "  ruff check lightning_action tests"
+          echo ""
+
+      - name: Type check with pyright
+        id: pyright
+        run: pyright lightning_action
+
+      - name: Show fix instructions if type checking failed
+        if: always() && steps.pyright.outcome == 'failure'
+        run: |
+          echo ""
+          echo "Type checking failed!"
+          echo ""
+          echo "To reproduce locally, run:"
+          echo "  pyright lightning_action"
           echo ""

@@ -6,7 +6,7 @@ updated to use PyTorch Lightning for training and modern architectural patterns.
 
 import logging
 from abc import abstractmethod
-from typing import Any
+from typing import Any, overload
 
 import lightning as pl
 import torch
@@ -100,6 +100,11 @@ class BaseModel(pl.LightningModule):
             dictionary with model outputs including 'logits' and 'probabilities'
         """
         raise NotImplementedError
+
+    @overload
+    def _remove_padding(self, data: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]: ...
+    @overload
+    def _remove_padding(self, data: torch.Tensor) -> torch.Tensor: ...
 
     def _remove_padding(
         self,
