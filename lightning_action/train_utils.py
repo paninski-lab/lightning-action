@@ -23,8 +23,8 @@ import lightning.pytorch as pl
 import numpy as np
 import torch
 import yaml
+from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 from lightning.pytorch.utilities import rank_zero_only
-from typeguard import typechecked
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 # Reproducibility
 # =============================================================================
 
-@typechecked
 def reset_seeds(seed: int = 0) -> None:
     """Reset all random seeds for reproducibility.
 
@@ -55,7 +54,6 @@ def reset_seeds(seed: int = 0) -> None:
 # Lightning Callbacks
 # =============================================================================
 
-@typechecked
 def get_callbacks(
     checkpointing: bool = True,
     lr_monitor: bool = True,
@@ -82,23 +80,23 @@ def get_callbacks(
 
     # Learning rate monitoring
     if lr_monitor:
-        lr_monitor_cb = pl.callbacks.LearningRateMonitor(logging_interval='epoch')
+        lr_monitor_cb = LearningRateMonitor(logging_interval='epoch')
         callbacks.append(lr_monitor_cb)
 
     # Model checkpointing - save best model based on monitored metric
     if checkpointing:
-        ckpt_best_callback = pl.callbacks.ModelCheckpoint(
+        ckpt_best_callback = ModelCheckpoint(
             monitor=monitor,  # Can be None, 'val_loss', 'train_loss', etc.
-            mode='min' if monitor else None,
+            mode='min',
             filename='{epoch}-{step}-best',
-            save_top_k=1 if monitor else None,
+            save_top_k=1 if monitor else 0,
             save_last=True if monitor is None else False,  # Save last if no monitor
         )
         callbacks.append(ckpt_best_callback)
 
     # Periodic checkpointing (save every N epochs regardless of performance)
     if ckpt_every_n_epochs is not None:
-        ckpt_callback = pl.callbacks.ModelCheckpoint(
+        ckpt_callback = ModelCheckpoint(
             monitor=None,
             every_n_epochs=ckpt_every_n_epochs,
             save_top_k=-1,
@@ -108,7 +106,8 @@ def get_callbacks(
 
     # Early stopping
     if early_stopping:
-        early_stop_callback = pl.callbacks.EarlyStopping(
+        assert monitor is not None, "monitor must be set when early_stopping=True"
+        early_stop_callback = EarlyStopping(
             monitor=monitor,
             mode='min',
             patience=early_stopping_patience,
@@ -123,7 +122,6 @@ def get_callbacks(
 # Config Validation and Updates
 # =============================================================================
 
-@typechecked
 def validate_config(config: dict[str, Any], required_sections: list[str]) -> None:
     """Validate that required configuration sections are present.
 
@@ -139,7 +137,6 @@ def validate_config(config: dict[str, Any], required_sections: list[str]) -> Non
             raise ValueError(f"Configuration must contain '{section}' section")
 
 
-@typechecked
 def update_config_with_class_weights(
     config: dict[str, Any],
     model: pl.LightningModule,
@@ -165,12 +162,12 @@ def update_config_with_class_weights(
 
     # Store in model's config if it has one
     if hasattr(model, 'config'):
-        if 'model' not in model.config:
-            model.config['model'] = {}
-        model.config['model']['class_weights'] = class_weights
+        model_config: dict[str, Any] = model.config  # type: ignore[assignment]
+        if 'model' not in model_config:
+            model_config['model'] = {}
+        model_config['model']['class_weights'] = class_weights
 
 
-@typechecked
 def update_config_with_label_names(
     config: dict[str, Any],
     model: pl.LightningModule,
@@ -194,13 +191,13 @@ def update_config_with_label_names(
         config['data']['label_names'] = label_names
 
         if hasattr(model, 'config'):
-            if 'data' not in model.config:
-                model.config['data'] = {}
-            model.config['data']['label_names'] = label_names
+            model_config: dict[str, Any] = model.config  # type: ignore[assignment]
+            if 'data' not in model_config:
+                model_config['data'] = {}
+            model_config['data']['label_names'] = label_names
 
 
 @rank_zero_only
-@typechecked
 def save_config(
     config: dict[str, Any],
     output_dir: Path,
@@ -235,7 +232,6 @@ def save_config(
 # =============================================================================
 
 @rank_zero_only
-@typechecked
 def pretty_print_config(config: dict[str, Any]) -> None:
     """Pretty print configuration dictionary.
 
@@ -264,7 +260,6 @@ def pretty_print_config(config: dict[str, Any]) -> None:
 # Callback Configuration Helper
 # =============================================================================
 
-@typechecked
 def get_callbacks_from_config(
     training_config: dict[str, Any],
     monitor: str = 'val_loss',

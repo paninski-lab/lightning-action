@@ -34,7 +34,7 @@ import torch
 def dali_available() -> bool:
     """Check if NVIDIA DALI is installed."""
     try:
-        from nvidia.dali import types  # noqa
+        from nvidia.dali import types  # type: ignore[import-not-found]  # noqa
         return True
     except ImportError:
         return False
@@ -138,7 +138,7 @@ def create_test_video(video_config):
 
         # Create video writer
         # NOTE: cv2.VideoWriter size is (width, height), not (height, width)!
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # type: ignore[attr-defined]
         writer = cv2.VideoWriter(video_path, fourcc, fps, (width, height))
 
         if not writer.isOpened():
@@ -398,6 +398,7 @@ class TestLoadLabelsForVideos:
                 ignore_index=-100
             )
 
+            assert labels_2d is not None
             assert labels_2d.shape == (3, 100)
 
             # Check each video has correct label padding
@@ -444,6 +445,7 @@ class TestLoadLabelsForVideos:
             )
 
             # Check conversion from one-hot to class indices
+            assert labels_2d is not None
             assert torch.all(labels_2d[0, :num_frames] == torch.from_numpy(expected_classes))
 
     def test_missing_label_file(self, create_test_video):
@@ -519,6 +521,7 @@ class TestLoadLabelsForVideos:
             )
 
             # Padding should use custom ignore_index
+            assert labels_2d is not None
             assert torch.all(labels_2d[0, num_frames:] == custom_ignore)
 
 
@@ -889,8 +892,8 @@ class TestDALIIteratorLogic:
 
         metadata = []
         for i in range(len(frame_indices)):
-            video_idx = frame_indices[i].item()
-            start_frame = start_frames[i].item()
+            video_idx = int(frame_indices[i].item())
+            start_frame = int(start_frames[i].item())
 
             is_start = (start_frame == 0)
             is_end = False
@@ -927,8 +930,8 @@ class TestDALIIteratorLogic:
 
         metadata = []
         for i in range(len(frame_indices)):
-            video_idx = frame_indices[i].item()
-            start_frame = start_frames[i].item()
+            video_idx = int(frame_indices[i].item())
+            start_frame = int(start_frames[i].item())
 
             is_start = (start_frame == 0)
             is_end = False
@@ -1522,6 +1525,8 @@ class TestVideoDataModuleSetup:
             datamodule.setup('fit')
 
             # Should split at video level
+            assert datamodule.train_video_paths is not None
+            assert datamodule.val_video_paths is not None
             assert len(datamodule.train_video_paths) == 8
             assert len(datamodule.val_video_paths) == 2
             # No overlap
@@ -1558,6 +1563,7 @@ class TestVideoDataModuleSetup:
 
             datamodule.setup('predict')
 
+            assert datamodule._predict_video_paths is not None
             assert len(datamodule._predict_video_paths) == 3
 
     def test_invalid_probabilities(self, create_test_video, create_test_labels):
@@ -1707,7 +1713,7 @@ class TestDALIIntegration:
         import gc
         import tempfile as tf
 
-        from nvidia.dali.plugin.pytorch import LastBatchPolicy
+        from nvidia.dali.plugin.pytorch import LastBatchPolicy  # type: ignore[import-not-found]
 
         from lightning_action.data.video_datamodule import (
             DALIIterator,
@@ -1748,6 +1754,7 @@ class TestDALIIntegration:
                 labels_dir=labels_dir,
                 max_frames=num_frames + 50,
             )
+            assert labels_2d is not None
             labels_2d = labels_2d.cuda()
 
             # Get video lengths
@@ -1973,6 +1980,7 @@ class TestDALIIntegration:
 
                 # Check validation is enabled
                 assert datamodule.validation_enabled
+                assert datamodule.val_video_paths is not None
                 assert len(datamodule.val_video_paths) >= 1
 
                 val_loader = datamodule.val_dataloader()
@@ -1987,7 +1995,7 @@ class TestDALIIntegration:
             finally:
                 if val_loader is not None:
                     try:
-                        val_loader.reset()
+                        val_loader.reset()  # type: ignore[attr-defined]
                     except Exception:
                         pass
                 del val_loader
@@ -2054,7 +2062,7 @@ class TestDALIIntegration:
             finally:
                 if predict_loader is not None:
                     try:
-                        predict_loader.reset()
+                        predict_loader.reset()  # type: ignore[attr-defined]
                     except Exception:
                         pass
                 del predict_loader
@@ -2125,7 +2133,9 @@ class TestVideoPipelineConfig:
     def test_last_batch_policy_selection(self):
         """Test last batch policy string to enum conversion."""
         try:
-            from nvidia.dali.plugin.pytorch import LastBatchPolicy
+            from nvidia.dali.plugin.pytorch import (  # type: ignore[import-not-found]
+                LastBatchPolicy,
+            )
 
             # Test 'drop' policy
             policy_str = 'drop'

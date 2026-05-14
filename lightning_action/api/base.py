@@ -20,20 +20,20 @@ Subclasses must implement:
 import contextlib
 import os
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Generator
 from pathlib import Path
 from typing import Any, Generic, TypeVar
 
 import lightning as pl
 import torch
 import yaml
-from typeguard import typechecked
 
 # Type variable for the model type
 ModelT = TypeVar('ModelT', bound=pl.LightningModule)
 
 
 @contextlib.contextmanager
-def chdir(path: Path):
+def chdir(path: Path) -> Generator[None, None, None]:
     """Context manager for temporarily changing working directory.
 
     Useful when training requires relative paths from the output directory.
@@ -76,7 +76,6 @@ class BaseModelAPI(ABC, Generic[ModelT]):
         model_dir: Directory where the model is stored (after training/loading).
     """
 
-    @typechecked
     def __init__(
         self,
         model: ModelT,
@@ -126,7 +125,7 @@ class BaseModelAPI(ABC, Generic[ModelT]):
 
     @classmethod
     @abstractmethod
-    def _get_train_function(cls):
+    def _get_train_function(cls) -> Callable[..., Any]:
         """Return the training function for this pipeline.
 
         Returns:
@@ -157,7 +156,7 @@ class BaseModelAPI(ABC, Generic[ModelT]):
         pass
 
     @abstractmethod
-    def predict(self, *args, **kwargs) -> None:
+    def predict(self, *args: Any, **kwargs: Any) -> None:
         """Generate predictions using the trained model.
 
         Implementation differs between CSV and video pipelines.
@@ -253,7 +252,6 @@ class BaseModelAPI(ABC, Generic[ModelT]):
         return model
 
     @classmethod
-    @typechecked
     def from_dir(cls, model_dir: str | Path) -> 'BaseModelAPI[ModelT]':
         """Load a trained model from a directory.
 
@@ -292,7 +290,6 @@ class BaseModelAPI(ABC, Generic[ModelT]):
         return cls(model, config, model_dir)
 
     @classmethod
-    @typechecked
     def from_config(cls, config_path: str | Path | dict) -> 'BaseModelAPI[ModelT]':
         """Create a new untrained model from configuration.
 
@@ -318,7 +315,6 @@ class BaseModelAPI(ABC, Generic[ModelT]):
 
         return cls(model, config, model_dir=None)
 
-    @typechecked
     def train(
         self,
         output_dir: str | Path = 'runs/default',

@@ -10,7 +10,6 @@ from typing import Any
 import lightning as pl
 import numpy as np
 from torch.utils.data import DataLoader, random_split
-from typeguard import typechecked
 
 from lightning_action.data.datasets import FeatureDataset
 from lightning_action.data.utils import split_sizes_from_probabilities
@@ -26,7 +25,6 @@ class DataModule(pl.LightningDataModule):
     and provides train/validation DataLoaders.
     """
 
-    @typechecked
     def __init__(
         self,
         data_config: dict[str, Any],
@@ -39,7 +37,7 @@ class DataModule(pl.LightningDataModule):
         pin_memory: bool = True,
         persistent_workers: bool = True,
         seed: int = 42,
-    ):
+    ) -> None:
         """Initialize DataModule.
 
         Args:
@@ -101,7 +99,7 @@ class DataModule(pl.LightningDataModule):
         self.dataset_val = None
         self.setup()
 
-    def setup(self, stage: str | None = None):
+    def setup(self, stage: str | None = None) -> None:
         """Set up datasets for training and validation.
 
         Args:
@@ -133,6 +131,7 @@ class DataModule(pl.LightningDataModule):
         Returns:
             DataLoader for training data
         """
+        assert self.dataset_train is not None, "setup() must be called before train_dataloader()"
         return DataLoader(
             self.dataset_train,
             batch_size=self.batch_size,
@@ -148,6 +147,7 @@ class DataModule(pl.LightningDataModule):
         Returns:
             DataLoader for validation data
         """
+        assert self.dataset_val is not None, "setup() must be called before val_dataloader()"
         return DataLoader(
             self.dataset_val,
             batch_size=self.batch_size,

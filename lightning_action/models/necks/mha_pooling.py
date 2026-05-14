@@ -25,7 +25,6 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typeguard import typechecked
 
 
 class MultiheadAttentionPooling(nn.Module):
@@ -58,7 +57,6 @@ class MultiheadAttentionPooling(nn.Module):
         https://arxiv.org/abs/1810.00825
     """
 
-    @typechecked
     def __init__(
         self,
         embed_dim: int,
@@ -67,7 +65,7 @@ class MultiheadAttentionPooling(nn.Module):
         dropout: float = 0.0,
         use_ffn: bool = True,
         layer_norm: bool = False,
-    ):
+    ) -> None:
         """Initialize the attention pooling module.
 
         Args:
@@ -110,7 +108,6 @@ class MultiheadAttentionPooling(nn.Module):
         else:
             self.ffn = None
 
-    @typechecked
     def forward(
         self,
         x: torch.Tensor,

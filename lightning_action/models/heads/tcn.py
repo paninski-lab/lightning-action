@@ -7,7 +7,6 @@ residual connections for temporal modeling.
 import torch
 from jaxtyping import Float
 from torch import nn
-from typeguard import typechecked
 
 
 class DilatedTCN(nn.Module):
@@ -16,7 +15,6 @@ class DilatedTCN(nn.Module):
     Encoder-only implementation of a dilated TCN with residual connections.
     """
 
-    @typechecked
     def __init__(
         self,
         input_size: int,
@@ -26,7 +24,7 @@ class DilatedTCN(nn.Module):
         activation: str = 'lrelu',
         dropout_rate: float = 0.2,
         seed: int = 42,
-    ):
+    ) -> None:
         """Initialize DilatedTCN head.
 
         Args:
@@ -58,7 +56,7 @@ class DilatedTCN(nn.Module):
         self.model = nn.Sequential()
         self._build_model()
 
-    def _build_model(self):
+    def _build_model(self) -> None:
         """Build the TCN model layers."""
         for i_layer in range(self.num_layers):
             # dilation increases exponentially
@@ -91,7 +89,6 @@ class DilatedTCN(nn.Module):
             block_name = f'tcn_block_{i_layer:02d}'
             self.model.add_module(block_name, tcn_block)
 
-    @typechecked
     def forward(
         self,
         x: Float[torch.Tensor, 'batch sequence features']
@@ -137,7 +134,6 @@ class DilationBlock(nn.Module):
     Implements a residual block with dilated convolutions for temporal modeling.
     """
 
-    @typechecked
     def __init__(
         self,
         input_size: int,
@@ -149,7 +145,7 @@ class DilationBlock(nn.Module):
         activation: str = 'lrelu',
         dropout: float = 0.2,
         final_activation: str | None = None,
-    ):
+    ) -> None:
         """Initialize DilationBlock.
 
         Args:
@@ -229,7 +225,7 @@ class DilationBlock(nn.Module):
         self._init_weights()
 
     @staticmethod
-    def _get_activation_func(activation) -> nn.Module:
+    def _get_activation_func(activation: str) -> nn.Module:
         """Get activation function module.
 
         Returns:
@@ -251,12 +247,12 @@ class DilationBlock(nn.Module):
         else:
             raise ValueError(f'Unsupported activation: {activation}')
 
-    def _init_weights(self):
+    def _init_weights(self) -> None:
         """Initialize weights with normal distribution."""
-        self.conv0.weight.data.normal_(0, 0.01)
-        self.conv1.weight.data.normal_(0, 0.01)
+        nn.init.normal_(self.conv0.weight, 0, 0.01)  # type: ignore[arg-type]
+        nn.init.normal_(self.conv1.weight, 0, 0.01)  # type: ignore[arg-type]
         if self.downsample is not None:
-            self.downsample.weight.data.normal_(0, 0.01)
+            nn.init.normal_(self.downsample.weight, 0, 0.01)  # type: ignore[arg-type]
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through dilation block.

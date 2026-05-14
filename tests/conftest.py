@@ -44,7 +44,7 @@ def create_test_feature_csv() -> Callable:
         feature_names = [f'feature_{i}' for i in range(n_features)]
         data = np.random.rand(n_frames, n_features)
 
-        df = pd.DataFrame(data, columns=feature_names)
+        df = pd.DataFrame(data, columns=feature_names)  # type: ignore[arg-type]
         df.index.name = 'frame'
 
         df.to_csv(file_path)
@@ -65,7 +65,7 @@ def create_test_label_csv():
         for i in range(n_frames):
             labels[i, np.random.randint(0, n_classes)] = 1
 
-        df = pd.DataFrame(labels, columns=class_names)
+        df = pd.DataFrame(labels, columns=class_names)  # type: ignore[arg-type]
         df.index.name = 'frame'
 
         df.to_csv(file_path)

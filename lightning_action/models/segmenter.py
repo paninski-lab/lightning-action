@@ -6,7 +6,8 @@ updated to use PyTorch Lightning for training and modern architectural patterns.
 
 import logging
 from abc import abstractmethod
-from typing import Any
+from collections.abc import Iterator
+from typing import Any, overload
 
 import lightning as pl
 import torch
@@ -14,7 +15,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from jaxtyping import Float
 from torchmetrics import Accuracy, F1Score
-from typeguard import typechecked
 
 from lightning_action.data.utils import compute_sequence_pad
 
@@ -29,8 +29,7 @@ class BaseModel(pl.LightningModule):
     segmentation architectures.
     """
 
-    @typechecked
-    def __init__(self, config: dict[str, Any]):
+    def __init__(self, config: dict[str, Any]) -> None:
         """Initialize base model.
 
         Args:
@@ -63,7 +62,7 @@ class BaseModel(pl.LightningModule):
         self.sequence_pad = compute_sequence_pad(config['model']['head'], **config['model'])
         config['model']['sequence_pad'] = self.sequence_pad
 
-    def _setup_metrics(self):
+    def _setup_metrics(self) -> None:
         """Set up torchmetrics for evaluation."""
         num_classes = self.output_size
 
@@ -84,7 +83,7 @@ class BaseModel(pl.LightningModule):
         )
 
     @abstractmethod
-    def _build_model(self):
+    def _build_model(self) -> None:
         """Build the model architecture. Implemented by subclasses."""
         raise NotImplementedError
 
@@ -102,6 +101,11 @@ class BaseModel(pl.LightningModule):
             dictionary with model outputs including 'logits' and 'probabilities'
         """
         raise NotImplementedError
+
+    @overload
+    def _remove_padding(self, data: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]: ...
+    @overload
+    def _remove_padding(self, data: torch.Tensor) -> torch.Tensor: ...
 
     def _remove_padding(
         self,
@@ -416,7 +420,7 @@ class BaseModel(pl.LightningModule):
             }
         }
 
-    def _get_optimizer_params(self):
+    def _get_optimizer_params(self) -> Iterator[nn.Parameter] | list[dict[str, Any]]:
         """Get parameters to optimize.
 
         Override in subclasses for custom parameter groups.
@@ -435,7 +439,7 @@ class Segmenter(BaseModel):
     temporal model architecture with a classification head.
     """
 
-    def _build_model(self):
+    def _build_model(self) -> None:
         """Build the segmentation model architecture."""
         # build head network
         self.head = self._build_head()
@@ -502,7 +506,7 @@ class Segmenter(BaseModel):
         # both TemporalMLP and RNN output num_hid_units features
         return self.model_config['num_hid_units']
 
-    def _initialize_weights(self):
+    def _initialize_weights(self) -> None:
         """Initialize model weights."""
         for module in self.modules():
             if isinstance(module, nn.Linear):
@@ -510,7 +514,6 @@ class Segmenter(BaseModel):
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
 
-    @typechecked
     def forward(
         self,
         x: Float[torch.Tensor, 'batch sequence features'],

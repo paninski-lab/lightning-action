@@ -37,7 +37,6 @@ dependencies = [
     "torch",
     "torchvision",
     "transformers",
-    "typeguard (<3.0.0)",
     "pandas",
     "pyyaml",
 ]
@@ -57,6 +56,7 @@ litaction = "lightning_action.cli.main:main"
 [project.optional-dependencies]
 dev = [
     "pre-commit",
+    "pyright",
     "pytest",
     "pytest-html",
     "requests",
@@ -100,6 +100,15 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["lightning_action"]
+
+[tool.pyright]
+pythonVersion = "3.11"
+pythonPlatform = "Linux"
+typeCheckingMode = "basic"
+include = ["lightning_action", "tests"]
+exclude = ["build", "configs", "data", "dist", "docs", "scripts"]
+# torch stubs don't re-export public functions at the top level (torch.tensor, torch.allclose, etc.)
+reportPrivateImportUsage = "none"
 
 [tool.pytest.ini_options]
 testpaths = "tests"

@@ -11,13 +11,13 @@ only the methods that need video-specific behavior.
 """
 
 import os
+from collections.abc import Iterator
 from typing import Any
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from jaxtyping import Float
-from typeguard import typechecked
 
 from lightning_action.models.backbones import (
     ResNetBackbone,
@@ -72,7 +72,6 @@ class VideoBaseModel(BaseModel):
 
         return frames, labels, metadata
 
-    @typechecked
     def training_step(
         self,
         batch: tuple[torch.Tensor, torch.Tensor, list[dict]] | dict,
@@ -92,6 +91,7 @@ class VideoBaseModel(BaseModel):
             Loss tensor, or None if batch should be skipped.
         """
         frames, labels, metadata = self._get_inputs_and_targets(batch)
+        assert labels is not None, "training_step requires labels"
 
         # Removes the start and end chunks during training to prevent context corruption.
         if metadata is not None:
@@ -136,7 +136,6 @@ class VideoBaseModel(BaseModel):
 
         return loss
 
-    @typechecked
     def validation_step(
         self,
         batch: tuple[torch.Tensor, torch.Tensor, list[dict]] | dict,
@@ -149,6 +148,7 @@ class VideoBaseModel(BaseModel):
             batch_idx: Index of this batch.
         """
         frames, labels, _ = self._get_inputs_and_targets(batch)
+        assert labels is not None, "validation_step requires labels"
 
         outputs = self.forward(frames)
         outputs_no_pad = self._remove_padding(outputs)
@@ -163,7 +163,6 @@ class VideoBaseModel(BaseModel):
                 batch_size=frames.shape[0],
             )
 
-    @typechecked
     def predict_step(
         self,
         batch: tuple[torch.Tensor, list[int], list[dict]] | dict,
@@ -226,7 +225,7 @@ class VideoBaseModel(BaseModel):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    def _get_optimizer_params(self):
+    def _get_optimizer_params(self) -> Iterator[nn.Parameter] | list[dict[str, Any]]:
         """Get parameters to optimize.
 
         Override in subclasses for custom parameter groups.
@@ -275,7 +274,7 @@ class VideoSegmenter(VideoBaseModel):
         'resnet152-beast': 2048,
     }
 
-    def __init__(self, config: dict[str, Any]):
+    def __init__(self, config: dict[str, Any]) -> None:
         """Initialize VideoSegmenter with auto-computed input_size.
 
         Args:
@@ -483,7 +482,7 @@ class VideoSegmenter(VideoBaseModel):
                     if submodule.bias is not None:
                         nn.init.zeros_(submodule.bias)
 
-    def _get_optimizer_params(self):
+    def _get_optimizer_params(self) -> Iterator[nn.Parameter] | list[dict[str, Any]]:
         """Get parameters to optimize with specific groups.
 
         Returns parameters from pooling, head, and classifier.
@@ -492,7 +491,7 @@ class VideoSegmenter(VideoBaseModel):
         Returns:
             List of parameter group dicts.
         """
-        param_groups = [
+        param_groups: list[dict[str, Any]] = [
             {'params': self.pooling.parameters()},
             {'params': self.head.parameters()},
             {'params': self.classifier.parameters()},
@@ -515,7 +514,6 @@ class VideoSegmenter(VideoBaseModel):
 
         return param_groups
 
-    @typechecked
     def forward(
         self,
         x: Float[torch.Tensor, 'batch sequence channels height width'],

@@ -18,13 +18,13 @@ Reference:
 """
 
 import math
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import torch
 import torch.nn as nn
 from transformers import ViTMAEModel
-from typeguard import typechecked
 
 
 class ViTMAEBackbone(nn.Module):
@@ -58,8 +58,7 @@ class ViTMAEBackbone(nn.Module):
         features = backbone(images)  # (4, 768, 14, 14)
     """
 
-    @typechecked
-    def __init__(self, config: dict[str, Any] | None = None):
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize the ViT-MAE backbone.
 
         Args:
@@ -99,19 +98,18 @@ class ViTMAEBackbone(nn.Module):
     @property
     def image_size(self) -> int:
         """Expected input image size (square)."""
-        return self.vit_mae.config.image_size
+        return self.vit_mae.config.image_size  # type: ignore[return-value]
 
     @property
     def patch_size(self) -> int:
         """Size of image patches for the transformer."""
-        return self.vit_mae.config.patch_size
+        return self.vit_mae.config.patch_size  # type: ignore[return-value]
 
     @property
     def backbone_type(self) -> str:
         """Return backbone type identifier."""
         return 'vitmae'
 
-    @typechecked
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through ViT-MAE backbone.
 
@@ -162,7 +160,6 @@ class ViTMAEBackbone(nn.Module):
 
         return spatial_features
 
-    @typechecked
     def load_pretrained_weights(
         self,
         checkpoint_path: str,
@@ -242,7 +239,7 @@ class ViTMAEBackbone(nn.Module):
         else:
             print("Warning: No matching weights found in checkpoint")
 
-    def get_last_layer_params(self):
+    def get_last_layer_params(self) -> Iterator[nn.Parameter]:
         """Get parameters of the last transformer layer for fine-tuning.
 
         Returns:

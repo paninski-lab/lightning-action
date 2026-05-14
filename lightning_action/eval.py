@@ -1,19 +1,18 @@
 """Evaluation functions for the lightning-action package."""
 
 import itertools
+from typing import Any
 
 import numpy as np
 from sklearn.metrics import precision_score, recall_score
-from typeguard import typechecked
 
 
-@typechecked
 def get_precision_recall(
     true_classes: np.ndarray,
     pred_classes: np.ndarray,
     background: int | None = 0,
     n_classes: int | None = None,
-) -> dict[str, np.ndarray]:
+) -> dict[str, Any]:
     """Compute precision and recall for classifier.
 
     Args:
@@ -51,11 +50,11 @@ def get_precision_recall(
 
     precision = precision_score(
         true_classes[obs_idxs], pred_classes[obs_idxs],
-        labels=labels, average=None, zero_division=0,
+        labels=labels, average=None, zero_division=0,  # type: ignore[arg-type]
     )
     recall = recall_score(
         true_classes[obs_idxs], pred_classes[obs_idxs],
-        labels=labels, average=None, zero_division=0,
+        labels=labels, average=None, zero_division=0,  # type: ignore[arg-type]
     )
 
     # replace 0s with NaNs for classes with no ground truth
@@ -71,7 +70,6 @@ def get_precision_recall(
     return {'precision': p, 'recall': r, 'f1': f1}
 
 
-@typechecked
 def int_over_union(array1: np.ndarray, array2: np.ndarray) -> dict[int, float]:
     """Compute intersection over union for two 1D arrays.
 
@@ -92,7 +90,6 @@ def int_over_union(array1: np.ndarray, array2: np.ndarray) -> dict[int, float]:
     return iou
 
 
-@typechecked
 def run_lengths(array: np.ndarray) -> dict[int, list[int]]:
     """Compute distribution of run lengths for an array with integer entries.
 

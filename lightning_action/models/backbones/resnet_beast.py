@@ -27,10 +27,8 @@ from typing import Any, Literal
 
 import torch
 import torch.nn as nn
-from typeguard import typechecked
 
 
-@typechecked
 def get_configs(arch: str = 'resnet50') -> tuple:
     """Get number and type of layers for resnet models.
 
@@ -91,8 +89,7 @@ class ResNetBeastBackbone(nn.Module):
         features = backbone(images)  # (4, 2048, 7, 7)
     """
 
-    @typechecked
-    def __init__(self, config: dict[str, Any] | None = None):
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize the beast ResNet backbone.
 
         Args:
@@ -151,7 +148,6 @@ class ResNetBeastBackbone(nn.Module):
         """Return backbone type identifier."""
         return 'resnet-beast'
 
-    @typechecked
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through the backbone.
 
@@ -164,7 +160,6 @@ class ResNetBeastBackbone(nn.Module):
         """
         return self.backbone(x)
 
-    @typechecked
     def load_pretrained_weights(
         self,
         checkpoint_path: str,

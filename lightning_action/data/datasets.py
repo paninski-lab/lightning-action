@@ -14,7 +14,6 @@ import numpy as np
 import torch
 from jaxtyping import Float, Int
 from torch.utils.data import Dataset
-from typeguard import typechecked
 
 from .utils import compute_sequences, load_feature_csv, load_label_csv, load_marker_csv
 
@@ -29,7 +28,6 @@ class FeatureDataset(Dataset):
     but simplified for Lightning integration.
     """
 
-    @typechecked
     def __init__(
         self,
         ids: list[str],
@@ -38,7 +36,7 @@ class FeatureDataset(Dataset):
         paths: list[list[str | Path | None]],
         sequence_length: int = 500,
         sequence_pad: int = 0,
-    ):
+    ) -> None:
         """Initialize FeatureDataset.
 
         Args:
@@ -75,7 +73,7 @@ class FeatureDataset(Dataset):
         # load and process all data
         self._load_all_data()
 
-    def _validate_inputs(self):
+    def _validate_inputs(self) -> None:
         """Validate that input lists have consistent lengths."""
         n_datasets = len(self.ids)
         if not all(len(lst) == n_datasets for lst in [self.signals, self.transforms, self.paths]):
@@ -88,7 +86,7 @@ class FeatureDataset(Dataset):
                     f'Dataset {i}: signals, transforms, and paths must have same length'
                 )
 
-    def _load_all_data(self):
+    def _load_all_data(self) -> None:
         """Load and process data from all datasets."""
         for dataset_idx, dataset_id in enumerate(self.ids):
             logger.debug(f'Loading dataset {dataset_id}')
@@ -111,14 +109,14 @@ class FeatureDataset(Dataset):
             # record length of original inputs
             self.data_lengths.append(dataset_length)
 
-    def _load_dataset_data(self, dataset_idx: int) -> OrderedDict:
+    def _load_dataset_data(self, dataset_idx: int) -> tuple[OrderedDict, int]:
         """Load raw data for a single dataset.
 
         Args:
             dataset_idx: index of dataset to load
 
         Returns:
-            OrderedDict mapping signal names to loaded data arrays
+            Tuple of (OrderedDict mapping signal names to arrays, common frame count)
 
         Raises:
             ValueError: if data loading fails or data lengths are inconsistent
@@ -284,6 +282,7 @@ class FeatureDataset(Dataset):
                 raise ValueError(f'Sequence count mismatch for signal {signal}')
 
         # create sequence dictionaries
+        assert n_sequences is not None
         for seq_idx in range(n_sequences):
             sequence = {}
             for signal, seq_data in signal_sequences.items():

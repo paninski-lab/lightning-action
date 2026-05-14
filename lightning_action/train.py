@@ -22,8 +22,8 @@ from typing import Any
 import lightning.pytorch as pl
 import numpy as np
 import torch
+from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.utilities import rank_zero_only
-from typeguard import typechecked
 
 from lightning_action import __version__
 from lightning_action.data import DataModule
@@ -50,7 +50,6 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-@typechecked
 def train(
     config: dict[str, Any],
     model: pl.LightningModule,
@@ -148,7 +147,9 @@ def train(
     feature_names = datamodule.dataset.feature_names
     if len(feature_names) > 0:
         config['data']['feature_names'] = feature_names
-        model.config['data']['feature_names'] = feature_names
+        if hasattr(model, 'config'):
+            model_config: dict[str, Any] = model.config  # type: ignore[assignment]
+            model_config['data']['feature_names'] = feature_names
 
     label_names = datamodule.dataset.label_names
     update_config_with_label_names(config, model, label_names)
@@ -157,15 +158,17 @@ def train(
     num_epochs = training_config.get('num_epochs', 100)
     batch_size = training_config.get('batch_size', 32)
 
+    assert datamodule.dataset_train is not None
     steps_per_epoch = int(np.ceil(len(datamodule.dataset_train) / batch_size))
     total_steps = steps_per_epoch * num_epochs
 
     # Update model config with step information
     if hasattr(model, 'config'):
-        if 'optimizer' not in model.config:
-            model.config['optimizer'] = {}
-        model.config['optimizer']['steps_per_epoch'] = steps_per_epoch
-        model.config['optimizer']['total_steps'] = total_steps
+        model_config = model.config  # type: ignore[assignment]
+        if 'optimizer' not in model_config:
+            model_config['optimizer'] = {}
+        model_config['optimizer']['steps_per_epoch'] = steps_per_epoch
+        model_config['optimizer']['total_steps'] = total_steps
 
     logger.info(f"Training steps: {steps_per_epoch} per epoch, {total_steps} total")
 
@@ -189,7 +192,7 @@ def train(
     logger.info("Setting up trainer...")
 
     # Logger
-    tb_logger = pl.loggers.TensorBoardLogger(
+    tb_logger = TensorBoardLogger(
         save_dir=output_dir / 'tb_logs',
         name='',
         version='',
@@ -240,7 +243,6 @@ def train(
     return model
 
 
-@typechecked
 def compute_class_weights(
     datamodule: DataModule,
     ignore_index: int = -100,
@@ -263,6 +265,7 @@ def compute_class_weights(
     if not hasattr(datamodule, 'dataset_train') or datamodule.dataset_train is None:
         datamodule.setup('fit')
 
+    assert datamodule.dataset_train is not None
     # Collect labels from training dataset
     all_labels, num_classes = collect_labels_from_datamodule(
         datamodule.dataset_train,
@@ -273,7 +276,7 @@ def compute_class_weights(
         logger.warning("No labels found in training dataset, using uniform weights")
         # Try to get num_classes from dataset
         if hasattr(datamodule.dataset_train, 'label_names'):
-            num_classes = len(datamodule.dataset_train.label_names)
+            num_classes = len(datamodule.dataset_train.label_names)  # type: ignore[union-attr]
         else:
             num_classes = 4  # default fallback
         return [1.0] * num_classes
@@ -287,7 +290,6 @@ def compute_class_weights(
     )
 
 
-@typechecked
 def build_data_config_from_path(
     data_path: str | Path,
     expt_ids: list[str] | None = None,

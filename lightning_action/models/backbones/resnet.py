@@ -26,13 +26,13 @@ Reference:
     https://arxiv.org/abs/1512.03385
 """
 
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import torch
 import torch.nn as nn
 import torchvision.models as models
-from typeguard import typechecked
 
 # Mapping of backbone names to output dimensions
 RESNET_HIDDEN_SIZES = {
@@ -86,8 +86,7 @@ class ResNetBackbone(nn.Module):
         features = backbone(images)  # (4, 2048, 7, 7)
     """
 
-    @typechecked
-    def __init__(self, config: dict[str, Any] | None = None):
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize the ResNet image backbone.
 
         Args:
@@ -183,7 +182,6 @@ class ResNetBackbone(nn.Module):
         """Return backbone type identifier."""
         return 'resnet'
 
-    @typechecked
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through ResNet backbone.
 
@@ -216,7 +214,6 @@ class ResNetBackbone(nn.Module):
 
         return spatial_features
 
-    @typechecked
     def load_pretrained_weights(
         self,
         checkpoint_path: str,
@@ -290,7 +287,7 @@ class ResNetBackbone(nn.Module):
         else:
             print("Warning: No matching weights found in checkpoint")
 
-    def get_last_layer_params(self):
+    def get_last_layer_params(self) -> Iterator[nn.Parameter]:
         """Get parameters of the last residual stage for fine-tuning.
 
         Returns:

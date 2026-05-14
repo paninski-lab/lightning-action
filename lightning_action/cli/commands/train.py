@@ -1,12 +1,12 @@
 """Command to train a model."""
 
+import argparse
 import datetime
 import logging
 from pathlib import Path
 from typing import Any
 
 import yaml
-from typeguard import typechecked
 
 from lightning_action.api.model import Model
 from lightning_action.cli.types import config_file, output_dir
@@ -14,7 +14,7 @@ from lightning_action.cli.types import config_file, output_dir
 logger = logging.getLogger('LIGHTNING_ACTION.CLI.TRAIN')
 
 
-def register_parser(subparsers):
+def register_parser(subparsers: argparse._SubParsersAction) -> None:
     """Register the train command parser."""
     parser = subparsers.add_parser(
         'train',
@@ -76,8 +76,7 @@ def register_parser(subparsers):
     )
 
 
-@typechecked
-def handle(args):
+def handle(args: argparse.Namespace) -> None:
     """Handle the train command execution."""
     # Load config
     with open(args.config) as f:
@@ -110,7 +109,7 @@ def handle(args):
         raise
 
 
-def _setup_model_logging(output_dir: Path):
+def _setup_model_logging(output_dir: Path) -> logging.FileHandler:
     """Set up additional logging to the model directory and remove original file handler."""
 
     # Create log file path
@@ -133,8 +132,7 @@ def _setup_model_logging(output_dir: Path):
     return model_handler
 
 
-@typechecked
-def apply_overrides(config: dict[str, Any], args) -> dict[str, Any]:
+def apply_overrides(config: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
     """Apply command line overrides to config."""
     # Apply direct overrides
     if args.data_dir:
@@ -162,7 +160,6 @@ def apply_overrides(config: dict[str, Any], args) -> dict[str, Any]:
     return config
 
 
-@typechecked
 def apply_config_overrides(config: dict[str, Any], overrides: list[str]) -> dict[str, Any]:
     """Apply command line overrides to config using dot notation."""
     for override in overrides:
@@ -188,7 +185,6 @@ def apply_config_overrides(config: dict[str, Any], overrides: list[str]) -> dict
     return config
 
 
-@typechecked
 def parse_config_value(value: str) -> Any:
     """Parse a config value from string to appropriate type."""
     # Handle booleans

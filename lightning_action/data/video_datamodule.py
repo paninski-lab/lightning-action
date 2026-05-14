@@ -42,7 +42,6 @@ import lightning as pl
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
-from typeguard import typechecked
 
 from lightning_action.data.utils import (
     split_sizes_from_probabilities,
@@ -53,17 +52,26 @@ logger = logging.getLogger(__name__)
 
 DALI_AVAILABLE = False
 try:
-    from nvidia.dali import fn, types
-    from nvidia.dali.pipeline import Pipeline
-    from nvidia.dali.plugin.pytorch import DALIGenericIterator, LastBatchPolicy
+    from nvidia.dali import fn, types  # type: ignore[import-not-found]
+    from nvidia.dali.pipeline import Pipeline  # type: ignore[import-not-found]
+    from nvidia.dali.plugin.pytorch import (  # type: ignore[import-not-found]
+        DALIGenericIterator,
+        LastBatchPolicy,
+    )
     DALI_AVAILABLE = True
 except ImportError:
-    fn = types = LastBatchPolicy = None
+    # typed as Any so pyright doesn't flag every fn.*/types.* call as an attribute
+    # of None — the real guard is DALI_AVAILABLE / _check_dali_available()
+    fn: Any = None
+    types: Any = None
+    LastBatchPolicy: Any = None
+    # Pipeline/DALIGenericIterator used as base classes; object is a valid fallback
+    # and Any would break the class statement syntax
     Pipeline = object
     DALIGenericIterator = object
 
 
-def _check_dali_available():
+def _check_dali_available() -> None:
     """Raise informative error if DALI is not available."""
     if not DALI_AVAILABLE:
         raise ImportError(
@@ -167,7 +175,7 @@ AUGMENTATION_PRESETS = {
 }
 
 
-def _resolve_augmentation_config(config) -> dict:
+def _resolve_augmentation_config(config: str | dict | None) -> dict:
     """Resolve augmentation config from string preset, dict, or None.
 
     Args:
@@ -216,7 +224,7 @@ def _resolve_augmentation_config(config) -> dict:
     return {}
 
 
-class VideoPipeline(Pipeline):
+class VideoPipeline(Pipeline):  # type: ignore[misc]
     """DALI pipeline for GPU-accelerated video decoding and preprocessing.
 
     This pipeline:
@@ -247,7 +255,7 @@ class VideoPipeline(Pipeline):
         pad_sequences: bool = False,
         transform_mode: str = "imagenet",
         augmentations: dict | None = None,
-    ):
+    ) -> None:
         """Initialize the DALI video pipeline.
 
         Args:
@@ -296,7 +304,7 @@ class VideoPipeline(Pipeline):
         self._transform_preset = TRANSFORM_PRESETS[transform_mode]
         self._augmentations = augmentations or {}
 
-    def _apply_augmentations(self, frames):
+    def _apply_augmentations(self, frames: Any) -> Any:
         """Apply DALI-native augmentations to video frames.
 
         All random parameters are generated per-sample (not per-frame) to
@@ -368,7 +376,7 @@ class VideoPipeline(Pipeline):
 
         return frames
 
-    def define_graph(self):
+    def define_graph(self) -> tuple[Any, Any, Any]:
         """Define the DALI processing graph."""
         frames, frame_idx, start_frame = fn.readers.video(
             device="gpu",
@@ -413,7 +421,7 @@ class VideoPipeline(Pipeline):
         return frames, frame_idx, start_frame
 
 
-class DALIIterator(DALIGenericIterator):
+class DALIIterator(DALIGenericIterator):  # type: ignore[misc]
     """Custom DALI iterator that pairs video frames with labels.
 
     This iterator wraps DALI's generic iterator to:
@@ -424,7 +432,7 @@ class DALIIterator(DALIGenericIterator):
 
     def __init__(
         self,
-        pipe: Pipeline,
+        pipe: Pipeline,  # type: ignore[valid-type]
         output_map: list[str],
         sequence_length: int,
         tcn_padding: int,
@@ -434,7 +442,7 @@ class DALIIterator(DALIGenericIterator):
         include_lengths: bool = False,
         video_lengths: dict[int, int] | None = None,
         last_batch_policy: Any | None = None,
-    ):
+    ) -> None:
         """Initialize the DALI iterator.
 
         Args:
@@ -473,7 +481,10 @@ class DALIIterator(DALIGenericIterator):
         self.all_labels_2d = all_labels_2d
         self.video_lengths = video_lengths
 
-    def _process_batch(self, batch):
+    def _process_batch(
+        self,
+        batch: Any,
+    ) -> tuple[torch.Tensor, torch.Tensor | None, list[dict]]:
         """Extract frames, labels, and metadata from a raw DALI batch."""
         frames = batch[0]['frames']
         frame_indices = batch[0]['frame_idx']
@@ -525,9 +536,12 @@ class DALIIterator(DALIGenericIterator):
 
         return frames, labels, metadata
 
-    def __next__(self):
+    def __next__(
+        self,
+    ) -> tuple[torch.Tensor | None, torch.Tensor | list[int] | None, list[dict] | None]:
         """Get the next batch with frames, labels, and metadata."""
         max_retries = 50
+        frames, labels, metadata = None, None, None
         for _attempt in range(max_retries + 1):
             batch = super().__next__()
             frames, labels, metadata = self._process_batch(batch)
@@ -740,7 +754,6 @@ class VideoDataModule(pl.LightningDataModule):
         val_video_paths: Video paths assigned to validation.
     """
 
-    @typechecked
     def __init__(
         self,
         data_config: dict[str, Any],
@@ -751,7 +764,7 @@ class VideoDataModule(pl.LightningDataModule):
         val_probability: float = 0.05,
         seed: int = 0,
         model_config: dict[str, Any] | None = None,
-    ):
+    ) -> None:
         """Initialize the VideoDataModule.
 
         Args:
@@ -816,7 +829,7 @@ class VideoDataModule(pl.LightningDataModule):
         if torch.distributed.is_available() and torch.distributed.is_initialized():
             world_size = torch.distributed.get_world_size()
             if world_size > 1:
-                self.num_threads = max(1, os.cpu_count() // world_size)
+                self.num_threads = max(1, (os.cpu_count() or 1) // world_size)
 
         # Determine num_lags based on head type
         head_type = self.model_config.get('head', 'dtcn').lower()
@@ -1020,6 +1033,8 @@ class VideoDataModule(pl.LightningDataModule):
         if hasattr(self, 'trainer') and self.trainer is not None:
             self.current_epoch = self.trainer.current_epoch
 
+        assert self.train_video_paths is not None, \
+            "setup('fit') must be called before train_dataloader()"
         # Compute max frames and load labels for training videos
         max_frames = get_max_frames(
             self.train_video_paths,

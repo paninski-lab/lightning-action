@@ -24,6 +24,7 @@ Example usage:
     model.train(output_dir='runs/new_experiment')
 """
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -31,7 +32,6 @@ import lightning as pl
 import numpy as np
 import pandas as pd
 import torch
-from typeguard import typechecked
 
 from lightning_action.api.base import BaseModelAPI
 from lightning_action.data import DataModule
@@ -39,7 +39,6 @@ from lightning_action.models.segmenter import Segmenter
 from lightning_action.train import train
 
 
-@typechecked
 class Model(BaseModelAPI[Segmenter]):
     """High-level API wrapper for CSV-based action segmentation models.
 
@@ -57,7 +56,7 @@ class Model(BaseModelAPI[Segmenter]):
         return Segmenter
 
     @classmethod
-    def _get_train_function(cls):
+    def _get_train_function(cls) -> Callable[..., Any]:
         """Return the CSV pipeline training function."""
         return train
 
@@ -160,7 +159,6 @@ class Model(BaseModelAPI[Segmenter]):
             print(f'Warning: Post-training inference failed with error: {e}')
             print('Training completed successfully, but automatic inference was skipped.')
 
-    @typechecked
     def predict(
         self,
         data_path: str | Path,
@@ -240,9 +238,10 @@ class Model(BaseModelAPI[Segmenter]):
             predictions = trainer.predict(self.model, datamodule=datamodule)
 
             # Concatenate predictions from all batches
+            assert predictions is not None
             all_probs = []
             for batch_preds in predictions:
-                probs = batch_preds['probabilities'][0]  # Remove batch dim
+                probs = batch_preds['probabilities'][0]  # type: ignore[index]
                 all_probs.append(probs.cpu().numpy())
 
             final_probs = np.vstack(all_probs)

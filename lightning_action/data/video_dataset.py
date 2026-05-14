@@ -27,7 +27,6 @@ import os
 import cv2
 import numpy as np
 from tqdm import tqdm
-from typeguard import typechecked
 
 from lightning_action.data.utils import (
     collect_labels_from_files,
@@ -55,7 +54,6 @@ class VideoDataset:
         tcn_padding: Number of frames of context needed on each side of a chunk.
     """
 
-    @typechecked
     def __init__(
         self,
         videos_dir: str,
@@ -71,7 +69,7 @@ class VideoDataset:
         require_labels: bool = True,
         num_classes: int | None = None,
         label_names: list[str] | None = None,
-    ):
+    ) -> None:
         """Initialize the VideoDataset.
 
         Args:
@@ -257,7 +255,6 @@ class VideoDataset:
         """Return a copy of the class label names."""
         return self.label_names.copy()
 
-    @typechecked
     def get_video_length(self, video_idx: int) -> int:
         """Get the frame count for a specific video.
 

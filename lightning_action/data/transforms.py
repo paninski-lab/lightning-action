@@ -8,7 +8,6 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 from jaxtyping import Float
-from typeguard import typechecked
 
 
 class Transform(ABC):
@@ -53,8 +52,7 @@ class Compose:
         >>> transformed_data = transform(data)
     """
 
-    @typechecked
-    def __init__(self, transforms: list[Transform]):
+    def __init__(self, transforms: list[Transform]) -> None:
         """Initialize Compose transform.
 
         Args:
@@ -62,7 +60,6 @@ class Compose:
         """
         self.transforms = transforms
 
-    @typechecked
     def __call__(
         self,
         data: Float[np.ndarray, 'time features'],
@@ -97,11 +94,10 @@ class MotionEnergy(Transform):
     providing a measure of movement or change in the signal.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize MotionEnergy transform."""
         pass
 
-    @typechecked
     def __call__(
         self,
         data: Float[np.ndarray, 'time features'],
@@ -139,8 +135,7 @@ class ZScore(Transform):
     by leaving them unchanged.
     """
 
-    @typechecked
-    def __init__(self, eps: float = 1e-8):
+    def __init__(self, eps: float = 1e-8) -> None:
         """Initialize ZScore transform.
 
         Args:
@@ -150,7 +145,6 @@ class ZScore(Transform):
         self.mean = None
         self.std = None
 
-    @typechecked
     def __call__(
         self,
         data: Float[np.ndarray, 'time features'],
@@ -194,11 +188,10 @@ class VelocityConcat(Transform):
     velocity to the original signal along the feature dimension.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize VelocityConcat transform."""
         pass
 
-    @typechecked
     def __call__(
         self,
         data: Float[np.ndarray, 'time features'],

@@ -1,9 +1,8 @@
 """Command to run model prediction on data."""
 
+import argparse
 import logging
 from pathlib import Path
-
-from typeguard import typechecked
 
 from lightning_action.api.model import Model
 from lightning_action.cli.types import valid_dir
@@ -11,7 +10,7 @@ from lightning_action.cli.types import valid_dir
 logger = logging.getLogger('LIGHTNING_ACTION.CLI.PREDICT')
 
 
-def register_parser(subparsers):
+def register_parser(subparsers: argparse._SubParsersAction) -> None:
     """Register the predict command parser."""
     parser = subparsers.add_parser(
         'predict',
@@ -54,8 +53,7 @@ def register_parser(subparsers):
     )
 
 
-@typechecked
-def handle(args):
+def handle(args: argparse.Namespace) -> None:
     """Handle the predict command execution."""
     # Set default output directory
     if not args.output_dir:

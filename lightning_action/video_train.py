@@ -28,7 +28,6 @@ from typing import Any
 import lightning as pl
 import torch
 from lightning.pytorch.loggers import TensorBoardLogger
-from typeguard import typechecked
 
 from lightning_action.data.video_datamodule import VideoDataModule
 from lightning_action.models.video_segmenter import VideoSegmenter
@@ -51,7 +50,6 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-@typechecked
 def train_video(
     config: dict[str, Any],
     model: VideoSegmenter,
@@ -167,7 +165,7 @@ def train_video(
     # Configure distributed training strategy
     if num_gpus > 1:
         try:
-            get_ipython()
+            get_ipython()  # type: ignore[name-defined]
             strategy = 'ddp_notebook'
         except NameError:
             strategy = 'ddp'

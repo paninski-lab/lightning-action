@@ -1082,7 +1082,7 @@ class TestModelIntegration:
                 if expected_padding > 0:
                     # Should have NaN rows at the end for padding
                     last_rows = predictions.tail(expected_padding)
-                    assert last_rows.isna().all().all(), (
+                    assert last_rows.isna().all().all(), (  # type: ignore[attr-defined]
                         f'With seq_len={seq_len}, last {expected_padding} rows should be NaN'
                     )
 

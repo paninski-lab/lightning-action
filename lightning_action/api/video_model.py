@@ -28,6 +28,7 @@ Example usage:
     model.train(output_dir='runs/new_experiment')
 """
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -36,7 +37,6 @@ import lightning as pl
 import numpy as np
 import pandas as pd
 import torch
-from typeguard import typechecked
 
 from lightning_action.api.base import BaseModelAPI
 from lightning_action.data.video_datamodule import VideoDataModule
@@ -44,7 +44,6 @@ from lightning_action.models.video_segmenter import VideoSegmenter
 from lightning_action.video_train import train_video
 
 
-@typechecked
 def _get_video_frame_count(video_path: str | Path) -> int:
     """Get the total frame count of a video using OpenCV.
 
@@ -70,7 +69,6 @@ def _get_video_frame_count(video_path: str | Path) -> int:
     return frame_count
 
 
-@typechecked
 class VideoModel(BaseModelAPI[VideoSegmenter]):
     """High-level wrapper for video action segmentation models.
 
@@ -93,7 +91,7 @@ class VideoModel(BaseModelAPI[VideoSegmenter]):
         return VideoSegmenter
 
     @classmethod
-    def _get_train_function(cls):
+    def _get_train_function(cls) -> Callable[..., Any]:
         """Return the video pipeline training function."""
         return train_video
 
@@ -133,7 +131,6 @@ class VideoModel(BaseModelAPI[VideoSegmenter]):
         except Exception as e:
             print(f'Warning: Post-training inference failed: {e}')
 
-    @typechecked
     def _setup_trainer(self) -> pl.Trainer:
         """Set up a Lightning Trainer for prediction.
 
@@ -163,7 +160,6 @@ class VideoModel(BaseModelAPI[VideoSegmenter]):
 
         return pl.Trainer(**trainer_config)
 
-    @typechecked
     def _predict_single_video(
         self,
         video_path: Path,
@@ -263,13 +259,12 @@ class VideoModel(BaseModelAPI[VideoSegmenter]):
             label_names = [f'class_{i}' for i in range(num_classes)]
 
         # Create and save output DataFrame
-        df = pd.DataFrame(data=final_probs, columns=label_names)
+        df = pd.DataFrame(data=final_probs, columns=label_names)  # type: ignore[arg-type]
         df.insert(0, 'frame', np.arange(len(df)))
 
         output_path.parent.mkdir(exist_ok=True, parents=True)
         df.to_csv(output_path, index=False)
 
-    @typechecked
     def predict(
         self,
         videos_dir: str | Path,

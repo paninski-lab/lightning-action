@@ -7,7 +7,6 @@ which uses 1D convolution for temporal context followed by dense layers.
 import torch
 import torch.nn as nn
 from jaxtyping import Float
-from typeguard import typechecked
 
 
 class TemporalMLP(nn.Module):
@@ -25,7 +24,6 @@ class TemporalMLP(nn.Module):
     Output shape: (batch, sequence, n_hid_units)
     """
 
-    @typechecked
     def __init__(
         self,
         input_size: int,
@@ -35,7 +33,7 @@ class TemporalMLP(nn.Module):
         activation: str = 'lrelu',
         dropout_rate: float = 0.0,
         seed: int = 42,
-    ):
+    ) -> None:
         """Initialize TemporalMLP head.
 
         Args:
@@ -63,7 +61,7 @@ class TemporalMLP(nn.Module):
         self.layers = nn.ModuleList()
         self._build_model()
 
-    def _build_model(self):
+    def _build_model(self) -> None:
         """Build the TemporalMLP model layers."""
         # initial 1D convolution layer for temporal context
         conv_kernel_size = 2 * self.num_lags + 1
@@ -119,7 +117,6 @@ class TemporalMLP(nn.Module):
         else:
             raise ValueError(f'Unsupported activation: {self.activation}')
 
-    @typechecked
     def forward(
         self,
         x: Float[torch.Tensor, 'batch sequence features'],
