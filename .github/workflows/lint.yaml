@@ -21,8 +21,15 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install ruff
-        run: pip install ruff pyright numpy
+      - name: Install dependencies
+        run: |
+          # CPU-only torch is sufficient for type checking (avoids ~2GB CUDA download)
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          # Install remaining project dependencies; DALI requires GPU hardware so it is
+          # skipped — the source handles its absence with a try/except already
+          pip install "lightning~=2.5" jaxtyping "numpy>=2.0.0" opencv-python-headless \
+            scikit-learn tensorboard transformers pandas pyyaml torchmetrics
+          pip install ruff pyright
 
       - name: Lint with ruff
         id: ruff

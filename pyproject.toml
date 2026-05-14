@@ -106,7 +106,7 @@ pythonVersion = "3.11"
 pythonPlatform = "Linux"
 typeCheckingMode = "basic"
 include = ["lightning_action", "tests"]
-exclude = ["/build", "/configs", "/data", "/dist", "/docs", "/scripts"]
+exclude = ["build", "configs", "data", "dist", "docs", "scripts"]
 # torch stubs don't re-export public functions at the top level (torch.tensor, torch.allclose, etc.)
 reportPrivateImportUsage = "none"
 
