@@ -27,7 +27,7 @@ Reference:
 """
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -87,7 +87,7 @@ class ResNetBackbone(nn.Module):
     """
 
     @typechecked
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         """Initialize the ResNet image backbone.
 
         Args:

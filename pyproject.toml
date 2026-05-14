@@ -56,12 +56,10 @@ litaction = "lightning_action.cli.main:main"
 
 [project.optional-dependencies]
 dev = [
-    "autopep8",
-    "flake8-pyproject",
-    "isort",
     "pytest",
     "pytest-html",
     "requests",
+    "ruff",
 ]
 
 [tool.ruff]

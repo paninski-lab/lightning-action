@@ -29,7 +29,7 @@ Example usage:
 """
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import cv2
 import lightning as pl
@@ -274,8 +274,8 @@ class VideoModel(BaseModelAPI[VideoSegmenter]):
         self,
         videos_dir: str | Path,
         output_dir: str | Path,
-        output_file: Optional[str | Path] = None,
-        expt_ids: Optional[list[str]] = None,
+        output_file: str | Path | None = None,
+        expt_ids: list[str] | None = None,
     ) -> None:
         """Generate predictions for videos.
 
