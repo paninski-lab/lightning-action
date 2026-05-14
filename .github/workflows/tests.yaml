@@ -3,6 +3,8 @@ name: Run Tests
 on:
   # Allow manually running from Github UI or API.
   workflow_dispatch:
+  push:
+    branches: [main]
   # to re-run status checks, mark as draft then ready_for_review
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
