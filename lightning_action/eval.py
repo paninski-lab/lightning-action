@@ -49,11 +49,11 @@ def get_precision_recall(
 
     precision = precision_score(
         true_classes[obs_idxs], pred_classes[obs_idxs],
-        labels=labels, average=None, zero_division=0,
+        labels=labels, average=None, zero_division=0,  # type: ignore[arg-type]
     )
     recall = recall_score(
         true_classes[obs_idxs], pred_classes[obs_idxs],
-        labels=labels, average=None, zero_division=0,
+        labels=labels, average=None, zero_division=0,  # type: ignore[arg-type]
     )
 
     # replace 0s with NaNs for classes with no ground truth

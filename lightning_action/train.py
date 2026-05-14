@@ -146,7 +146,9 @@ def train(
     feature_names = datamodule.dataset.feature_names
     if len(feature_names) > 0:
         config['data']['feature_names'] = feature_names
-        model.config['data']['feature_names'] = feature_names
+        if hasattr(model, 'config'):
+            model_config: dict[str, Any] = model.config
+            model_config['data']['feature_names'] = feature_names
 
     label_names = datamodule.dataset.label_names
     update_config_with_label_names(config, model, label_names)
@@ -160,10 +162,11 @@ def train(
 
     # Update model config with step information
     if hasattr(model, 'config'):
-        if 'optimizer' not in model.config:
-            model.config['optimizer'] = {}
-        model.config['optimizer']['steps_per_epoch'] = steps_per_epoch
-        model.config['optimizer']['total_steps'] = total_steps
+        model_config = model.config
+        if 'optimizer' not in model_config:
+            model_config['optimizer'] = {}
+        model_config['optimizer']['steps_per_epoch'] = steps_per_epoch
+        model_config['optimizer']['total_steps'] = total_steps
 
     logger.info(f"Training steps: {steps_per_epoch} per epoch, {total_steps} total")
 

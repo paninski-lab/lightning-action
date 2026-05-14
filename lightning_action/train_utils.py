@@ -160,9 +160,10 @@ def update_config_with_class_weights(
 
     # Store in model's config if it has one
     if hasattr(model, 'config'):
-        if 'model' not in model.config:
-            model.config['model'] = {}
-        model.config['model']['class_weights'] = class_weights
+        model_config: dict[str, Any] = model.config
+        if 'model' not in model_config:
+            model_config['model'] = {}
+        model_config['model']['class_weights'] = class_weights
 
 
 def update_config_with_label_names(
@@ -188,9 +189,10 @@ def update_config_with_label_names(
         config['data']['label_names'] = label_names
 
         if hasattr(model, 'config'):
-            if 'data' not in model.config:
-                model.config['data'] = {}
-            model.config['data']['label_names'] = label_names
+            model_config = model.config
+            if 'data' not in model_config:
+                model_config['data'] = {}
+            model_config['data']['label_names'] = label_names
 
 
 @rank_zero_only

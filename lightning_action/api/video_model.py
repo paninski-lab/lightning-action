@@ -258,7 +258,7 @@ class VideoModel(BaseModelAPI[VideoSegmenter]):
             label_names = [f'class_{i}' for i in range(num_classes)]
 
         # Create and save output DataFrame
-        df = pd.DataFrame(data=final_probs, columns=label_names)
+        df = pd.DataFrame(data=final_probs, columns=label_names)  # type: ignore[arg-type]
         df.insert(0, 'frame', np.arange(len(df)))
 
         output_path.parent.mkdir(exist_ok=True, parents=True)
