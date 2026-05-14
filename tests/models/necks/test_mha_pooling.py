@@ -376,6 +376,7 @@ class TestMultiheadAttentionPoolingGradients:
         loss = output.sum()
         loss.backward()
 
+        assert pooling.ffn is not None
         assert pooling.ffn.weight.grad is not None
         assert pooling.ffn.bias.grad is not None
 

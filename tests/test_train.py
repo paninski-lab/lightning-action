@@ -7,11 +7,13 @@ training utilities (train_utils.py).
 import os
 import tempfile
 from pathlib import Path
+from typing import cast
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 import torch
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 
 from lightning_action.data import DataModule
 from lightning_action.models.segmenter import Segmenter
@@ -236,6 +238,7 @@ class TestSaveConfig:
             output_dir = Path(tmpdir)
             result = save_config(config, output_dir)
 
+            assert result is not None
             assert result == output_dir / 'config.yaml'
             assert result.exists()
 
@@ -253,6 +256,7 @@ class TestSaveConfig:
             output_dir = Path(tmpdir) / 'nested' / 'dirs'
             result = save_config(config, output_dir)
 
+            assert result is not None
             assert result.exists()
 
     def test_custom_filename(self):
@@ -263,6 +267,7 @@ class TestSaveConfig:
             output_dir = Path(tmpdir)
             result = save_config(config, output_dir, filename='custom.yaml')
 
+            assert result is not None
             assert result == output_dir / 'custom.yaml'
             assert result.exists()
 
@@ -372,7 +377,9 @@ class TestGetCallbacks:
         assert 'EarlyStopping' in callback_types
 
         # Find early stopping callback and check patience
-        early_stop_cb = next(cb for cb in callbacks if type(cb).__name__ == 'EarlyStopping')
+        early_stop_cb = cast(
+            EarlyStopping, next(cb for cb in callbacks if type(cb).__name__ == 'EarlyStopping')
+        )
         assert early_stop_cb.patience == 5
 
     def test_get_callbacks_periodic_checkpointing(self):
@@ -412,7 +419,9 @@ class TestGetCallbacks:
         assert callback_types.count('ModelCheckpoint') == 2
 
         # Check early stopping patience
-        early_stop_cb = next(cb for cb in callbacks if type(cb).__name__ == 'EarlyStopping')
+        early_stop_cb = cast(
+            EarlyStopping, next(cb for cb in callbacks if type(cb).__name__ == 'EarlyStopping')
+        )
         assert early_stop_cb.patience == 15
 
     def test_get_callbacks_custom_monitor(self):
@@ -420,7 +429,9 @@ class TestGetCallbacks:
         callbacks = get_callbacks(monitor='train_loss')
 
         # Find the checkpoint callback and verify monitor
-        ckpt_cb = next(cb for cb in callbacks if type(cb).__name__ == 'ModelCheckpoint')
+        ckpt_cb = cast(
+            ModelCheckpoint, next(cb for cb in callbacks if type(cb).__name__ == 'ModelCheckpoint')
+        )
         assert ckpt_cb.monitor == 'train_loss'
 
     def test_get_callbacks_early_stopping_custom_monitor(self):
@@ -431,7 +442,9 @@ class TestGetCallbacks:
             monitor='train_loss',
         )
 
-        early_stop_cb = next(cb for cb in callbacks if type(cb).__name__ == 'EarlyStopping')
+        early_stop_cb = cast(
+            EarlyStopping, next(cb for cb in callbacks if type(cb).__name__ == 'EarlyStopping')
+        )
         assert early_stop_cb.monitor == 'train_loss'
 
 
@@ -455,7 +468,9 @@ class TestGetCallbacksFromConfig:
         assert 'EarlyStopping' in callback_types
 
         # Check patience
-        early_stop_cb = next(cb for cb in callbacks if type(cb).__name__ == 'EarlyStopping')
+        early_stop_cb = cast(
+            EarlyStopping, next(cb for cb in callbacks if type(cb).__name__ == 'EarlyStopping')
+        )
         assert early_stop_cb.patience == 7
 
     def test_uses_defaults_for_missing_keys(self):
@@ -487,7 +502,9 @@ class TestGetCallbacksFromConfig:
 
         callbacks = get_callbacks_from_config(training_config, monitor='train_loss')
 
-        ckpt_cb = next(cb for cb in callbacks if type(cb).__name__ == 'ModelCheckpoint')
+        ckpt_cb = cast(
+            ModelCheckpoint, next(cb for cb in callbacks if type(cb).__name__ == 'ModelCheckpoint')
+        )
         assert ckpt_cb.monitor == 'train_loss'
 
 

@@ -25,7 +25,7 @@ class TestTransform:
     def test_abstract_methods(self):
         """Test that Transform cannot be instantiated directly."""
         with pytest.raises(TypeError):
-            Transform()
+            Transform()  # type: ignore[abstract]
 
 
 class TestCompose:
