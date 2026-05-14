@@ -347,7 +347,7 @@ class ResidualBlock(nn.Module):
                 self.add_module(f'{i + 1} EncoderLayer', layer)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        for name, layer in self.named_children():
+        for _name, layer in self.named_children():
             x = layer(x)
         return x
 
@@ -397,7 +397,7 @@ class BottleneckBlock(nn.Module):
                 self.add_module(f'{i + 1} EncoderLayer', layer)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        for name, layer in self.named_children():
+        for _name, layer in self.named_children():
             x = layer(x)
         return x
 

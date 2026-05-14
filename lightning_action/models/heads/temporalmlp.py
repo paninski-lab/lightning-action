@@ -138,7 +138,7 @@ class TemporalMLP(nn.Module):
         output = x
 
         # apply layers sequentially
-        for i, layer in enumerate(self.layers):
+        for _i, layer in enumerate(self.layers):
             if isinstance(layer, nn.Conv1d):
                 # conv1d expects (batch, channels, sequence)
                 output = output.transpose(1, 2)  # (batch, features, sequence)

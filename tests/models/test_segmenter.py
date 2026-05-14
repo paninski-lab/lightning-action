@@ -518,12 +518,12 @@ class TestSegmenter:
                 """
                 # Capture the shapes of the tensors passed to compute_loss
                 # The key thing we're checking: do these shapes reflect padding removal?
-                captured_shapes['outputs_shape'] = outputs['logits'].shape
-                captured_shapes['targets_shape'] = targets.shape
+                captured_shapes['outputs_shape'] = outputs['logits'].shape  # noqa: B023
+                captured_shapes['targets_shape'] = targets.shape  # noqa: B023
 
                 # Call the original compute_loss method to maintain normal behavior
                 # This ensures training_step still returns a valid loss
-                return original_compute_loss(outputs, targets, stage)
+                return original_compute_loss(outputs, targets, stage)  # noqa: B023
 
             # Step 4: Use patch.object as a context manager
             # - patch.object(model, 'compute_loss', ...): temporarily replace model.compute_loss
@@ -584,9 +584,9 @@ class TestSegmenter:
 
             # Spy function to capture shapes
             def spy_compute_loss(outputs, targets, stage='val'):
-                captured_shapes['outputs_shape'] = outputs['logits'].shape
-                captured_shapes['targets_shape'] = targets.shape
-                return original_compute_loss(outputs, targets, stage)
+                captured_shapes['outputs_shape'] = outputs['logits'].shape  # noqa: B023
+                captured_shapes['targets_shape'] = targets.shape  # noqa: B023
+                return original_compute_loss(outputs, targets, stage)  # noqa: B023
 
             # Temporarily replace compute_loss with our spy
             with patch.object(model, 'compute_loss', side_effect=spy_compute_loss):

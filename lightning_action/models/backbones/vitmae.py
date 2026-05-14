@@ -9,7 +9,7 @@ Architecture:
     1. Patch embedding: (B, C, H, W) -> (B, num_patches, hidden_dim)
     2. Transformer encoder: Self-attention over patches
     3. Output: Spatial features (B, hidden_dim, H', W')
-    
+
     Where H' = W' = image_size / patch_size (typically 14 for 224/16)
 
 Reference:

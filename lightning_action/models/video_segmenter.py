@@ -382,7 +382,8 @@ class VideoSegmenter(VideoBaseModel):
             warnings.warn(
                 f"Config input_size ({self.input_size}) differs from expected "
                 f"({expected_input_size} = 2 × {self.embed_dim}). "
-                f"Using config value."
+                f"Using config value.",
+                stacklevel=2,
             )
 
         # Configure backbone freezing

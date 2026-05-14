@@ -112,7 +112,7 @@ class BaseModel(pl.LightningModule):
             return data
 
         if isinstance(data, dict):
-            for key, val in data.items():
+            for key, _val in data.items():
                 data[key] = data[key][:, self.sequence_pad:-self.sequence_pad]
         else:
             data = data[:, self.sequence_pad:-self.sequence_pad]

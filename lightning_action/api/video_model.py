@@ -16,13 +16,13 @@ The VideoModel class inherits from BaseModelAPI and provides video-specific:
 Example usage:
     # Load a trained model
     model = VideoModel.from_dir('runs/my_experiment')
-    
+
     # Run predictions on new videos
     model.predict(
         videos_dir='/path/to/videos',
         output_dir='/path/to/predictions',
     )
-    
+
     # Or train a new model
     model = VideoModel.from_config('config.yaml')
     model.train(output_dir='runs/new_experiment')
