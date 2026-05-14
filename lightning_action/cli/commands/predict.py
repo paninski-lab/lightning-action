@@ -3,8 +3,6 @@
 import logging
 from pathlib import Path
 
-from typeguard import typechecked
-
 from lightning_action.api.model import Model
 from lightning_action.cli.types import valid_dir
 
@@ -54,7 +52,6 @@ def register_parser(subparsers):
     )
 
 
-@typechecked
 def handle(args):
     """Handle the predict command execution."""
     # Set default output directory

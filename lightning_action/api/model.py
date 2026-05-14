@@ -31,7 +31,6 @@ import lightning as pl
 import numpy as np
 import pandas as pd
 import torch
-from typeguard import typechecked
 
 from lightning_action.api.base import BaseModelAPI
 from lightning_action.data import DataModule
@@ -39,7 +38,6 @@ from lightning_action.models.segmenter import Segmenter
 from lightning_action.train import train
 
 
-@typechecked
 class Model(BaseModelAPI[Segmenter]):
     """High-level API wrapper for CSV-based action segmentation models.
 
@@ -160,7 +158,6 @@ class Model(BaseModelAPI[Segmenter]):
             print(f'Warning: Post-training inference failed with error: {e}')
             print('Training completed successfully, but automatic inference was skipped.')
 
-    @typechecked
     def predict(
         self,
         data_path: str | Path,

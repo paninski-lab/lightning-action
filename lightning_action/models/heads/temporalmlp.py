@@ -7,7 +7,6 @@ which uses 1D convolution for temporal context followed by dense layers.
 import torch
 import torch.nn as nn
 from jaxtyping import Float
-from typeguard import typechecked
 
 
 class TemporalMLP(nn.Module):
@@ -25,7 +24,6 @@ class TemporalMLP(nn.Module):
     Output shape: (batch, sequence, n_hid_units)
     """
 
-    @typechecked
     def __init__(
         self,
         input_size: int,
@@ -119,7 +117,6 @@ class TemporalMLP(nn.Module):
         else:
             raise ValueError(f'Unsupported activation: {self.activation}')
 
-    @typechecked
     def forward(
         self,
         x: Float[torch.Tensor, 'batch sequence features'],

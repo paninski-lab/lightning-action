@@ -10,7 +10,6 @@ from typing import Any
 import lightning as pl
 import numpy as np
 from torch.utils.data import DataLoader, random_split
-from typeguard import typechecked
 
 from lightning_action.data.datasets import FeatureDataset
 from lightning_action.data.utils import split_sizes_from_probabilities
@@ -26,7 +25,6 @@ class DataModule(pl.LightningDataModule):
     and provides train/validation DataLoaders.
     """
 
-    @typechecked
     def __init__(
         self,
         data_config: dict[str, Any],

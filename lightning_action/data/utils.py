@@ -11,12 +11,10 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from jaxtyping import Float, Int
-from typeguard import typechecked
 
 logger = logging.getLogger(__name__)
 
 
-@typechecked
 def compute_sequences(
     data: Float[np.ndarray, 'n_frames ...'] | list,
     sequence_length: int,
@@ -73,7 +71,6 @@ def compute_sequences(
     return batched_data
 
 
-@typechecked
 def compute_sequence_pad(
     model_type: str,
     default: int | None = None,
@@ -134,7 +131,6 @@ def compute_sequence_pad(
         raise ValueError(f'Unknown model type: {model_type}')
 
 
-@typechecked
 def load_marker_csv(file_path: str | Path) -> tuple[
     Float[np.ndarray, 'n_frames n_markers'],
     Float[np.ndarray, 'n_frames n_markers'],
@@ -200,7 +196,6 @@ def load_marker_csv(file_path: str | Path) -> tuple[
         raise ValueError(f'Error loading marker CSV file {file_path}: {e}') from e
 
 
-@typechecked
 def load_feature_csv(file_path: str | Path) -> tuple[
     Float[np.ndarray, 'n_frames n_features'],
     list[str],
@@ -235,7 +230,6 @@ def load_feature_csv(file_path: str | Path) -> tuple[
         raise ValueError(f'Error loading feature CSV file {file_path}: {e}') from e
 
 
-@typechecked
 def load_label_csv(file_path: str | Path) -> tuple[
     Int[np.ndarray, 'n_frames n_classes'],
     list[str],
@@ -272,7 +266,6 @@ def load_label_csv(file_path: str | Path) -> tuple[
         raise ValueError(f'Error loading label CSV file {file_path}: {e}') from e
 
 
-@typechecked
 def split_sizes_from_probabilities(
     total_number: int,
     train_probability: float,
@@ -306,7 +299,6 @@ def split_sizes_from_probabilities(
     return [train_number, val_number]
 
 
-@typechecked
 def compute_class_weights(
     labels: np.ndarray,
     num_classes: int | None = None,
@@ -394,7 +386,6 @@ def compute_class_weights(
     return weights.tolist()
 
 
-@typechecked
 def collect_labels_from_files(
     label_paths: list[str],
     ignore_index: int = -100,
@@ -453,7 +444,6 @@ def collect_labels_from_files(
     return np.concatenate(all_labels), num_classes
 
 
-@typechecked
 def collect_labels_from_datamodule(
     dataset,
     ignore_index: int = -100,

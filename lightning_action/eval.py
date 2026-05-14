@@ -4,10 +4,8 @@ import itertools
 
 import numpy as np
 from sklearn.metrics import precision_score, recall_score
-from typeguard import typechecked
 
 
-@typechecked
 def get_precision_recall(
     true_classes: np.ndarray,
     pred_classes: np.ndarray,
@@ -71,7 +69,6 @@ def get_precision_recall(
     return {'precision': p, 'recall': r, 'f1': f1}
 
 
-@typechecked
 def int_over_union(array1: np.ndarray, array2: np.ndarray) -> dict[int, float]:
     """Compute intersection over union for two 1D arrays.
 
@@ -92,7 +89,6 @@ def int_over_union(array1: np.ndarray, array2: np.ndarray) -> dict[int, float]:
     return iou
 
 
-@typechecked
 def run_lengths(array: np.ndarray) -> dict[int, list[int]]:
     """Compute distribution of run lengths for an array with integer entries.
 

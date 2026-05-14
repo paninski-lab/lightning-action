@@ -14,7 +14,6 @@ import numpy as np
 import torch
 from jaxtyping import Float, Int
 from torch.utils.data import Dataset
-from typeguard import typechecked
 
 from .utils import compute_sequences, load_feature_csv, load_label_csv, load_marker_csv
 
@@ -29,7 +28,6 @@ class FeatureDataset(Dataset):
     but simplified for Lightning integration.
     """
 
-    @typechecked
     def __init__(
         self,
         ids: list[str],

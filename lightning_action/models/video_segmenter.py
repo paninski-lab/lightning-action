@@ -17,7 +17,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from jaxtyping import Float
-from typeguard import typechecked
 
 from lightning_action.models.backbones import (
     ResNetBackbone,
@@ -72,7 +71,6 @@ class VideoBaseModel(BaseModel):
 
         return frames, labels, metadata
 
-    @typechecked
     def training_step(
         self,
         batch: tuple[torch.Tensor, torch.Tensor, list[dict]] | dict,
@@ -136,7 +134,6 @@ class VideoBaseModel(BaseModel):
 
         return loss
 
-    @typechecked
     def validation_step(
         self,
         batch: tuple[torch.Tensor, torch.Tensor, list[dict]] | dict,
@@ -163,7 +160,6 @@ class VideoBaseModel(BaseModel):
                 batch_size=frames.shape[0],
             )
 
-    @typechecked
     def predict_step(
         self,
         batch: tuple[torch.Tensor, list[int], list[dict]] | dict,
@@ -515,7 +511,6 @@ class VideoSegmenter(VideoBaseModel):
 
         return param_groups
 
-    @typechecked
     def forward(
         self,
         x: Float[torch.Tensor, 'batch sequence channels height width'],

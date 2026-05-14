@@ -26,7 +26,6 @@ from typing import Any, Generic, TypeVar
 import lightning as pl
 import torch
 import yaml
-from typeguard import typechecked
 
 # Type variable for the model type
 ModelT = TypeVar('ModelT', bound=pl.LightningModule)
@@ -76,7 +75,6 @@ class BaseModelAPI(ABC, Generic[ModelT]):
         model_dir: Directory where the model is stored (after training/loading).
     """
 
-    @typechecked
     def __init__(
         self,
         model: ModelT,
@@ -253,7 +251,6 @@ class BaseModelAPI(ABC, Generic[ModelT]):
         return model
 
     @classmethod
-    @typechecked
     def from_dir(cls, model_dir: str | Path) -> 'BaseModelAPI[ModelT]':
         """Load a trained model from a directory.
 
@@ -292,7 +289,6 @@ class BaseModelAPI(ABC, Generic[ModelT]):
         return cls(model, config, model_dir)
 
     @classmethod
-    @typechecked
     def from_config(cls, config_path: str | Path | dict) -> 'BaseModelAPI[ModelT]':
         """Create a new untrained model from configuration.
 
@@ -318,7 +314,6 @@ class BaseModelAPI(ABC, Generic[ModelT]):
 
         return cls(model, config, model_dir=None)
 
-    @typechecked
     def train(
         self,
         output_dir: str | Path = 'runs/default',

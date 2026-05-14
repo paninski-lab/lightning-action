@@ -32,7 +32,6 @@ from typing import Any
 import torch
 import torch.nn as nn
 import torchvision.models as models
-from typeguard import typechecked
 
 # Mapping of backbone names to output dimensions
 RESNET_HIDDEN_SIZES = {
@@ -86,7 +85,6 @@ class ResNetBackbone(nn.Module):
         features = backbone(images)  # (4, 2048, 7, 7)
     """
 
-    @typechecked
     def __init__(self, config: dict[str, Any] | None = None):
         """Initialize the ResNet image backbone.
 
@@ -183,7 +181,6 @@ class ResNetBackbone(nn.Module):
         """Return backbone type identifier."""
         return 'resnet'
 
-    @typechecked
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through ResNet backbone.
 
@@ -216,7 +213,6 @@ class ResNetBackbone(nn.Module):
 
         return spatial_features
 
-    @typechecked
     def load_pretrained_weights(
         self,
         checkpoint_path: str,

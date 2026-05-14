@@ -36,7 +36,6 @@ import lightning as pl
 import numpy as np
 import pandas as pd
 import torch
-from typeguard import typechecked
 
 from lightning_action.api.base import BaseModelAPI
 from lightning_action.data.video_datamodule import VideoDataModule
@@ -44,7 +43,6 @@ from lightning_action.models.video_segmenter import VideoSegmenter
 from lightning_action.video_train import train_video
 
 
-@typechecked
 def _get_video_frame_count(video_path: str | Path) -> int:
     """Get the total frame count of a video using OpenCV.
 
@@ -70,7 +68,6 @@ def _get_video_frame_count(video_path: str | Path) -> int:
     return frame_count
 
 
-@typechecked
 class VideoModel(BaseModelAPI[VideoSegmenter]):
     """High-level wrapper for video action segmentation models.
 
@@ -133,7 +130,6 @@ class VideoModel(BaseModelAPI[VideoSegmenter]):
         except Exception as e:
             print(f'Warning: Post-training inference failed: {e}')
 
-    @typechecked
     def _setup_trainer(self) -> pl.Trainer:
         """Set up a Lightning Trainer for prediction.
 
@@ -163,7 +159,6 @@ class VideoModel(BaseModelAPI[VideoSegmenter]):
 
         return pl.Trainer(**trainer_config)
 
-    @typechecked
     def _predict_single_video(
         self,
         video_path: Path,
@@ -269,7 +264,6 @@ class VideoModel(BaseModelAPI[VideoSegmenter]):
         output_path.parent.mkdir(exist_ok=True, parents=True)
         df.to_csv(output_path, index=False)
 
-    @typechecked
     def predict(
         self,
         videos_dir: str | Path,

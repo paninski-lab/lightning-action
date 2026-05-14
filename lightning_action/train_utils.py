@@ -24,7 +24,6 @@ import numpy as np
 import torch
 import yaml
 from lightning.pytorch.utilities import rank_zero_only
-from typeguard import typechecked
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,6 @@ logger = logging.getLogger(__name__)
 # Reproducibility
 # =============================================================================
 
-@typechecked
 def reset_seeds(seed: int = 0) -> None:
     """Reset all random seeds for reproducibility.
 
@@ -55,7 +53,6 @@ def reset_seeds(seed: int = 0) -> None:
 # Lightning Callbacks
 # =============================================================================
 
-@typechecked
 def get_callbacks(
     checkpointing: bool = True,
     lr_monitor: bool = True,
@@ -123,7 +120,6 @@ def get_callbacks(
 # Config Validation and Updates
 # =============================================================================
 
-@typechecked
 def validate_config(config: dict[str, Any], required_sections: list[str]) -> None:
     """Validate that required configuration sections are present.
 
@@ -139,7 +135,6 @@ def validate_config(config: dict[str, Any], required_sections: list[str]) -> Non
             raise ValueError(f"Configuration must contain '{section}' section")
 
 
-@typechecked
 def update_config_with_class_weights(
     config: dict[str, Any],
     model: pl.LightningModule,
@@ -170,7 +165,6 @@ def update_config_with_class_weights(
         model.config['model']['class_weights'] = class_weights
 
 
-@typechecked
 def update_config_with_label_names(
     config: dict[str, Any],
     model: pl.LightningModule,
@@ -200,7 +194,6 @@ def update_config_with_label_names(
 
 
 @rank_zero_only
-@typechecked
 def save_config(
     config: dict[str, Any],
     output_dir: Path,
@@ -235,7 +228,6 @@ def save_config(
 # =============================================================================
 
 @rank_zero_only
-@typechecked
 def pretty_print_config(config: dict[str, Any]) -> None:
     """Pretty print configuration dictionary.
 
@@ -264,7 +256,6 @@ def pretty_print_config(config: dict[str, Any]) -> None:
 # Callback Configuration Helper
 # =============================================================================
 
-@typechecked
 def get_callbacks_from_config(
     training_config: dict[str, Any],
     monitor: str = 'val_loss',

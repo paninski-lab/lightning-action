@@ -14,7 +14,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from jaxtyping import Float
 from torchmetrics import Accuracy, F1Score
-from typeguard import typechecked
 
 from lightning_action.data.utils import compute_sequence_pad
 
@@ -29,7 +28,6 @@ class BaseModel(pl.LightningModule):
     segmentation architectures.
     """
 
-    @typechecked
     def __init__(self, config: dict[str, Any]):
         """Initialize base model.
 
@@ -510,7 +508,6 @@ class Segmenter(BaseModel):
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
 
-    @typechecked
     def forward(
         self,
         x: Float[torch.Tensor, 'batch sequence features'],

@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from typeguard import typechecked
 
 from lightning_action.api.model import Model
 from lightning_action.cli.types import config_file, output_dir
@@ -76,7 +75,6 @@ def register_parser(subparsers):
     )
 
 
-@typechecked
 def handle(args):
     """Handle the train command execution."""
     # Load config
@@ -133,7 +131,6 @@ def _setup_model_logging(output_dir: Path):
     return model_handler
 
 
-@typechecked
 def apply_overrides(config: dict[str, Any], args) -> dict[str, Any]:
     """Apply command line overrides to config."""
     # Apply direct overrides
@@ -162,7 +159,6 @@ def apply_overrides(config: dict[str, Any], args) -> dict[str, Any]:
     return config
 
 
-@typechecked
 def apply_config_overrides(config: dict[str, Any], overrides: list[str]) -> dict[str, Any]:
     """Apply command line overrides to config using dot notation."""
     for override in overrides:
@@ -188,7 +184,6 @@ def apply_config_overrides(config: dict[str, Any], overrides: list[str]) -> dict
     return config
 
 
-@typechecked
 def parse_config_value(value: str) -> Any:
     """Parse a config value from string to appropriate type."""
     # Handle booleans

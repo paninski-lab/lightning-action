@@ -7,7 +7,6 @@ residual connections for temporal modeling.
 import torch
 from jaxtyping import Float
 from torch import nn
-from typeguard import typechecked
 
 
 class DilatedTCN(nn.Module):
@@ -16,7 +15,6 @@ class DilatedTCN(nn.Module):
     Encoder-only implementation of a dilated TCN with residual connections.
     """
 
-    @typechecked
     def __init__(
         self,
         input_size: int,
@@ -91,7 +89,6 @@ class DilatedTCN(nn.Module):
             block_name = f'tcn_block_{i_layer:02d}'
             self.model.add_module(block_name, tcn_block)
 
-    @typechecked
     def forward(
         self,
         x: Float[torch.Tensor, 'batch sequence features']
@@ -137,7 +134,6 @@ class DilationBlock(nn.Module):
     Implements a residual block with dilated convolutions for temporal modeling.
     """
 
-    @typechecked
     def __init__(
         self,
         input_size: int,

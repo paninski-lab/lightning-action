@@ -8,7 +8,6 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 from jaxtyping import Float
-from typeguard import typechecked
 
 
 class Transform(ABC):
@@ -53,7 +52,6 @@ class Compose:
         >>> transformed_data = transform(data)
     """
 
-    @typechecked
     def __init__(self, transforms: list[Transform]):
         """Initialize Compose transform.
 
@@ -62,7 +60,6 @@ class Compose:
         """
         self.transforms = transforms
 
-    @typechecked
     def __call__(
         self,
         data: Float[np.ndarray, 'time features'],
@@ -101,7 +98,6 @@ class MotionEnergy(Transform):
         """Initialize MotionEnergy transform."""
         pass
 
-    @typechecked
     def __call__(
         self,
         data: Float[np.ndarray, 'time features'],
@@ -139,7 +135,6 @@ class ZScore(Transform):
     by leaving them unchanged.
     """
 
-    @typechecked
     def __init__(self, eps: float = 1e-8):
         """Initialize ZScore transform.
 
@@ -150,7 +145,6 @@ class ZScore(Transform):
         self.mean = None
         self.std = None
 
-    @typechecked
     def __call__(
         self,
         data: Float[np.ndarray, 'time features'],
@@ -198,7 +192,6 @@ class VelocityConcat(Transform):
         """Initialize VelocityConcat transform."""
         pass
 
-    @typechecked
     def __call__(
         self,
         data: Float[np.ndarray, 'time features'],

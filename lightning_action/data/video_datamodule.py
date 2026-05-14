@@ -42,7 +42,6 @@ import lightning as pl
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
-from typeguard import typechecked
 
 from lightning_action.data.utils import (
     split_sizes_from_probabilities,
@@ -740,7 +739,6 @@ class VideoDataModule(pl.LightningDataModule):
         val_video_paths: Video paths assigned to validation.
     """
 
-    @typechecked
     def __init__(
         self,
         data_config: dict[str, Any],

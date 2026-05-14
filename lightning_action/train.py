@@ -23,7 +23,6 @@ import lightning.pytorch as pl
 import numpy as np
 import torch
 from lightning.pytorch.utilities import rank_zero_only
-from typeguard import typechecked
 
 from lightning_action import __version__
 from lightning_action.data import DataModule
@@ -50,7 +49,6 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-@typechecked
 def train(
     config: dict[str, Any],
     model: pl.LightningModule,
@@ -240,7 +238,6 @@ def train(
     return model
 
 
-@typechecked
 def compute_class_weights(
     datamodule: DataModule,
     ignore_index: int = -100,
@@ -287,7 +284,6 @@ def compute_class_weights(
     )
 
 
-@typechecked
 def build_data_config_from_path(
     data_path: str | Path,
     expt_ids: list[str] | None = None,

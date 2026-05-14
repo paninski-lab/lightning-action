@@ -8,7 +8,6 @@ processing capability.
 import torch
 from jaxtyping import Float
 from torch import nn
-from typeguard import typechecked
 
 
 class RNN(nn.Module):
@@ -18,7 +17,6 @@ class RNN(nn.Module):
     optional bidirectional processing.
     """
 
-    @typechecked
     def __init__(
         self,
         input_size: int,
@@ -90,7 +88,6 @@ class RNN(nn.Module):
         rnn_output_size = self.num_hid_units * (2 if self.bidirectional else 1)
         self.output_projection = nn.Linear(rnn_output_size, self.num_hid_units)
 
-    @typechecked
     def forward(
         self,
         x: Float[torch.Tensor, 'batch sequence features']

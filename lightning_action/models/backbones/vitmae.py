@@ -24,7 +24,6 @@ from typing import Any
 import torch
 import torch.nn as nn
 from transformers import ViTMAEModel
-from typeguard import typechecked
 
 
 class ViTMAEBackbone(nn.Module):
@@ -58,7 +57,6 @@ class ViTMAEBackbone(nn.Module):
         features = backbone(images)  # (4, 768, 14, 14)
     """
 
-    @typechecked
     def __init__(self, config: dict[str, Any] | None = None):
         """Initialize the ViT-MAE backbone.
 
@@ -111,7 +109,6 @@ class ViTMAEBackbone(nn.Module):
         """Return backbone type identifier."""
         return 'vitmae'
 
-    @typechecked
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through ViT-MAE backbone.
 
@@ -162,7 +159,6 @@ class ViTMAEBackbone(nn.Module):
 
         return spatial_features
 
-    @typechecked
     def load_pretrained_weights(
         self,
         checkpoint_path: str,
