@@ -14,7 +14,7 @@ Architecture:
     1. Conv stem: Initial convolution and pooling
     2. ResNet stages: Four residual stages with downsampling
     3. Output: Spatial features (B, hidden_size, H', W')
-    
+
     Where H' = W' = image_size / 32 (typically 7 for 224/32)
 
 Supported backbones:
@@ -27,7 +27,7 @@ Reference:
 """
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -87,7 +87,7 @@ class ResNetBackbone(nn.Module):
     """
 
     @typechecked
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         """Initialize the ResNet image backbone.
 
         Args:
@@ -297,5 +297,4 @@ class ResNetBackbone(nn.Module):
             Iterator over parameters of layer4 (last residual stage).
         """
         # backbone[7] is layer4 in our Sequential
-        for param in self.backbone[7].parameters():
-            yield param
+        yield from self.backbone[7].parameters()

@@ -13,15 +13,14 @@ Example usage:
         num_heads=8,
         num_seeds=1,  # Pool to single vector
     )
-    
+
     # Input: patch features from ViT
     x = torch.randn(batch_size, num_patches, 768)
-    
+
     # Output: pooled representation
     pooled = pooling(x)  # (batch_size, 1, 768)
 """
 import math
-from typing import Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -116,7 +115,7 @@ class MultiheadAttentionPooling(nn.Module):
         self,
         x: torch.Tensor,
         return_attention: bool = False,
-    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         """Pool input sequence using attention.
 
         Args:

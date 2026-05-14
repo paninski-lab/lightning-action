@@ -17,7 +17,7 @@ import logging
 import os
 import random
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import lightning.pytorch as pl
 import numpy as np
@@ -59,10 +59,10 @@ def reset_seeds(seed: int = 0) -> None:
 def get_callbacks(
     checkpointing: bool = True,
     lr_monitor: bool = True,
-    ckpt_every_n_epochs: Optional[int] = None,
+    ckpt_every_n_epochs: int | None = None,
     early_stopping: bool = False,
     early_stopping_patience: int = 10,
-    monitor: Optional[str] = 'val_loss',  # New parameter
+    monitor: str | None = 'val_loss',  # New parameter
 ) -> list[pl.Callback]:
     """Get Lightning callbacks for training.
 
@@ -143,7 +143,7 @@ def validate_config(config: dict[str, Any], required_sections: list[str]) -> Non
 def update_config_with_class_weights(
     config: dict[str, Any],
     model: pl.LightningModule,
-    class_weights: Optional[list[float]],
+    class_weights: list[float] | None,
 ) -> None:
     """Update config and model with computed class weights.
 

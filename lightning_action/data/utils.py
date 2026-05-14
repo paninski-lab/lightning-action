@@ -6,7 +6,7 @@ adapted from the daart package with modern type hints and Lightning compatibilit
 
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -76,7 +76,7 @@ def compute_sequences(
 @typechecked
 def compute_sequence_pad(
     model_type: str,
-    default: Optional[int] = None,
+    default: int | None = None,
     **model_params: Any,
 ) -> int:
     """Compute required sequence padding based on model architecture.
@@ -197,7 +197,7 @@ def load_marker_csv(file_path: str | Path) -> tuple[
         return x_coords, y_coords, likelihoods, marker_names
 
     except Exception as e:
-        raise ValueError(f'Error loading marker CSV file {file_path}: {e}')
+        raise ValueError(f'Error loading marker CSV file {file_path}: {e}') from e
 
 
 @typechecked
@@ -232,7 +232,7 @@ def load_feature_csv(file_path: str | Path) -> tuple[
         return features, feature_names
 
     except Exception as e:
-        raise ValueError(f'Error loading feature CSV file {file_path}: {e}')
+        raise ValueError(f'Error loading feature CSV file {file_path}: {e}') from e
 
 
 @typechecked
@@ -269,7 +269,7 @@ def load_label_csv(file_path: str | Path) -> tuple[
         return labels, class_names
 
     except Exception as e:
-        raise ValueError(f'Error loading label CSV file {file_path}: {e}')
+        raise ValueError(f'Error loading label CSV file {file_path}: {e}') from e
 
 
 @typechecked
@@ -309,7 +309,7 @@ def split_sizes_from_probabilities(
 @typechecked
 def compute_class_weights(
     labels: np.ndarray,
-    num_classes: Optional[int] = None,
+    num_classes: int | None = None,
     ignore_index: int = -100,
     sqrt_dampening: bool = False,
 ) -> list[float]:
@@ -367,7 +367,7 @@ def compute_class_weights(
 
     # Build counts array for all classes
     totals = np.zeros(num_classes, dtype=np.float64)
-    for cls, count in zip(unique_classes, counts):
+    for cls, count in zip(unique_classes, counts, strict=True):
         cls_int = int(cls)
         if 0 <= cls_int < num_classes:
             totals[cls_int] = count

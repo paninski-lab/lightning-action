@@ -16,14 +16,13 @@ Typical usage:
         labels_dir='/path/to/labels',
         expt_ids=['video1', 'video2'],
     )
-    
+
     # Access video list and class info
     print(f"Videos: {dataset.video_paths}")
     print(f"Class weights: {dataset.class_weights}")
 """
 
 import os
-from typing import Optional
 
 import cv2
 import numpy as np
@@ -60,18 +59,18 @@ class VideoDataset:
     def __init__(
         self,
         videos_dir: str,
-        labels_dir: Optional[str] = None,
+        labels_dir: str | None = None,
         sequence_length: int = 128,
         resolution: int = 224,
-        expt_ids: Optional[list[str]] = None,
+        expt_ids: list[str] | None = None,
         input_size: int = 1536,
         num_lags: int = 0,
         ignore_index: int = -100,
         head: str = 'dtcn',
         num_layers: int = 2,
         require_labels: bool = True,
-        num_classes: Optional[int] = None,
-        label_names: Optional[list[str]] = None,
+        num_classes: int | None = None,
+        label_names: list[str] | None = None,
     ):
         """Initialize the VideoDataset.
 
@@ -147,7 +146,7 @@ class VideoDataset:
             # Default uniform weights when no labels available
             self.class_weights = [1.0] * self.num_classes
 
-    def _discover_videos(self, expt_ids: Optional[list[str]] = None) -> None:
+    def _discover_videos(self, expt_ids: list[str] | None = None) -> None:
         """Discover videos and optionally validate corresponding label files exist.
 
         Populates video_paths, label_paths, and extracts class information.

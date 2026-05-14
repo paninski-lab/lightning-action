@@ -21,8 +21,9 @@ Hidden dimensions:
     - resnet50/101/152 (bottleneck): 2048
 """
 
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Dict, Iterator, Literal, Optional
+from typing import Any, Literal
 
 import torch
 import torch.nn as nn
@@ -91,7 +92,7 @@ class ResNetBeastBackbone(nn.Module):
     """
 
     @typechecked
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         """Initialize the beast ResNet backbone.
 
         Args:
@@ -346,7 +347,7 @@ class ResidualBlock(nn.Module):
                 self.add_module(f'{i + 1} EncoderLayer', layer)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        for name, layer in self.named_children():
+        for _name, layer in self.named_children():
             x = layer(x)
         return x
 
@@ -396,7 +397,7 @@ class BottleneckBlock(nn.Module):
                 self.add_module(f'{i + 1} EncoderLayer', layer)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        for name, layer in self.named_children():
+        for _name, layer in self.named_children():
             x = layer(x)
         return x
 

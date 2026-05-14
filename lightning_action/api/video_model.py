@@ -16,20 +16,20 @@ The VideoModel class inherits from BaseModelAPI and provides video-specific:
 Example usage:
     # Load a trained model
     model = VideoModel.from_dir('runs/my_experiment')
-    
+
     # Run predictions on new videos
     model.predict(
         videos_dir='/path/to/videos',
         output_dir='/path/to/predictions',
     )
-    
+
     # Or train a new model
     model = VideoModel.from_config('config.yaml')
     model.train(output_dir='runs/new_experiment')
 """
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import cv2
 import lightning as pl
@@ -274,8 +274,8 @@ class VideoModel(BaseModelAPI[VideoSegmenter]):
         self,
         videos_dir: str | Path,
         output_dir: str | Path,
-        output_file: Optional[str | Path] = None,
-        expt_ids: Optional[list[str]] = None,
+        output_file: str | Path | None = None,
+        expt_ids: list[str] | None = None,
     ) -> None:
         """Generate predictions for videos.
 

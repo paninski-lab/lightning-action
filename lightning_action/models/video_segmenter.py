@@ -11,7 +11,7 @@ only the methods that need video-specific behavior.
 """
 
 import os
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -45,8 +45,8 @@ class VideoBaseModel(BaseModel):
 
     def _get_inputs_and_targets(
         self,
-        batch: Union[Tuple, dict],
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[List[dict]]]:
+        batch: tuple | dict,
+    ) -> tuple[torch.Tensor, torch.Tensor | None, list[dict] | None]:
         """Extract inputs and targets from batch.
 
         Handles both tuple format (from DALI) and dict format (from standard loaders).
@@ -75,9 +75,9 @@ class VideoBaseModel(BaseModel):
     @typechecked
     def training_step(
         self,
-        batch: Union[Tuple[torch.Tensor, torch.Tensor, List[dict]], dict],
+        batch: tuple[torch.Tensor, torch.Tensor, list[dict]] | dict,
         batch_idx: int,
-    ) -> Optional[torch.Tensor]:
+    ) -> torch.Tensor | None:
         """Execute one training step.
 
         Handles the special case where all labels in a batch are ignore_index
@@ -139,7 +139,7 @@ class VideoBaseModel(BaseModel):
     @typechecked
     def validation_step(
         self,
-        batch: Union[Tuple[torch.Tensor, torch.Tensor, List[dict]], dict],
+        batch: tuple[torch.Tensor, torch.Tensor, list[dict]] | dict,
         batch_idx: int,
     ) -> None:
         """Execute one validation step.
@@ -166,10 +166,10 @@ class VideoBaseModel(BaseModel):
     @typechecked
     def predict_step(
         self,
-        batch: Union[Tuple[torch.Tensor, List[int], List[dict]], dict],
+        batch: tuple[torch.Tensor, list[int], list[dict]] | dict,
         batch_idx: int,
-        dataloader_idx: Optional[int] = None,
-    ) -> List[torch.Tensor]:
+        dataloader_idx: int | None = None,
+    ) -> list[torch.Tensor]:
         """Execute one prediction step with boundary-aware output slicing.
 
         The extended sequence from DALI provides context on both sides.
@@ -275,7 +275,7 @@ class VideoSegmenter(VideoBaseModel):
         'resnet152-beast': 2048,
     }
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         """Initialize VideoSegmenter with auto-computed input_size.
 
         Args:
@@ -298,7 +298,7 @@ class VideoSegmenter(VideoBaseModel):
         backbone_config_path = self.model_config.get('backbone_config_path')
         if backbone_config_path and os.path.exists(backbone_config_path):
             import yaml
-            with open(backbone_config_path, 'r') as f:
+            with open(backbone_config_path) as f:
                 backbone_file_config = yaml.safe_load(f)
 
         # Extract model_params from backbone config (mirrors vit.yaml / resnet_ae.yaml structure)
@@ -382,7 +382,8 @@ class VideoSegmenter(VideoBaseModel):
             warnings.warn(
                 f"Config input_size ({self.input_size}) differs from expected "
                 f"({expected_input_size} = 2 × {self.embed_dim}). "
-                f"Using config value."
+                f"Using config value.",
+                stacklevel=2,
             )
 
         # Configure backbone freezing
@@ -518,7 +519,7 @@ class VideoSegmenter(VideoBaseModel):
     def forward(
         self,
         x: Float[torch.Tensor, 'batch sequence channels height width'],
-    ) -> Dict[str, torch.Tensor]:
+    ) -> dict[str, torch.Tensor]:
         """Forward pass through video segmentation model.
 
         Processing steps:
@@ -580,7 +581,7 @@ class VideoSegmenter(VideoBaseModel):
             'features': features,
         }
 
-    def get_backbone_info(self) -> Dict[str, Any]:
+    def get_backbone_info(self) -> dict[str, Any]:
         """Get information about the current backbone configuration.
 
         Returns:

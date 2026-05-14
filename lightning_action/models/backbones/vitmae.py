@@ -9,7 +9,7 @@ Architecture:
     1. Patch embedding: (B, C, H, W) -> (B, num_patches, hidden_dim)
     2. Transformer encoder: Self-attention over patches
     3. Output: Spatial features (B, hidden_dim, H', W')
-    
+
     Where H' = W' = image_size / patch_size (typically 14 for 224/16)
 
 Reference:
@@ -19,7 +19,7 @@ Reference:
 
 import math
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -59,7 +59,7 @@ class ViTMAEBackbone(nn.Module):
     """
 
     @typechecked
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         """Initialize the ViT-MAE backbone.
 
         Args:

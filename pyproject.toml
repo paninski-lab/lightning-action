@@ -56,33 +56,50 @@ litaction = "lightning_action.cli.main:main"
 
 [project.optional-dependencies]
 dev = [
-    "autopep8",
-    "flake8-pyproject",
-    "isort",
+    "pre-commit",
     "pytest",
     "pytest-html",
     "requests",
+    "ruff",
 ]
 
-[tool.isort]
-line_length = 99
-profile = "black"
-src_paths = ["lightning_action", "tests"]
-
-[tool.flake8]
-max-line-length = 99
-extend-ignore = ["E203", "W503", "F722", "W293"]
+[tool.ruff]
+line-length = 99
 exclude = [
     ".git",
     "__pycache__",
-    "build",
-    "dist",
-    ".venv",
-    "venv",
-    "docs/",
-    "scripts/",
-    "examples/",
+    "/build",
+    "/configs",
+    "/data",
+    "/dist",
+    "/docs",
+    "/scripts",
 ]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes (undefined names, unused imports/variables)
+    "I",   # isort
+    "UP",  # pyupgrade (modernize syntax: Tuple->tuple, Union->|, etc.)
+    "B",   # flake8-bugbear (real bugs: mutable defaults, broad excepts, etc.)
+    # "N",   # pep8-naming
+]
+ignore = [
+    # F821: flags undefined names; produces false positives for forward references in
+    # type annotations and dynamically defined names (e.g. jaxtyping's Float)
+    "F821",
+    # F722: jaxtyping uses string annotations like Float[torch.Tensor, 'batch seq feat']
+    # that ruff incorrectly parses as syntax errors in forward annotations
+    "F722",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["lightning_action"]
 
 [tool.pytest.ini_options]
 testpaths = "tests"

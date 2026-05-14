@@ -11,14 +11,14 @@ The Model class inherits from BaseModelAPI and provides CSV-specific:
 Example usage:
     # Load a trained model
     model = Model.from_dir('runs/my_experiment')
-    
+
     # Run predictions on new data
     model.predict(
         data_path='/path/to/data',
         input_dir='markers',
         output_dir='/path/to/predictions',
     )
-    
+
     # Or train a new model
     model = Model.from_config('config.yaml')
     model.train(output_dir='runs/new_experiment')
