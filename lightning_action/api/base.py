@@ -20,6 +20,7 @@ Subclasses must implement:
 import contextlib
 import os
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Generic, TypeVar
 
@@ -124,7 +125,7 @@ class BaseModelAPI(ABC, Generic[ModelT]):
 
     @classmethod
     @abstractmethod
-    def _get_train_function(cls):
+    def _get_train_function(cls) -> Callable[..., Any]:
         """Return the training function for this pipeline.
 
         Returns:

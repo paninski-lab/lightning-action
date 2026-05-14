@@ -237,9 +237,10 @@ class Model(BaseModelAPI[Segmenter]):
             predictions = trainer.predict(self.model, datamodule=datamodule)
 
             # Concatenate predictions from all batches
+            assert predictions is not None
             all_probs = []
             for batch_preds in predictions:
-                probs = batch_preds['probabilities'][0]  # Remove batch dim
+                probs = batch_preds['probabilities'][0]  # type: ignore[index]
                 all_probs.append(probs.cpu().numpy())
 
             final_probs = np.vstack(all_probs)

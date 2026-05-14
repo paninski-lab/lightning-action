@@ -1,6 +1,7 @@
 """Evaluation functions for the lightning-action package."""
 
 import itertools
+from typing import Any
 
 import numpy as np
 from sklearn.metrics import precision_score, recall_score
@@ -11,7 +12,7 @@ def get_precision_recall(
     pred_classes: np.ndarray,
     background: int | None = 0,
     n_classes: int | None = None,
-) -> dict[str, np.ndarray]:
+) -> dict[str, Any]:
     """Compute precision and recall for classifier.
 
     Args:

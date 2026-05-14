@@ -165,7 +165,7 @@ def train_video(
     # Configure distributed training strategy
     if num_gpus > 1:
         try:
-            get_ipython()
+            get_ipython()  # type: ignore[name-defined]
             strategy = 'ddp_notebook'
         except NameError:
             strategy = 'ddp'

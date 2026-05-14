@@ -109,14 +109,14 @@ class FeatureDataset(Dataset):
             # record length of original inputs
             self.data_lengths.append(dataset_length)
 
-    def _load_dataset_data(self, dataset_idx: int) -> OrderedDict:
+    def _load_dataset_data(self, dataset_idx: int) -> tuple[OrderedDict, int]:
         """Load raw data for a single dataset.
 
         Args:
             dataset_idx: index of dataset to load
 
         Returns:
-            OrderedDict mapping signal names to loaded data arrays
+            Tuple of (OrderedDict mapping signal names to arrays, common frame count)
 
         Raises:
             ValueError: if data loading fails or data lengths are inconsistent
@@ -282,6 +282,7 @@ class FeatureDataset(Dataset):
                 raise ValueError(f'Sequence count mismatch for signal {signal}')
 
         # create sequence dictionaries
+        assert n_sequences is not None
         for seq_idx in range(n_sequences):
             sequence = {}
             for signal, seq_data in signal_sequences.items():

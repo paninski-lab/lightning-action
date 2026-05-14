@@ -97,12 +97,12 @@ class ViTMAEBackbone(nn.Module):
     @property
     def image_size(self) -> int:
         """Expected input image size (square)."""
-        return self.vit_mae.config.image_size
+        return self.vit_mae.config.image_size  # type: ignore[return-value]
 
     @property
     def patch_size(self) -> int:
         """Size of image patches for the transformer."""
-        return self.vit_mae.config.patch_size
+        return self.vit_mae.config.patch_size  # type: ignore[return-value]
 
     @property
     def backbone_type(self) -> str:
