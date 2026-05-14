@@ -25,7 +25,7 @@ jobs:
         run: pip install ruff
 
       - name: Lint with ruff
-        run: ruff check lightning_pose tests
+        run: ruff check lightning_action tests
         # Reads config from [tool.ruff.lint] in pyproject.toml
 
       - name: Show fix instructions if linting failed
@@ -35,5 +35,5 @@ jobs:
           echo "Linting failed!"
           echo ""
           echo "To fix issues locally, run:"
-          echo "  ruff check --fix lightning_pose tests"
+          echo "  ruff check --fix lightning_action tests"
           echo ""
