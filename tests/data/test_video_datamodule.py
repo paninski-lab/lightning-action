@@ -2133,8 +2133,8 @@ class TestVideoPipelineConfig:
     def test_last_batch_policy_selection(self):
         """Test last batch policy string to enum conversion."""
         try:
-            from nvidia.dali.plugin.pytorch import (
-                LastBatchPolicy,  # type: ignore[import-not-found]
+            from nvidia.dali.plugin.pytorch import (  # type: ignore[import-not-found]
+                LastBatchPolicy,
             )
 
             # Test 'drop' policy
