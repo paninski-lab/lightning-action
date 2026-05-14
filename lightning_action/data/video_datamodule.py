@@ -57,7 +57,13 @@ try:
     from nvidia.dali.plugin.pytorch import DALIGenericIterator, LastBatchPolicy
     DALI_AVAILABLE = True
 except ImportError:
-    fn = types = LastBatchPolicy = None
+    # typed as Any so pyright doesn't flag every fn.*/types.* call as an attribute
+    # of None — the real guard is DALI_AVAILABLE / _check_dali_available()
+    fn: Any = None
+    types: Any = None
+    LastBatchPolicy: Any = None
+    # Pipeline/DALIGenericIterator used as base classes; object is a valid fallback
+    # and Any would break the class statement syntax
     Pipeline = object
     DALIGenericIterator = object
 
@@ -215,7 +221,7 @@ def _resolve_augmentation_config(config) -> dict:
     return {}
 
 
-class VideoPipeline(Pipeline):
+class VideoPipeline(Pipeline):  # type: ignore[misc]
     """DALI pipeline for GPU-accelerated video decoding and preprocessing.
 
     This pipeline:
@@ -412,7 +418,7 @@ class VideoPipeline(Pipeline):
         return frames, frame_idx, start_frame
 
 
-class DALIIterator(DALIGenericIterator):
+class DALIIterator(DALIGenericIterator):  # type: ignore[misc]
     """Custom DALI iterator that pairs video frames with labels.
 
     This iterator wraps DALI's generic iterator to:
@@ -423,7 +429,7 @@ class DALIIterator(DALIGenericIterator):
 
     def __init__(
         self,
-        pipe: Pipeline,
+        pipe: Pipeline,  # type: ignore[valid-type]
         output_map: list[str],
         sequence_length: int,
         tcn_padding: int,
@@ -527,6 +533,7 @@ class DALIIterator(DALIGenericIterator):
     def __next__(self):
         """Get the next batch with frames, labels, and metadata."""
         max_retries = 50
+        frames, labels, metadata = None, None, None
         for _attempt in range(max_retries + 1):
             batch = super().__next__()
             frames, labels, metadata = self._process_batch(batch)
@@ -814,7 +821,7 @@ class VideoDataModule(pl.LightningDataModule):
         if torch.distributed.is_available() and torch.distributed.is_initialized():
             world_size = torch.distributed.get_world_size()
             if world_size > 1:
-                self.num_threads = max(1, os.cpu_count() // world_size)
+                self.num_threads = max(1, (os.cpu_count() or 1) // world_size)
 
         # Determine num_lags based on head type
         head_type = self.model_config.get('head', 'dtcn').lower()

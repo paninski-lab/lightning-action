@@ -138,7 +138,7 @@ def create_test_video(video_config):
 
         # Create video writer
         # NOTE: cv2.VideoWriter size is (width, height), not (height, width)!
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # type: ignore[attr-defined]
         writer = cv2.VideoWriter(video_path, fourcc, fps, (width, height))
 
         if not writer.isOpened():
@@ -398,6 +398,7 @@ class TestLoadLabelsForVideos:
                 ignore_index=-100
             )
 
+            assert labels_2d is not None
             assert labels_2d.shape == (3, 100)
 
             # Check each video has correct label padding
@@ -444,6 +445,7 @@ class TestLoadLabelsForVideos:
             )
 
             # Check conversion from one-hot to class indices
+            assert labels_2d is not None
             assert torch.all(labels_2d[0, :num_frames] == torch.from_numpy(expected_classes))
 
     def test_missing_label_file(self, create_test_video):
@@ -519,6 +521,7 @@ class TestLoadLabelsForVideos:
             )
 
             # Padding should use custom ignore_index
+            assert labels_2d is not None
             assert torch.all(labels_2d[0, num_frames:] == custom_ignore)
 
 
@@ -889,8 +892,8 @@ class TestDALIIteratorLogic:
 
         metadata = []
         for i in range(len(frame_indices)):
-            video_idx = frame_indices[i].item()
-            start_frame = start_frames[i].item()
+            video_idx = int(frame_indices[i].item())
+            start_frame = int(start_frames[i].item())
 
             is_start = (start_frame == 0)
             is_end = False
@@ -927,8 +930,8 @@ class TestDALIIteratorLogic:
 
         metadata = []
         for i in range(len(frame_indices)):
-            video_idx = frame_indices[i].item()
-            start_frame = start_frames[i].item()
+            video_idx = int(frame_indices[i].item())
+            start_frame = int(start_frames[i].item())
 
             is_start = (start_frame == 0)
             is_end = False
@@ -1751,6 +1754,7 @@ class TestDALIIntegration:
                 labels_dir=labels_dir,
                 max_frames=num_frames + 50,
             )
+            assert labels_2d is not None
             labels_2d = labels_2d.cuda()
 
             # Get video lengths
@@ -1991,7 +1995,7 @@ class TestDALIIntegration:
             finally:
                 if val_loader is not None:
                     try:
-                        val_loader.reset()
+                        val_loader.reset()  # type: ignore[attr-defined]
                     except Exception:
                         pass
                 del val_loader
@@ -2058,7 +2062,7 @@ class TestDALIIntegration:
             finally:
                 if predict_loader is not None:
                     try:
-                        predict_loader.reset()
+                        predict_loader.reset()  # type: ignore[attr-defined]
                     except Exception:
                         pass
                 del predict_loader
