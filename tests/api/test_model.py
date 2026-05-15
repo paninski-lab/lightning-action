@@ -137,6 +137,30 @@ class TestBaseModelAPIShared:
             with pytest.raises(FileNotFoundError, match='No checkpoint files found'):
                 Model._find_checkpoint_file(model_dir)
 
+    def test_load_checkpoint_plain_pytorch_state_dict(self):
+        """Test loading weights from a plain .pt state dict file."""
+        config = {
+            'data': {'data_path': '/tmp/test', 'input_dir': 'markers'},
+            'model': {
+                'input_size': 10, 'output_size': 4, 'head': 'temporalmlp',
+                'num_hid_units': 32, 'num_layers': 2, 'num_lags': 3,
+            },
+            'optimizer': {'type': 'Adam', 'lr': 1e-3},
+            'training': {'num_epochs': 1, 'batch_size': 4},
+        }
+        model_api = Model.from_config(config)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_dict_path = Path(tmpdir) / 'model.pt'
+            torch.save(model_api.model.state_dict(), state_dict_path)
+
+            loaded = Model._load_checkpoint(
+                model=model_api.model,
+                checkpoint_path=state_dict_path,
+                config=config,
+            )
+            assert loaded is not None
+
 
 # =============================================================================
 # Tests for Model sequence padding (from original TestModelSequencePadding)
@@ -444,6 +468,69 @@ class TestModelAPI:
         """Test that _get_train_function returns train."""
         from lightning_action.train import train
         assert Model._get_train_function() == train
+
+    def test_create_model_with_transforms_but_no_velocity_concat(self):
+        """Test that transforms without VelocityConcat leave input_size unchanged."""
+        config = {
+            'data': {
+                'data_path': '/tmp/test',
+                'input_dir': 'markers',
+                'transforms': ['ZScore'],  # exists but no VelocityConcat
+            },
+            'model': {
+                'input_size': 10, 'output_size': 4, 'head': 'temporalmlp',
+                'num_hid_units': 32, 'num_layers': 2, 'num_lags': 3,
+            },
+            'optimizer': {'type': 'Adam', 'lr': 1e-3},
+            'training': {'num_epochs': 1, 'batch_size': 4},
+        }
+        model = Model.from_config(config)
+        assert model.config['model']['input_size'] == 10
+
+    def test_post_training_inference_skipped_when_model_is_none(self, basic_config, capsys):
+        """Test _run_post_training_inference returns early when model is None."""
+        model = Model.from_config(basic_config)
+        model.model = None
+        model._run_post_training_inference()
+        assert 'No trained model found' in capsys.readouterr().out
+
+    def test_post_training_inference_skipped_when_no_model_dir(self, basic_config, capsys):
+        """Test _run_post_training_inference returns early when model_dir is None."""
+        model = Model.from_config(basic_config)
+        # model.model is set; model_dir is None (default after from_config)
+        model._run_post_training_inference()
+        assert 'No model directory found' in capsys.readouterr().out
+
+    def test_post_training_inference_warns_on_full_ids_config(
+        self, basic_config, capsys, tmp_path,
+    ):
+        """Test warning when data config uses full 'ids' format without data_path."""
+        model = Model.from_config(basic_config)
+        model.model_dir = tmp_path
+        model.config['data'] = {'ids': ['exp1', 'exp2']}
+        model._run_post_training_inference()
+        assert 'Full data config format' in capsys.readouterr().out
+
+    def test_post_training_inference_warns_on_missing_data_path(
+        self, basic_config, capsys, tmp_path,
+    ):
+        """Test warning when data config has neither data_path nor ids."""
+        model = Model.from_config(basic_config)
+        model.model_dir = tmp_path
+        model.config['data'] = {'something_else': 'value'}
+        model._run_post_training_inference()
+        assert 'No data path found' in capsys.readouterr().out
+
+    def test_post_training_inference_handles_predict_error(
+        self, basic_config, capsys, tmp_path,
+    ):
+        """Test that a predict error during post-training inference prints a warning."""
+        model = Model.from_config(basic_config)
+        model.model_dir = tmp_path
+        model.config['data']['data_path'] = '/tmp/data'
+        with patch.object(model, 'predict', side_effect=Exception('predict failed')):
+            model._run_post_training_inference()
+        assert 'Warning' in capsys.readouterr().out
 
 
 # =============================================================================
@@ -1092,3 +1179,27 @@ class TestModelIntegration:
                     assert np.allclose(prob_sums, 1.0, atol=1e-6), (
                         f'With seq_len={seq_len}, non-padded predictions should sum to 1'
                     )
+
+    def test_model_predict_with_custom_output_file(self, data_dir, fast_config):
+        """Test prediction saves to a user-specified output file path."""
+        fast_config['data']['data_path'] = str(data_dir)
+
+        model = Model.from_config(fast_config)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / 'test_run'
+            model.train(output_dir=output_dir, post_inference=False)
+
+            output_file = Path(temp_dir) / 'custom_predictions.csv'
+            model.predict(
+                data_path=data_dir,
+                input_dir='markers',
+                output_dir=Path(temp_dir),
+                output_file=output_file,
+                expt_ids=['2019_06_26_fly2'],
+            )
+
+            assert output_file.exists()
+            predictions = pd.read_csv(output_file, index_col=0)
+            assert predictions.shape[0] > 0
+            assert predictions.shape[1] == fast_config['model']['output_size']

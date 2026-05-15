@@ -111,7 +111,7 @@ class BaseModelAPI(ABC, Generic[ModelT]):
         Returns:
             Initialized model (untrained).
         """
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     @abstractmethod
@@ -121,7 +121,7 @@ class BaseModelAPI(ABC, Generic[ModelT]):
         Returns:
             The Lightning module class (e.g., Segmenter, VideoSegmenter).
         """
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     @abstractmethod
@@ -131,7 +131,7 @@ class BaseModelAPI(ABC, Generic[ModelT]):
         Returns:
             The train function (e.g., train, train_video).
         """
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def _setup_trainer(self) -> pl.Trainer:
@@ -143,7 +143,7 @@ class BaseModelAPI(ABC, Generic[ModelT]):
         Returns:
             Configured Trainer instance for prediction.
         """
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def _run_post_training_inference(self) -> None:
@@ -153,7 +153,7 @@ class BaseModelAPI(ABC, Generic[ModelT]):
         configuration and run predictions, saving results to the model
         directory.
         """
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def predict(self, *args: Any, **kwargs: Any) -> None:
@@ -161,7 +161,7 @@ class BaseModelAPI(ABC, Generic[ModelT]):
 
         Implementation differs between CSV and video pipelines.
         """
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     def _find_config_file(cls, model_dir: Path) -> Path:

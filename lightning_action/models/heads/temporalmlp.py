@@ -112,7 +112,9 @@ class TemporalMLP(nn.Module):
             return nn.Sigmoid()
         elif self.activation == 'tanh':
             return nn.Tanh()
-        elif self.activation == 'linear':
+        elif self.activation == 'linear':  # pragma: no cover
+            # unreachable: _build_model guards all _get_activation calls with
+            # `if self.activation != 'linear'`
             return nn.Identity()
         else:
             raise ValueError(f'Unsupported activation: {self.activation}')

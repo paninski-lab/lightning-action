@@ -4,6 +4,5 @@ from importlib.metadata import PackageNotFoundError, version
 
 try:
     __version__ = version("lightning-action")
-except PackageNotFoundError:
-    # package is not installed, set a default or read from pyproject.toml
+except PackageNotFoundError:  # pragma: no cover
     __version__ = "unknown"

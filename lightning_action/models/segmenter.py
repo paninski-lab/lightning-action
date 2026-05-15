@@ -85,7 +85,7 @@ class BaseModel(pl.LightningModule):
     @abstractmethod
     def _build_model(self) -> None:
         """Build the model architecture. Implemented by subclasses."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     @abstractmethod
     def forward(
@@ -100,7 +100,7 @@ class BaseModel(pl.LightningModule):
         Returns:
             dictionary with model outputs including 'logits' and 'probabilities'
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     @overload
     def _remove_padding(self, data: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]: ...

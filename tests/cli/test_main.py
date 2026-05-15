@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 import yaml
 
 from lightning_action.cli.main import main
@@ -50,3 +51,10 @@ class TestMain:
                     main()
 
                 mock_predict_handle.assert_called_once()
+
+    def test_no_args_prints_help_and_exits(self, monkeypatch, capsys):
+        """Test that running with no arguments prints help and exits with code 1."""
+        monkeypatch.setattr('sys.argv', ['lightning-action'])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1

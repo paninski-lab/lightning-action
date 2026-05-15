@@ -15,6 +15,9 @@ from lightning_action.data.utils import (
     collect_labels_from_datamodule,
     collect_labels_from_files,
     compute_class_weights,
+    load_feature_csv,
+    load_label_csv,
+    load_marker_csv,
 )
 
 
@@ -38,6 +41,25 @@ class TestComputeSequences:
         data = [1, 2, 3]
         batch_data = compute_sequences(data, sequence_length=10)
         assert data == batch_data
+
+    def test_compute_sequences_invalid_sequence_length(self):
+        """Test that non-positive sequence_length raises ValueError."""
+        data = np.random.randn(10, 4)
+        with pytest.raises(ValueError, match='sequence_length must be positive'):
+            compute_sequences(data, sequence_length=0)
+
+    def test_compute_sequences_invalid_sequence_pad(self):
+        """Test that negative sequence_pad raises ValueError."""
+        data = np.random.randn(10, 4)
+        with pytest.raises(ValueError, match='sequence_pad must be non-negative'):
+            compute_sequences(data, sequence_length=5, sequence_pad=-1)
+
+    def test_compute_sequences_1d_data(self):
+        """Test that 1D input produces 1D sequences."""
+        data = np.arange(10, dtype=float)
+        sequences = compute_sequences(data, sequence_length=5)
+        assert len(sequences) == 2
+        assert sequences[0].shape == (5,)
 
 
 class TestComputeSequencePad:
@@ -260,6 +282,20 @@ class TestComputeClassWeights:
         assert weights[0] > 0
         assert weights[1] == 0.0  # No samples
         assert weights[2] == 0.0  # No samples
+
+    def test_all_ignored_labels_with_no_num_classes(self):
+        """Test that all-ignored labels with num_classes=None defaults to 1 class."""
+        labels = np.array([-100, -100, -100])
+        weights = compute_class_weights(labels, num_classes=None, ignore_index=-100)
+        assert len(weights) == 1
+        assert weights[0] == 1.0
+
+    def test_out_of_range_classes_return_uniform_weights(self):
+        """Test that class indices all exceeding num_classes returns uniform weights."""
+        labels = np.array([5, 6, 7])  # all exceed num_classes=3
+        weights = compute_class_weights(labels, num_classes=3)
+        assert len(weights) == 3
+        assert all(w == 1.0 for w in weights)
 
 
 class TestCollectLabelsFromFiles:
@@ -505,6 +541,23 @@ class TestCollectLabelsFromDatamodule:
         assert len(all_labels) == 0
         assert num_classes == 3
 
+    def test_empty_dataset_without_label_names_attribute(self):
+        """Test empty dataset with no label_names attribute returns num_classes=0."""
+        class MinimalDataset:
+            """Minimal dataset with no label_names attribute."""
+
+            def __len__(self) -> int:
+                return 0
+
+            def __getitem__(self, idx: int) -> dict:
+                raise IndexError
+
+        all_labels, num_classes = collect_labels_from_datamodule(
+            MinimalDataset(), show_progress=False
+        )
+        assert len(all_labels) == 0
+        assert num_classes == 0
+
 
 class TestComputeClassWeightsIntegration:
     """Integration tests combining collect_* functions with compute_class_weights."""
@@ -627,3 +680,51 @@ class TestComputeClassWeightsIntegration:
             assert len(weights) == 2
             assert abs(weights[0] - 1.0) < 1e-6  # Class 0 is most frequent
             assert abs(weights[1] - 2.0) < 0.1   # Class 1 is half as frequent
+
+
+class TestLoadMarkerCsv:
+    """Test the load_marker_csv function."""
+
+    def test_file_not_found(self):
+        """Test FileNotFoundError for missing file."""
+        with pytest.raises(FileNotFoundError, match='File not found'):
+            load_marker_csv('/nonexistent/file.csv')
+
+    def test_invalid_format_raises_value_error(self, tmp_path):
+        """Test ValueError when file cannot be parsed as a marker CSV."""
+        invalid_file = tmp_path / 'invalid.csv'
+        invalid_file.write_text('not,a,valid,marker,csv')  # too few rows for header=[0,1,2]
+        with pytest.raises(ValueError, match='Error loading marker CSV file'):
+            load_marker_csv(invalid_file)
+
+
+class TestLoadFeatureCsv:
+    """Test the load_feature_csv function."""
+
+    def test_file_not_found(self):
+        """Test FileNotFoundError for missing file."""
+        with pytest.raises(FileNotFoundError, match='File not found'):
+            load_feature_csv('/nonexistent/file.csv')
+
+    def test_invalid_format_raises_value_error(self, tmp_path):
+        """Test ValueError when CSV contains non-numeric data."""
+        invalid_file = tmp_path / 'invalid.csv'
+        invalid_file.write_text('col1,col2\nhello,world\n')
+        with pytest.raises(ValueError, match='Error loading feature CSV file'):
+            load_feature_csv(invalid_file)
+
+
+class TestLoadLabelCsv:
+    """Test the load_label_csv function."""
+
+    def test_file_not_found(self):
+        """Test FileNotFoundError for missing file."""
+        with pytest.raises(FileNotFoundError, match='File not found'):
+            load_label_csv('/nonexistent/file.csv')
+
+    def test_invalid_format_raises_value_error(self, tmp_path):
+        """Test ValueError when CSV contains non-integer data."""
+        invalid_file = tmp_path / 'invalid.csv'
+        invalid_file.write_text('col1,col2\nhello,world\n')
+        with pytest.raises(ValueError, match='Error loading label CSV file'):
+            load_label_csv(invalid_file)

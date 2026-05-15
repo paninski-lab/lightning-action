@@ -113,7 +113,15 @@ reportPrivateImportUsage = "none"
 
 [tool.coverage.run]
 source = ["lightning_action"]
-omit = ["*/tests/*"]
+omit = [
+    "*/tests/*",
+    # the following require gpu and cannot be tested on cpu-only github runners
+    "lightning_action/api/video_model.py",
+    "lightning_action/data/video_datamodule.py",
+    "lightning_action/data/video_dataset.py",
+    "lightning_action/models/video_segmenter.py",
+    "lightning_action/video_train.py",
+]
 
 [tool.coverage.report]
 exclude_lines = [

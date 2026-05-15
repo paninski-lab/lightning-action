@@ -6,6 +6,12 @@ import torch
 from lightning_action.models.backbones.resnet import RESNET_HIDDEN_SIZES, ResNetBackbone
 
 
+@pytest.fixture(scope='module')
+def resnet18_backbone():
+    """Module-scoped resnet18 backbone to avoid repeated model construction."""
+    return ResNetBackbone({'backbone': 'resnet18'})
+
+
 class TestResNetBackbone:
     """Test the ResNetBackbone class."""
 
@@ -107,3 +113,51 @@ class TestResNetBackbone:
         # All should be Parameters
         for p in params:
             assert isinstance(p, torch.nn.Parameter)
+
+
+class TestResNetBackboneLoadPretrainedWeights:
+    """Test the load_pretrained_weights method of ResNetBackbone."""
+
+    def test_load_raw_state_dict(self, resnet18_backbone, tmp_path):
+        """Test loading a plain state dict with no wrapper key."""
+        ckpt = tmp_path / 'model.pt'
+        torch.save(resnet18_backbone.backbone.state_dict(), ckpt)
+        resnet18_backbone.load_pretrained_weights(ckpt)
+
+    def test_load_state_dict_key(self, resnet18_backbone, tmp_path):
+        """Test loading a Lightning-style checkpoint with 'state_dict' wrapper."""
+        ckpt = tmp_path / 'model.pt'
+        torch.save({'state_dict': resnet18_backbone.backbone.state_dict()}, ckpt)
+        resnet18_backbone.load_pretrained_weights(ckpt)
+
+    def test_load_model_state_dict_key(self, resnet18_backbone, tmp_path):
+        """Test loading a PyTorch training-loop checkpoint with 'model_state_dict' wrapper."""
+        ckpt = tmp_path / 'model.pt'
+        torch.save({'model_state_dict': resnet18_backbone.backbone.state_dict()}, ckpt)
+        resnet18_backbone.load_pretrained_weights(ckpt)
+
+    def test_load_with_backbone_prefix(self, resnet18_backbone, tmp_path):
+        """Test that 'backbone.' key prefix is stripped before matching."""
+        prefixed = {
+            f'backbone.{k}': v
+            for k, v in resnet18_backbone.backbone.state_dict().items()
+        }
+        ckpt = tmp_path / 'model.pt'
+        torch.save(prefixed, ckpt)
+        resnet18_backbone.load_pretrained_weights(ckpt)
+
+    def test_fc_keys_are_skipped(self, resnet18_backbone, tmp_path, capsys):
+        """Test that 'fc.' keys are skipped and do not cause errors."""
+        state_dict = resnet18_backbone.backbone.state_dict()
+        state_dict['fc.weight'] = torch.zeros(1000, 512)
+        state_dict['fc.bias'] = torch.zeros(1000)
+        ckpt = tmp_path / 'model.pt'
+        torch.save(state_dict, ckpt)
+        resnet18_backbone.load_pretrained_weights(ckpt)
+
+    def test_no_matching_weights_prints_warning(self, resnet18_backbone, tmp_path, capsys):
+        """Test that a checkpoint with no matching keys prints a warning."""
+        ckpt = tmp_path / 'model.pt'
+        torch.save({'completely_wrong_key': torch.zeros(1)}, ckpt)
+        resnet18_backbone.load_pretrained_weights(ckpt)
+        assert 'Warning' in capsys.readouterr().out

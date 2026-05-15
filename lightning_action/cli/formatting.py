@@ -12,7 +12,7 @@ class ArgumentParser(argparse.ArgumentParser):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(
             formatter_class=HelpFormatter,
-            **kwargs
+            **kwargs,
         )
         self.is_sub_parser = False
 
@@ -51,7 +51,7 @@ class HelpFormatter(argparse.HelpFormatter):
             p_lines = textwrap.wrap(
                 p, width,
                 break_long_words=False,
-                break_on_hyphens=False
+                break_on_hyphens=False,
             )
             if not p_lines:
                 p_lines = ['']
