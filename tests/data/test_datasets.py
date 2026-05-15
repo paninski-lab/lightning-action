@@ -278,6 +278,32 @@ class TestFeatureDataset:
             data = dataset._load_markers(marker_file, include_likelihoods=True)
             assert data.shape[1] == 6  # 2 markers * 3 coords (x, y, likelihood)
 
+    def test_load_markers_with_likelihoods_sets_feature_names(
+        self, create_test_marker_csv, create_test_label_csv,
+    ):
+        """Test _load_markers populates likelihood feature names when feature_names is empty."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            marker_file = Path(tmpdir) / 'markers.csv'
+            label_file = Path(tmpdir) / 'labels.csv'
+            create_test_marker_csv(marker_file, n_frames=30, n_markers=2)
+            create_test_label_csv(label_file, n_frames=30, n_classes=3)
+
+            # labels-only dataset leaves feature_names empty
+            dataset = FeatureDataset(
+                ids=['test'],
+                signals=[['labels']],
+                transforms=[[None]],
+                paths=[[str(label_file)]],
+                sequence_length=10,
+            )
+            assert dataset.feature_names == []
+
+            # calling _load_markers with include_likelihoods=True should now populate
+            # feature_names with x, y, and likelihood entries
+            dataset._load_markers(marker_file, include_likelihoods=True)
+            assert 'marker_0_likelihood' in dataset.feature_names
+            assert len(dataset.feature_names) == 6  # 2 markers * 3 coords
+
     def test_feature_names_not_reset_for_second_dataset(self, create_test_feature_csv):
         """Test that feature names and input_size are set only from the first dataset."""
         with tempfile.TemporaryDirectory() as tmpdir:

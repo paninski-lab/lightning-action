@@ -278,7 +278,9 @@ class FeatureDataset(Dataset):
             # track number of sequences (should be same for all signals)
             if n_sequences is None:
                 n_sequences = len(seq_data)
-            elif n_sequences != len(seq_data):
+            elif n_sequences != len(seq_data):  # pragma: no cover
+                # unreachable: sequence count is solely a function of frame count and
+                # sequence parameters, which are uniform across all signals in a dataset
                 raise ValueError(f'Sequence count mismatch for signal {signal}')
 
         # create sequence dictionaries
