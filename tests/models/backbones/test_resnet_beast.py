@@ -159,3 +159,57 @@ class TestResNetBeastComponents:
         output = block(x)
 
         assert output.shape == (1, 256, 28, 28)
+
+
+@pytest.fixture(scope='module')
+def resnet18_beast_backbone():
+    """Module-scoped resnet18 ResNetBeast backbone to avoid repeated model construction."""
+    return ResNetBeastBackbone({'backbone': 'resnet18'})
+
+
+class TestResNetBeastBackboneLoadPretrainedWeights:
+    """Test the load_pretrained_weights method of ResNetBeastBackbone."""
+
+    def test_load_raw_state_dict(self, resnet18_beast_backbone, tmp_path):
+        """Test loading a plain state dict with no wrapper key."""
+        ckpt = tmp_path / 'model.pt'
+        torch.save(resnet18_beast_backbone.backbone.state_dict(), ckpt)
+        resnet18_beast_backbone.load_pretrained_weights(ckpt)
+
+    def test_load_state_dict_key(self, resnet18_beast_backbone, tmp_path):
+        """Test loading a Lightning-style checkpoint with 'state_dict' wrapper."""
+        ckpt = tmp_path / 'model.pt'
+        torch.save({'state_dict': resnet18_beast_backbone.backbone.state_dict()}, ckpt)
+        resnet18_beast_backbone.load_pretrained_weights(ckpt)
+
+    def test_load_model_state_dict_key(self, resnet18_beast_backbone, tmp_path):
+        """Test loading a PyTorch training-loop checkpoint with 'model_state_dict' wrapper."""
+        ckpt = tmp_path / 'model.pt'
+        torch.save({'model_state_dict': resnet18_beast_backbone.backbone.state_dict()}, ckpt)
+        resnet18_beast_backbone.load_pretrained_weights(ckpt)
+
+    def test_load_with_encoder_prefix(self, resnet18_beast_backbone, tmp_path):
+        """Test that 'encoder.' key prefix is stripped before matching."""
+        prefixed = {
+            f'encoder.{k}': v
+            for k, v in resnet18_beast_backbone.backbone.state_dict().items()
+        }
+        ckpt = tmp_path / 'model.pt'
+        torch.save(prefixed, ckpt)
+        resnet18_beast_backbone.load_pretrained_weights(ckpt)
+
+    def test_decoder_and_latent_keys_are_skipped(self, resnet18_beast_backbone, tmp_path, capsys):
+        """Test that decoder and latent keys are skipped without error."""
+        state_dict = resnet18_beast_backbone.backbone.state_dict()
+        state_dict['decoder.weight'] = torch.zeros(10, 10)
+        state_dict['latent_mapping.weight'] = torch.zeros(10, 10)
+        ckpt = tmp_path / 'model.pt'
+        torch.save(state_dict, ckpt)
+        resnet18_beast_backbone.load_pretrained_weights(ckpt)
+
+    def test_no_matching_weights_prints_warning(self, resnet18_beast_backbone, tmp_path, capsys):
+        """Test that a checkpoint with no matching keys prints a warning."""
+        ckpt = tmp_path / 'model.pt'
+        torch.save({'completely_wrong_key': torch.zeros(1)}, ckpt)
+        resnet18_beast_backbone.load_pretrained_weights(ckpt)
+        assert 'Warning' in capsys.readouterr().out

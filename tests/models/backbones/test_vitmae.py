@@ -71,3 +71,51 @@ class TestViTMAEBackbone:
         assert len(params) > 0
         for p in params:
             assert isinstance(p, torch.nn.Parameter)
+
+
+class TestViTMAEBackboneLoadPretrainedWeights:
+    """Test the load_pretrained_weights method of ViTMAEBackbone."""
+
+    def test_load_raw_state_dict(self, vitmae_backbone, tmp_path):
+        """Test loading a plain state dict with no wrapper key."""
+        ckpt = tmp_path / 'model.pt'
+        torch.save(vitmae_backbone.vit_mae.state_dict(), ckpt)
+        vitmae_backbone.load_pretrained_weights(ckpt)
+
+    def test_load_state_dict_key(self, vitmae_backbone, tmp_path):
+        """Test loading a Lightning-style checkpoint with 'state_dict' wrapper."""
+        ckpt = tmp_path / 'model.pt'
+        torch.save({'state_dict': vitmae_backbone.vit_mae.state_dict()}, ckpt)
+        vitmae_backbone.load_pretrained_weights(ckpt)
+
+    def test_load_model_state_dict_key(self, vitmae_backbone, tmp_path):
+        """Test loading a PyTorch training-loop checkpoint with 'model_state_dict' wrapper."""
+        ckpt = tmp_path / 'model.pt'
+        torch.save({'model_state_dict': vitmae_backbone.vit_mae.state_dict()}, ckpt)
+        vitmae_backbone.load_pretrained_weights(ckpt)
+
+    def test_load_with_vit_prefix(self, vitmae_backbone, tmp_path):
+        """Test that 'vit.' key prefix is stripped before matching."""
+        prefixed = {
+            f'vit.{k}': v
+            for k, v in vitmae_backbone.vit_mae.state_dict().items()
+        }
+        ckpt = tmp_path / 'model.pt'
+        torch.save(prefixed, ckpt)
+        vitmae_backbone.load_pretrained_weights(ckpt)
+
+    def test_decoder_and_mask_token_keys_are_skipped(self, vitmae_backbone, tmp_path, capsys):
+        """Test that decoder and mask_token keys are skipped without error."""
+        state_dict = vitmae_backbone.vit_mae.state_dict()
+        state_dict['decoder.weight'] = torch.zeros(10, 10)
+        state_dict['mask_token'] = torch.zeros(1, 1, 768)
+        ckpt = tmp_path / 'model.pt'
+        torch.save(state_dict, ckpt)
+        vitmae_backbone.load_pretrained_weights(ckpt)
+
+    def test_no_matching_weights_prints_warning(self, vitmae_backbone, tmp_path, capsys):
+        """Test that a checkpoint with no matching keys prints a warning."""
+        ckpt = tmp_path / 'model.pt'
+        torch.save({'completely_wrong_key': torch.zeros(1)}, ckpt)
+        vitmae_backbone.load_pretrained_weights(ckpt)
+        assert 'Warning' in capsys.readouterr().out
