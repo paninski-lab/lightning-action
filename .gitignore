@@ -183,6 +183,3 @@ app.log
 
 # data
 *.png
-
-# Claude Code project-specific instructions
-CLAUDE.md

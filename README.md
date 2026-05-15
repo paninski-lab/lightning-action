@@ -41,6 +41,9 @@ Core dependencies include:
 
 ## Quick Start
 
+> The instructions below are for **keypoint-based models**.
+> For video-based models, see [docs/video_pipeline_quickstart.md](docs/video_pipeline_quickstart.md).
+
 ### 1. Prepare Your Data
 
 Organize your data in the following structure:
@@ -158,50 +161,12 @@ Lightning Action automatically logs training metrics to TensorBoard. To visualiz
 
 **Tip**: Keep TensorBoard running while training multiple experiments to compare results in real-time.
 
-## Development
-
-### Running Tests
-
-```bash
-# Install development dependencies
-pip install -e ".[dev]"
-
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=lightning_action
-```
-
-### Code Style
-
-The project uses:
-- `flake8` for linting
-- `isort` for import sorting
-- Maximum line length: 99 characters
-
-## Project Structure
-
-```
-lightning_action/
-├── api/           # High-level API for model usage
-├── cli/           # Command-line interface
-├── data/          # Data loading and preprocessing
-├── models/        # Model architectures
-│   └── backbones/ # Backbone implementations
-└── tests/         # Test suite
-```
+---
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Add tests for new functionality
-5. Run the test suite (`pytest`)
-6. Commit your changes (`git commit -m 'Add amazing feature'`)
-7. Push to the branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on setting up a development environment,
+code style, and submitting pull requests.
 
 ## License
 
@@ -212,11 +177,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 If you use this framework in your research, please cite:
 
 ```bibtex
-@software{lightning_action,
-  title = {Lightning Action: A PyTorch Lightning Framework for Action Segmentation},
-  author = {Whiteway, Matt},
-  url = {https://github.com/paninski-lab/lightning-action},
-  year = {2024}
+@article{blau2024study,
+  title={A study of animal action segmentation algorithms across supervised, unsupervised, and semi-supervised learning paradigms},
+  author={Blau, Ari and Schaffer, Evan S and Mishra, Neeli and Miska, Nathaniel J and Laboratory, International Brain and Paninski, Liam and Whiteway, Matthew R},
+  journal={Neurons, behavior, data analysis, and theory},
+  volume={2024},
+  pages={10--51628},
+  year={2024}
 }
 ```
 
