@@ -213,3 +213,87 @@ class TestFeatureDataset:
 
             with pytest.raises(IndexError):
                 dataset.get_sequence_info(len(dataset))
+
+    def test_signal_path_none_is_skipped(self, create_test_label_csv):
+        """Test that a None signal path is skipped without error."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            label_file = Path(tmpdir) / 'labels.csv'
+            create_test_label_csv(label_file, n_frames=30, n_classes=3)
+
+            dataset = FeatureDataset(
+                ids=['test'],
+                signals=[['markers', 'labels']],
+                transforms=[[None, None]],
+                paths=[[None, str(label_file)]],
+                sequence_length=10,
+            )
+            assert len(dataset) > 0
+
+    def test_unknown_signal_type_raises(self, tmp_path):
+        """Test that an unknown signal type that also fails as features raises ValueError."""
+        invalid_file = tmp_path / 'invalid.csv'
+        invalid_file.write_text('col1,col2\nhello,world\n')
+
+        with pytest.raises(ValueError, match='Unknown signal type'):
+            FeatureDataset(
+                ids=['test'],
+                signals=[['custom_signal']],
+                transforms=[[None]],
+                paths=[[str(invalid_file)]],
+                sequence_length=10,
+            )
+
+    def test_mismatched_signal_lengths_raises(self, create_test_marker_csv, create_test_label_csv):
+        """Test that signals with different frame counts raise ValueError."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            marker_file = Path(tmpdir) / 'markers.csv'
+            label_file = Path(tmpdir) / 'labels.csv'
+
+            create_test_marker_csv(marker_file, n_frames=30, n_markers=2)
+            create_test_label_csv(label_file, n_frames=40, n_classes=3)  # different length
+
+            with pytest.raises(ValueError, match='All signals must have same length'):
+                FeatureDataset(
+                    ids=['test'],
+                    signals=[['markers', 'labels']],
+                    transforms=[[None, None]],
+                    paths=[[str(marker_file), str(label_file)]],
+                    sequence_length=10,
+                )
+
+    def test_load_markers_with_likelihoods(self, create_test_marker_csv):
+        """Test _load_markers with include_likelihoods=True includes likelihood columns."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            marker_file = Path(tmpdir) / 'markers.csv'
+            create_test_marker_csv(marker_file, n_frames=30, n_markers=2)
+
+            dataset = FeatureDataset(
+                ids=['test'],
+                signals=[['markers']],
+                transforms=[[None]],
+                paths=[[str(marker_file)]],
+                sequence_length=10,
+            )
+
+            data = dataset._load_markers(marker_file, include_likelihoods=True)
+            assert data.shape[1] == 6  # 2 markers * 3 coords (x, y, likelihood)
+
+    def test_feature_names_not_reset_for_second_dataset(self, create_test_feature_csv):
+        """Test that feature names and input_size are set only from the first dataset."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            feat_file1 = Path(tmpdir) / 'features1.csv'
+            feat_file2 = Path(tmpdir) / 'features2.csv'
+
+            create_test_feature_csv(feat_file1, n_frames=30, n_features=4)
+            create_test_feature_csv(feat_file2, n_frames=30, n_features=4)
+
+            dataset = FeatureDataset(
+                ids=['ds1', 'ds2'],
+                signals=[['features'], ['features']],
+                transforms=[[None], [None]],
+                paths=[[str(feat_file1)], [str(feat_file2)]],
+                sequence_length=10,
+            )
+
+            assert len(dataset.get_feature_names()) == 4
+            assert dataset.input_size == 4

@@ -275,3 +275,75 @@ class TestDataModule:
             assert val_loader.num_workers == 0
             assert val_loader.pin_memory is False
             assert val_loader.persistent_workers is False
+
+
+class TestDataModuleProperties:
+    """Test DataModule property and accessor methods."""
+
+    def test_get_feature_names(self, create_test_marker_csv):
+        """Test get_feature_names returns correct feature names."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            marker_file = Path(tmpdir) / 'markers.csv'
+            create_test_marker_csv(marker_file, n_frames=30, n_markers=2)
+
+            data_config = {
+                'ids': ['test'],
+                'signals': [['markers']],
+                'transforms': [[None]],
+                'paths': [[str(marker_file)]],
+            }
+            datamodule = DataModule(data_config=data_config, sequence_length=10)
+
+            names = datamodule.get_feature_names()
+            assert len(names) == 4  # 2 markers * 2 coords
+            assert 'marker_0_x' in names
+
+    def test_get_label_names(self, create_test_label_csv):
+        """Test get_label_names returns correct label names."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            label_file = Path(tmpdir) / 'labels.csv'
+            create_test_label_csv(label_file, n_frames=30, n_classes=3)
+
+            data_config = {
+                'ids': ['test'],
+                'signals': [['labels']],
+                'transforms': [[None]],
+                'paths': [[str(label_file)]],
+            }
+            datamodule = DataModule(data_config=data_config, sequence_length=10)
+
+            names = datamodule.get_label_names()
+            assert len(names) == 3
+            assert names == ['class_0', 'class_1', 'class_2']
+
+    def test_input_size_property(self, create_test_marker_csv):
+        """Test input_size property returns correct dimensionality."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            marker_file = Path(tmpdir) / 'markers.csv'
+            create_test_marker_csv(marker_file, n_frames=30, n_markers=3)
+
+            data_config = {
+                'ids': ['test'],
+                'signals': [['markers']],
+                'transforms': [[None]],
+                'paths': [[str(marker_file)]],
+            }
+            datamodule = DataModule(data_config=data_config, sequence_length=10)
+
+            assert datamodule.input_size == 6  # 3 markers * 2 coords
+
+    def test_num_classes_property(self, create_test_label_csv):
+        """Test num_classes property returns correct class count."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            label_file = Path(tmpdir) / 'labels.csv'
+            create_test_label_csv(label_file, n_frames=30, n_classes=4)
+
+            data_config = {
+                'ids': ['test'],
+                'signals': [['labels']],
+                'transforms': [[None]],
+                'paths': [[str(label_file)]],
+            }
+            datamodule = DataModule(data_config=data_config, sequence_length=10)
+
+            assert datamodule.num_classes == 4

@@ -30,12 +30,12 @@ class Transform(ABC):
         Returns:
             transformed data array with same shape
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     @abstractmethod
     def __repr__(self) -> str:
         """Return string representation of transform."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
 
 class Compose:
