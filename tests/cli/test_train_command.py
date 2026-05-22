@@ -163,7 +163,7 @@ class TestHandle:
         """Create a test config."""
         return {
             'data': {'data_path': '/test/data'},
-            'model': {'head': 'temporalmlp', 'num_hid_units': 64},
+            'model': {'head': 'temporalmlp', 'output_size': 4, 'num_hid_units': 64},
             'training': {'num_epochs': 10, 'device': 'cpu'},
             'optimizer': {'lr': 0.001},
         }
