@@ -58,3 +58,12 @@ class TestMain:
         with pytest.raises(SystemExit) as exc_info:
             main()
         assert exc_info.value.code == 1
+
+    def test_version_flag(self, monkeypatch, capsys):
+        """Test that --version prints the version string and exits with code 0."""
+        monkeypatch.setattr('sys.argv', ['lightning-action', '--version'])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 0
+        captured = capsys.readouterr()
+        assert 'lightning-action' in captured.out
