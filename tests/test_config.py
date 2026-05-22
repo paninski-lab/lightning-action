@@ -344,3 +344,28 @@ class TestLoadConfig:
         p = _write_yaml(tmp_path, raw)
         result = load_config(p)
         assert result['data']['expt_ids'] is None
+
+
+# ---------------------------------------------------------------------------
+# Smoke tests against the checked-in example configs
+# ---------------------------------------------------------------------------
+
+_CONFIGS_DIR = Path(__file__).parent.parent / 'configs'
+_TOP_LEVEL_CONFIGS = sorted(_CONFIGS_DIR.glob('*.yaml'))
+
+
+class TestExampleConfigs:
+    """Smoke-test every top-level YAML in configs/ against the pydantic schema.
+
+    Backbone sub-configs (configs/backbones/) are excluded because they are
+    not top-level pipeline configs and lack required sections.
+    """
+
+    @pytest.mark.parametrize('config_path', _TOP_LEVEL_CONFIGS, ids=lambda p: p.name)
+    def test_example_config_validates(self, config_path: Path):
+        result = load_config(config_path)
+        assert isinstance(result, dict)
+        assert 'data' in result
+        assert 'model' in result
+        assert 'optimizer' in result
+        assert 'training' in result
