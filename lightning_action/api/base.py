@@ -26,7 +26,8 @@ from typing import Any, Generic, TypeVar
 
 import lightning as pl
 import torch
-import yaml
+
+from lightning_action.config import load_config
 
 # Type variable for the model type
 ModelT = TypeVar('ModelT', bound=pl.LightningModule)
@@ -277,8 +278,7 @@ class BaseModelAPI(ABC, Generic[ModelT]):
 
         # Load configuration
         config_path = cls._find_config_file(model_dir)
-        with open(config_path) as f:
-            config = yaml.safe_load(f)
+        config = load_config(config_path)
 
         # Create model architecture
         model = cls._create_model_from_config(config)
@@ -303,11 +303,7 @@ class BaseModelAPI(ABC, Generic[ModelT]):
             FileNotFoundError: If config file path doesn't exist.
         """
         if not isinstance(config_path, dict):
-            config_path = Path(config_path)
-            if not config_path.exists():
-                raise FileNotFoundError(f'Config file not found: {config_path}')
-            with open(config_path) as f:
-                config = yaml.safe_load(f)
+            config = load_config(config_path)
         else:
             config = config_path
 

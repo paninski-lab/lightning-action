@@ -26,9 +26,9 @@ model:
   output_size: 4
 
   # Head architecture [temporalmlp | lstm | gru | dtcn]
-  head: temporalmlp
+  head: dtcn
   
-  # Backbone parameters
+  # Head parameters
   num_hid_units: 64
   num_layers: 2
   num_lags: 2
