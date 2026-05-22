@@ -81,7 +81,7 @@ class TestRNN:
                 input_size=6,
                 num_hid_units=32,
                 num_layers=1,
-                rnn_type='invalid',
+                rnn_type='invalid',  # type: ignore[arg-type]
             )
 
     def test_forward_pass_shape(self, rnn_configs):

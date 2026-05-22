@@ -58,7 +58,7 @@ class TestTemporalMLP:
                 input_size=input_size,
                 num_hid_units=n_hid_units,
                 num_layers=1,
-                activation=activation,
+                activation=activation,  # type: ignore[arg-type]
             )
 
             # should not raise error
@@ -72,7 +72,7 @@ class TestTemporalMLP:
                 input_size=4,
                 num_hid_units=16,
                 num_layers=1,
-                activation='invalid_activation',
+                activation='invalid_activation',  # type: ignore[arg-type]
             )
 
     def test_layer_count(self):

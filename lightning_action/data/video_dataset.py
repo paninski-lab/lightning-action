@@ -113,7 +113,7 @@ class VideoDataset:
 
         # Calculate TCN padding based on head architecture
         self.tcn_padding = compute_sequence_pad(
-            model_type=head,
+            model_type=head,  # type: ignore[arg-type]
             num_lags=num_lags,
             num_layers=num_layers,
             default=0,

@@ -89,7 +89,7 @@ class TestDilationBlock:
         activations = ['relu', 'lrelu', 'sigmoid', 'tanh', 'linear']
 
         for activation in activations:
-            block = DilationBlock(activation=activation, **base_config)
+            block = DilationBlock(activation=activation, **base_config)  # type: ignore[arg-type]
             x = torch.randn(2, 6, 100)
             output = block(x)
 

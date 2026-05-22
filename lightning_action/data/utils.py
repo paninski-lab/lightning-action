@@ -110,17 +110,17 @@ def compute_sequence_pad(
         # Unknown model type with default fallback
         pad = compute_sequence_pad('transformer', default=0, num_layers=4)
     """
-    model_type = model_type.lower()
+    model_type_lower = model_type.lower()
 
-    if model_type in ['temporal-mlp', 'temporalmlp']:
+    if model_type_lower in ['temporal-mlp', 'temporalmlp']:
         return model_params['num_lags']
 
-    elif model_type == 'tcn':
+    elif model_type_lower == 'tcn':
         num_layers = model_params['num_layers']
         num_lags = model_params['num_lags']
         return (2 ** num_layers) * num_lags
 
-    elif model_type in ['dtcn', 'dilatedtcn']:
+    elif model_type_lower in ['dtcn', 'dilatedtcn']:
         # dilated TCN with more complex calculation
         # dilation of each dilation block is 2 ** layer_num
         # 2 conv layers per dilation block
@@ -128,7 +128,7 @@ def compute_sequence_pad(
             [2 * (2 ** n) * model_params['num_lags'] for n in range(model_params['num_layers'])]
         )
 
-    elif model_type in ['lstm', 'gru', 'rnn']:
+    elif model_type_lower in ['lstm', 'gru', 'rnn']:
         # fixed warmup period for recurrent models
         return 4
 

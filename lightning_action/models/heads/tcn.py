@@ -49,7 +49,7 @@ class DilatedTCN(nn.Module):
         self.num_hid_units = num_hid_units
         self.num_layers = num_layers
         self.num_lags = num_lags
-        self.activation = activation
+        self.activation: ActivationType = activation
         self.dropout_rate = dropout_rate
         self.seed = seed
 
