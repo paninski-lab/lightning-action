@@ -5,9 +5,13 @@ PyTorch Lightning. Supports both LSTM and GRU architectures with bidirectional
 processing capability.
 """
 
+from typing import Literal, get_args
+
 import torch
 from jaxtyping import Float
 from torch import nn
+
+RnnType = Literal['lstm', 'gru']
 
 
 class RNN(nn.Module):
@@ -22,7 +26,7 @@ class RNN(nn.Module):
         input_size: int,
         num_hid_units: int,
         num_layers: int,
-        rnn_type: str = 'lstm',
+        rnn_type: RnnType = 'lstm',
         bidirectional: bool = False,
         dropout_rate: float = 0.0,
         seed: int = 42,
@@ -52,8 +56,11 @@ class RNN(nn.Module):
         self.seed = seed
 
         # validate rnn type
-        if self.rnn_type not in ['lstm', 'gru']:
-            raise ValueError(f'Invalid rnn_type "{rnn_type}"; must be "lstm" or "gru"')
+        if self.rnn_type not in get_args(RnnType):
+            raise ValueError(
+                f'Invalid rnn_type "{rnn_type}". '
+                f'Valid values: {", ".join(get_args(RnnType))}'
+            )
 
         # set random seed
         torch.manual_seed(seed)

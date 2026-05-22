@@ -727,7 +727,7 @@ class TestSegmenter:
 
         model = Segmenter(config)
 
-        with pytest.raises(ValueError, match='Unsupported optimizer type'):
+        with pytest.raises(ValueError, match='Unsupported optimizer type.*Valid values'):
             model.configure_optimizers()
 
     # =========================================================================
@@ -918,7 +918,7 @@ class TestSegmenter:
 
         model = Segmenter(config)
 
-        with pytest.raises(ValueError, match='Unsupported scheduler type'):
+        with pytest.raises(ValueError, match='Unsupported scheduler type.*Valid values'):
             model.configure_optimizers()
 
     def test_scheduler_T_max_from_optimizer_config(self, head_configs):
@@ -1094,7 +1094,7 @@ class TestSegmenter:
             }
         }
 
-        with pytest.raises(ValueError, match='Unsupported head type'):
+        with pytest.raises(ValueError, match='Unsupported head type.*Valid values'):
             Segmenter(config)
 
     def test_train_accuracy_metric(self, head_configs):

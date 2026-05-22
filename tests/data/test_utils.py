@@ -103,7 +103,7 @@ class TestComputeSequencePad:
 
     def test_unknown_model_type(self):
         """Test that unknown model type raises ValueError."""
-        with pytest.raises(ValueError, match='Unknown model type'):
+        with pytest.raises(ValueError, match='Unknown model type.*Valid values'):
             compute_sequence_pad('unknown-model')
 
     def test_unknown_model_type_with_default(self):

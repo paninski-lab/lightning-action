@@ -76,7 +76,7 @@ class TestRNN:
 
     def test_invalid_rnn_type(self):
         """Test that invalid RNN type raises ValueError."""
-        with pytest.raises(ValueError, match='Invalid rnn_type "invalid"'):
+        with pytest.raises(ValueError, match='Invalid rnn_type "invalid".*Valid values'):
             RNN(
                 input_size=6,
                 num_hid_units=32,

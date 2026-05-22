@@ -4,9 +4,13 @@ This module implements a temporal convolutional network with dilated convolution
 residual connections for temporal modeling.
 """
 
+from typing import Literal, get_args
+
 import torch
 from jaxtyping import Float
 from torch import nn
+
+ActivationType = Literal['relu', 'lrelu', 'sigmoid', 'tanh', 'linear']
 
 
 class DilatedTCN(nn.Module):
@@ -21,7 +25,7 @@ class DilatedTCN(nn.Module):
         num_hid_units: int,
         num_layers: int,
         num_lags: int = 1,
-        activation: str = 'lrelu',
+        activation: ActivationType = 'lrelu',
         dropout_rate: float = 0.2,
         seed: int = 42,
     ) -> None:
@@ -142,9 +146,9 @@ class DilationBlock(nn.Module):
         kernel_size: int,
         stride: int = 1,
         dilation: int = 2,
-        activation: str = 'lrelu',
+        activation: ActivationType = 'lrelu',
         dropout: float = 0.2,
-        final_activation: str | None = None,
+        final_activation: ActivationType | None = None,
     ) -> None:
         """Initialize DilationBlock.
 
@@ -245,7 +249,10 @@ class DilationBlock(nn.Module):
         elif activation == 'linear':
             return nn.Identity()
         else:
-            raise ValueError(f'Unsupported activation: {activation}')
+            raise ValueError(
+                f'Unsupported activation: {activation}. '
+                f'Valid values: {", ".join(get_args(ActivationType))}'
+            )
 
     def _init_weights(self) -> None:
         """Initialize weights with normal distribution."""

@@ -788,7 +788,10 @@ class TestBuildDataConfigFromPath:
 
     def test_build_config_invalid_transform(self, temp_data_dir):
         """Test error handling for invalid transform class name."""
-        with pytest.raises(ValueError, match="Unknown transform class: InvalidTransform"):
+        with pytest.raises(
+                ValueError,
+                match="Unknown transform class: InvalidTransform.*Available transforms",
+        ):
             build_data_config_from_path(
                 temp_data_dir,
                 transforms=['InvalidTransform']

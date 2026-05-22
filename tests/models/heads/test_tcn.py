@@ -279,7 +279,7 @@ class TestDilatedTCN:
 
         with pytest.raises(
                 ValueError,
-                match='Unsupported activation'
+                match='Unsupported activation.*Valid values'
         ):
             DilatedTCN(**config)
 

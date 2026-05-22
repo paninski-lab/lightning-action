@@ -67,7 +67,7 @@ class TestTemporalMLP:
 
     def test_invalid_activation(self):
         """Test that invalid activation raises error."""
-        with pytest.raises(ValueError, match='Unsupported activation'):
+        with pytest.raises(ValueError, match='Unsupported activation.*Valid values'):
             TemporalMLP(
                 input_size=4,
                 num_hid_units=16,

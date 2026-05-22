@@ -6,13 +6,20 @@ adapted from the daart package with modern type hints and Lightning compatibilit
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, get_args
 
 import numpy as np
 import pandas as pd
 from jaxtyping import Float, Int
 
 logger = logging.getLogger(__name__)
+
+ModelType = Literal[
+    'temporal-mlp', 'temporalmlp',
+    'tcn',
+    'dtcn', 'dilatedtcn',
+    'lstm', 'gru', 'rnn',
+]
 
 
 def compute_sequences(
@@ -72,7 +79,7 @@ def compute_sequences(
 
 
 def compute_sequence_pad(
-    model_type: str,
+    model_type: ModelType,
     default: int | None = None,
     **model_params: Any,
 ) -> int:
@@ -128,7 +135,10 @@ def compute_sequence_pad(
     else:
         if default is not None:
             return default
-        raise ValueError(f'Unknown model type: {model_type}')
+        raise ValueError(
+            f'Unknown model type: {model_type}. '
+            f'Valid values: {", ".join(get_args(ModelType))}'
+        )
 
 
 def load_marker_csv(file_path: str | Path) -> tuple[
