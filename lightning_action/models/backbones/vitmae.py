@@ -245,7 +245,8 @@ class ViTMAEBackbone(nn.Module):
         Returns:
             Iterator over parameters of the last encoder layer and layernorm.
         """
-        for param in self.vit_mae.encoder.layer[-1].parameters():
+        encoder_layers: nn.ModuleList = self.vit_mae.encoder.layer  # type: ignore[assignment]
+        for param in encoder_layers[-1].parameters():
             yield param
         for param in self.vit_mae.layernorm.parameters():
             yield param
