@@ -36,7 +36,7 @@ dependencies = [
     "tensorboard",
     "torch",
     "torchvision",
-    "transformers",
+    "transformers (<5.9.0)",
     "pandas",
     "pyyaml",
 ]
