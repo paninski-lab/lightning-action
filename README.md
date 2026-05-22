@@ -1,8 +1,8 @@
 # Lightning Action
 
 ![GitHub](https://img.shields.io/github/license/paninski-lab/lightning-action)
-![PyPI](https://img.shields.io/pypi/v/lightning-action)
 [![codecov](https://codecov.io/gh/paninski-lab/lightning-action/branch/main/graph/badge.svg)](https://codecov.io/gh/paninski-lab/lightning-action)
+![PyPI](https://img.shields.io/pypi/v/lightning-action)
 
 A modern action segmentation framework built with PyTorch Lightning for behavioral analysis.
 
@@ -163,16 +163,12 @@ Lightning Action automatically logs training metrics to TensorBoard. To visualiz
 
 ---
 
-## Contributing
+### Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on setting up a development environment,
 code style, and submitting pull requests.
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Citation
+### Citation
 
 If you use this framework in your research, please cite:
 
@@ -187,9 +183,14 @@ If you use this framework in your research, please cite:
 }
 ```
 
-## Acknowledgments
+### Funding
 
-This framework is built upon the work of:
-- [PyTorch Lightning](https://lightning.ai/) for the training framework
-- [PyTorch](https://pytorch.org/) for the deep learning backend
-- Previous action segmentation work from the [Paninski Lab](https://github.com/themattinthehatt/daart)
+We are grateful for support from the following:
+* Gatsby Charitable Foundation GAT3708
+* [NIH R50NS145433](https://reporter.nih.gov/search/Hmj4KMmLv0evcYPlPEDa-Q/project-details/11240675)
+* [NIH U19NS123716](https://reporter.nih.gov/search/Hmj4KMmLv0evcYPlPEDa-Q/project-details/11141703)
+* [NSF 1707398](https://ui.adsabs.harvard.edu/abs/2017nsf....1707398A/abstract)
+* [The NSF AI Institute for Artificial and Natural Intelligence](https://ui.adsabs.harvard.edu/abs/2023nsf....2229929Z/abstract)
+* Simons Foundation
+* Wellcome Trust 216324
+* Zuckerman Institute (Columbia University) Team Science
