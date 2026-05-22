@@ -241,6 +241,13 @@ class ResNetBeast(nn.Module):
     """ResNet backbone from beast package."""
 
     def __init__(self, configs: list, bottleneck: bool = False) -> None:
+        """Initialize the ResNetBeast backbone.
+
+        Args:
+            configs: list of four integers specifying the number of layers per block.
+            bottleneck: if True, use bottleneck (1x1/3x3/1x1) layers instead of residual
+                (3x3/3x3) layers.
+        """
         super().__init__()
 
         if len(configs) != 4:
@@ -286,6 +293,14 @@ class ResNetBeast(nn.Module):
             )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through all five convolutional blocks.
+
+        Args:
+            x: input tensor of shape (B, C, H, W).
+
+        Returns:
+            spatial feature tensor of shape (B, hidden_dim, H', W').
+        """
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
@@ -304,6 +319,15 @@ class ResidualBlock(nn.Module):
         layers: int,
         downsample_method: Literal['conv', 'pool'] = 'conv',
     ) -> None:
+        """Initialize the residual block.
+
+        Args:
+            in_channels: number of input channels.
+            hidden_channels: number of channels within and output of the block.
+            layers: number of residual layers to stack.
+            downsample_method: spatial downsampling strategy — 'conv' uses strided
+                convolution on the first layer; 'pool' uses max-pooling before the layers.
+        """
         super().__init__()
 
         if downsample_method == 'conv':
@@ -342,6 +366,14 @@ class ResidualBlock(nn.Module):
                 self.add_module(f'{i + 1} EncoderLayer', layer)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through all residual layers.
+
+        Args:
+            x: input tensor of shape (B, C, H, W).
+
+        Returns:
+            output tensor of shape (B, hidden_channels, H', W').
+        """
         for _name, layer in self.named_children():
             x = layer(x)
         return x
@@ -358,6 +390,16 @@ class BottleneckBlock(nn.Module):
         layers: int,
         downsample_method: Literal['conv', 'pool'] = 'conv',
     ) -> None:
+        """Initialize the bottleneck block.
+
+        Args:
+            in_channels: number of input channels.
+            hidden_channels: number of channels in the compressed middle convolution.
+            up_channels: number of output channels after the 1x1 expansion convolution.
+            layers: number of bottleneck layers to stack.
+            downsample_method: spatial downsampling strategy — 'conv' uses strided
+                convolution on the first layer; 'pool' uses max-pooling before the layers.
+        """
         super().__init__()
 
         if downsample_method == 'conv':
@@ -392,6 +434,14 @@ class BottleneckBlock(nn.Module):
                 self.add_module(f'{i + 1} EncoderLayer', layer)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through all bottleneck layers.
+
+        Args:
+            x: input tensor of shape (B, C, H, W).
+
+        Returns:
+            output tensor of shape (B, up_channels, H', W').
+        """
         for _name, layer in self.named_children():
             x = layer(x)
         return x
@@ -406,6 +456,13 @@ class ResidualLayer(nn.Module):
         hidden_channels: int,
         downsample: bool,
     ) -> None:
+        """Initialize the residual layer.
+
+        Args:
+            in_channels: number of input channels.
+            hidden_channels: number of output channels.
+            downsample: if True, apply stride-2 convolution and a matching skip connection.
+        """
         super().__init__()
 
         if downsample:
@@ -449,6 +506,14 @@ class ResidualLayer(nn.Module):
         self.relu = nn.Sequential(nn.ReLU(inplace=True))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the residual layer.
+
+        Args:
+            x: input tensor of shape (B, in_channels, H, W).
+
+        Returns:
+            output tensor of shape (B, hidden_channels, H', W').
+        """
         identity = x
         x = self.weight_layer1(x)
         x = self.weight_layer2(x)
@@ -469,6 +534,14 @@ class BottleneckLayer(nn.Module):
         up_channels: int,
         downsample: bool,
     ) -> None:
+        """Initialize the bottleneck layer.
+
+        Args:
+            in_channels: number of input channels.
+            hidden_channels: number of channels in the compressed 3x3 convolution.
+            up_channels: number of output channels after the 1x1 expansion convolution.
+            downsample: if True, apply stride-2 convolution and a matching skip connection.
+        """
         super().__init__()
 
         if downsample:
@@ -531,6 +604,14 @@ class BottleneckLayer(nn.Module):
         self.relu = nn.Sequential(nn.ReLU(inplace=True))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the bottleneck layer.
+
+        Args:
+            x: input tensor of shape (B, in_channels, H, W).
+
+        Returns:
+            output tensor of shape (B, up_channels, H', W').
+        """
         identity = x
         x = self.weight_layer1(x)
         x = self.weight_layer2(x)

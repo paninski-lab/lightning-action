@@ -1,8 +1,8 @@
 # Lightning Action
 
 ![GitHub](https://img.shields.io/github/license/paninski-lab/lightning-action)
-![PyPI](https://img.shields.io/pypi/v/lightning-action)
 [![codecov](https://codecov.io/gh/paninski-lab/lightning-action/branch/main/graph/badge.svg)](https://codecov.io/gh/paninski-lab/lightning-action)
+![PyPI](https://img.shields.io/pypi/v/lightning-action)
 
 A modern action segmentation framework built with PyTorch Lightning for behavioral analysis.
 
