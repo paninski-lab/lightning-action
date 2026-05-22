@@ -4,9 +4,13 @@ This module implements the TemporalMLP architecture adapted from daart,
 which uses 1D convolution for temporal context followed by dense layers.
 """
 
+from typing import Literal, get_args
+
 import torch
 import torch.nn as nn
 from jaxtyping import Float
+
+ActivationType = Literal['relu', 'lrelu', 'sigmoid', 'tanh', 'linear']
 
 
 class TemporalMLP(nn.Module):
@@ -30,7 +34,7 @@ class TemporalMLP(nn.Module):
         num_hid_units: int,
         num_layers: int,
         num_lags: int = 5,
-        activation: str = 'lrelu',
+        activation: ActivationType = 'lrelu',
         dropout_rate: float = 0.0,
         seed: int = 42,
     ) -> None:
@@ -117,7 +121,10 @@ class TemporalMLP(nn.Module):
             # `if self.activation != 'linear'`
             return nn.Identity()
         else:
-            raise ValueError(f'Unsupported activation: {self.activation}')
+            raise ValueError(
+                f'Unsupported activation: {self.activation}. '
+                f'Valid values: {", ".join(get_args(ActivationType))}'
+            )
 
     def forward(
         self,

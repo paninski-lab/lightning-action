@@ -467,7 +467,10 @@ class VideoSegmenter(VideoBaseModel):
                 seed=self.model_config.get('seed', 42),
             )
         else:
-            raise ValueError(f'Unsupported head type: {head_type}')
+            raise ValueError(
+                f'Unsupported head type: {head_type}. '
+                f'Valid values: temporalmlp, rnn, dtcn'
+            )
 
     def _get_head_output_size(self) -> int:
         """Get the output feature dimension of the head."""

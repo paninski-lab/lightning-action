@@ -28,8 +28,25 @@ from typing import Any, Literal
 import torch
 import torch.nn as nn
 
+# Hidden sizes for each architecture
+BEAST_RESNET_HIDDEN_SIZES = {
+    'resnet18': 512,
+    'resnet34': 512,
+    'resnet50': 2048,
+    'resnet101': 2048,
+    'resnet152': 2048,
+}
 
-def get_configs(arch: str = 'resnet50') -> tuple:
+_RESNET_CONFIGS: dict[str, tuple[list[int], bool]] = {
+    'resnet18': ([2, 2, 2, 2], False),
+    'resnet34': ([3, 4, 6, 3], False),
+    'resnet50': ([3, 4, 6, 3], True),
+    'resnet101': ([3, 4, 23, 3], True),
+    'resnet152': ([3, 8, 36, 3], True),
+}
+
+
+def get_configs(arch: str = 'resnet50') -> tuple[list[int], bool]:
     """Get number and type of layers for resnet models.
 
     Args:
@@ -41,28 +58,12 @@ def get_configs(arch: str = 'resnet50') -> tuple:
     Raises:
         ValueError: If architecture is not supported.
     """
-    if arch == 'resnet18':
-        return [2, 2, 2, 2], False
-    elif arch == 'resnet34':
-        return [3, 4, 6, 3], False
-    elif arch == 'resnet50':
-        return [3, 4, 6, 3], True
-    elif arch == 'resnet101':
-        return [3, 4, 23, 3], True
-    elif arch == 'resnet152':
-        return [3, 8, 36, 3], True
-    else:
-        raise ValueError(f'{arch} is not a valid ResNet architecture')
-
-
-# Hidden sizes for each architecture
-BEAST_RESNET_HIDDEN_SIZES = {
-    'resnet18': 512,
-    'resnet34': 512,
-    'resnet50': 2048,
-    'resnet101': 2048,
-    'resnet152': 2048,
-}
+    if arch not in _RESNET_CONFIGS:
+        raise ValueError(
+            f'{arch} is an invalid entry in model.backbone. '
+            f'Valid values: {", ".join(_RESNET_CONFIGS.keys())}'
+        )
+    return _RESNET_CONFIGS[arch]
 
 
 class ResNetBeastBackbone(nn.Module):

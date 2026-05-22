@@ -33,7 +33,7 @@ class TestGetConfigs:
 
     def test_invalid_arch(self):
         """Test that invalid architecture raises ValueError."""
-        with pytest.raises(ValueError, match="not a valid ResNet architecture"):
+        with pytest.raises(ValueError, match="invalid entry in model.backbone.*Valid values"):
             get_configs('resnet999')
 
 

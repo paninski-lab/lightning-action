@@ -76,12 +76,12 @@ class TestRNN:
 
     def test_invalid_rnn_type(self):
         """Test that invalid RNN type raises ValueError."""
-        with pytest.raises(ValueError, match='Invalid rnn_type "invalid"'):
+        with pytest.raises(ValueError, match='Invalid rnn_type "invalid".*Valid values'):
             RNN(
                 input_size=6,
                 num_hid_units=32,
                 num_layers=1,
-                rnn_type='invalid',
+                rnn_type='invalid',  # type: ignore[arg-type]
             )
 
     def test_forward_pass_shape(self, rnn_configs):

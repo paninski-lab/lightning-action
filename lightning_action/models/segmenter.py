@@ -344,7 +344,10 @@ class BaseModel(pl.LightningModule):
                 params, lr=lr, weight_decay=weight_decay, momentum=momentum
             )
         else:
-            raise ValueError(f'Unsupported optimizer type: {optimizer_type}')
+            raise ValueError(
+                f'Unsupported optimizer type: {optimizer_type}. '
+                f'Valid values: adam, adamw, sgd'
+            )
 
         # Parse scheduler config (support both flat and nested structures)
         scheduler_config = optimizer_config.get('scheduler', None)
@@ -408,7 +411,10 @@ class BaseModel(pl.LightningModule):
             }
 
         else:
-            raise ValueError(f'Unsupported scheduler type: {scheduler_type}')
+            raise ValueError(
+                f'Unsupported scheduler type: {scheduler_type}. '
+                f'Valid values: step, cosine, cosine_warm_restarts, reduce_on_plateau'
+            )
 
         return {
             'optimizer': optimizer,
@@ -495,7 +501,10 @@ class Segmenter(BaseModel):
                 seed=self.model_config.get('seed', 42),
             )
         else:
-            raise ValueError(f'Unsupported head type: {head_type}')
+            raise ValueError(
+                f'Unsupported head type: {head_type}. '
+                f'Valid values: temporalmlp, rnn, dtcn'
+            )
 
     def _get_head_output_size(self) -> int:
         """Get the output size of the head network.

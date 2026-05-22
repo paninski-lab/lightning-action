@@ -4,6 +4,7 @@ import logging
 import sys
 from argparse import ArgumentParser
 
+from lightning_action import __version__
 from lightning_action.cli import formatting
 from lightning_action.cli.commands import COMMANDS
 
@@ -14,6 +15,12 @@ def build_parser() -> ArgumentParser:
     parser = formatting.ArgumentParser(
         prog='lightning-action',
         description='Lightning-based action segmentation for behavioral analysis.',
+    )
+
+    parser.add_argument(
+        '--version',
+        action='version',
+        version=f'%(prog)s {__version__}',
     )
 
     subparsers = parser.add_subparsers(

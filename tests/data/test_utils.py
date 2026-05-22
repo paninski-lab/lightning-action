@@ -98,20 +98,20 @@ class TestComputeSequencePad:
     def test_case_insensitive(self):
         """Test that model type is case insensitive."""
         result_lower = compute_sequence_pad('temporal-mlp', num_lags=3)
-        result_upper = compute_sequence_pad('TEMPORAL-MLP', num_lags=3)
+        result_upper = compute_sequence_pad('TEMPORAL-MLP', num_lags=3)  # type: ignore[arg-type]
         assert result_lower == result_upper == 3
 
     def test_unknown_model_type(self):
         """Test that unknown model type raises ValueError."""
-        with pytest.raises(ValueError, match='Unknown model type'):
-            compute_sequence_pad('unknown-model')
+        with pytest.raises(ValueError, match='Unknown model type.*Valid values'):
+            compute_sequence_pad('unknown-model')  # type: ignore[arg-type]
 
     def test_unknown_model_type_with_default(self):
         """Test that unknown model type returns default when provided."""
-        result = compute_sequence_pad('unknown-model', default=0)
+        result = compute_sequence_pad('unknown-model', default=0)  # type: ignore[arg-type]
         assert result == 0
 
-        result = compute_sequence_pad('transformer', default=10)
+        result = compute_sequence_pad('transformer', default=10)  # type: ignore[arg-type]
         assert result == 10
 
 

@@ -15,6 +15,7 @@ Example usage:
     trained_model = train(config, model, output_dir='runs/experiment1')
 """
 
+import inspect
 import logging
 from pathlib import Path
 from typing import Any
@@ -371,7 +372,17 @@ def build_data_config_from_path(
         transform_classes = []
         for t_name in transforms:
             if not hasattr(transform_module, t_name):
-                raise ValueError(f"Unknown transform class: {t_name}")
+                available = sorted(
+                    name for name, cls in inspect.getmembers(
+                        transform_module, inspect.isclass,
+                    )
+                    if issubclass(cls, transform_module.Transform)
+                    and cls is not transform_module.Transform
+                )
+                raise ValueError(
+                    f"Unknown transform class: {t_name}. "
+                    f"Available transforms: {', '.join(available)}"
+                )
             transform_classes.append(getattr(transform_module, t_name)())
 
     # Build config
