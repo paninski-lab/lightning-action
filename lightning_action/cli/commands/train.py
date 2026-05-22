@@ -6,10 +6,9 @@ import logging
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from lightning_action.api.model import Model
 from lightning_action.cli.types import config_file, output_dir
+from lightning_action.config import load_config
 
 logger = logging.getLogger('LIGHTNING_ACTION.CLI.TRAIN')
 
@@ -79,8 +78,7 @@ def register_parser(subparsers: argparse._SubParsersAction) -> None:
 def handle(args: argparse.Namespace) -> None:
     """Handle the train command execution."""
     # Load config
-    with open(args.config) as f:
-        config = yaml.safe_load(f)
+    config = load_config(args.config)
 
     # Determine output directory
     if not args.output_dir:

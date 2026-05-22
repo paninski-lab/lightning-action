@@ -774,10 +774,16 @@ class TestModelIntegration:
             model = Model.from_config(temp_config_path)
 
             assert model.model is not None
-            assert 'sequence_pad' in model.config['model']  # Gets added before model creation
-            del model.config['model']['sequence_pad']
-            assert model.config == fast_config
             assert model.model_dir is None
+            # sequence_pad is computed and injected during model creation
+            assert 'sequence_pad' in model.config['model']
+            # pydantic coerces types (e.g. '1e-4' → 0.0001), so check key fields
+            # rather than exact equality with the raw yaml.safe_load dict
+            assert model.config['model']['head'] == fast_config['model']['head']
+            assert model.config['model']['output_size'] == fast_config['model']['output_size']
+            assert model.config['training']['num_epochs'] == fast_config['training']['num_epochs']
+            assert (pytest.approx(model.config['optimizer']['lr'])
+                    == float(fast_config['optimizer']['lr']))
         finally:
             Path(temp_config_path).unlink()
 
